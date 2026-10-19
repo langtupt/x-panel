@@ -38,4 +38,4 @@ tar -C "$TMP" -xzf "$TMP/$FILE"
 cd "$TMP/xpanel-linux-$ARCH"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}" ./install.sh
 # Turn on disk quotas when /home supports it (needs a reboot-free remount).
-./enable-quota.sh || echo "!! Chưa bật được quota tự động; xem hướng dẫn trong README."
+./enable-quota.sh || echo "!! Chưa bật được quota tự động (/home cần ext4 hoặc xfs); xem README."
