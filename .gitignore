@@ -1,0 +1,7 @@
+/bin/
+/dist/
+*.exe
+.env
+vps_test.txt
+vps_panel.txt
+/tests/results/

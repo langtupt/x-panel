@@ -1,0 +1,4 @@
+FROM debian:12
+RUN apt-get update -q && apt-get install -y -q systemd systemd-sysv iproute2 && apt-get clean
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]

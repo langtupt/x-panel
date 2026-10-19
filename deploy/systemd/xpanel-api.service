@@ -1,0 +1,27 @@
+[Unit]
+Description=X-Panel API
+After=network.target postgresql.service xpanel-agent.service
+Wants=xpanel-agent.service
+
+[Service]
+Type=simple
+User=xpanel
+Group=xpanel
+EnvironmentFile=/etc/xpanel/xpanel.env
+ExecStart=/opt/xpanel/bin/xpanel-api serve
+Restart=on-failure
+RestartSec=3
+
+# The API never touches the system directly; everything goes through the agent.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
