@@ -111,7 +111,9 @@ func Install(ctx context.Context, logf func(string, ...any)) error {
 	if err := writeMaps(ctx, agentproto.MailSyncParams{}); err != nil {
 		return err
 	}
-	for _, svc := range []string{"opendkim", "dovecot", "postfix"} {
+	// Postfix creates /var/spool/postfix/private on its first start; Dovecot
+	// puts its LMTP and auth sockets there, so it must start afterwards.
+	for _, svc := range []string{"opendkim", "postfix", "dovecot"} {
 		if err := step(run.Opts{}, "systemctl", "enable", svc); err != nil {
 			return err
 		}
@@ -267,6 +269,8 @@ protocols = imap pop3 lmtp
 mail_driver = maildir
 mail_home = ` + VmailRoot + `/%{user | domain}/%{user | username}
 mail_path = ~/Maildir
+# Debian 13 sets an mbox INBOX in /var/mail; INBOX lives in the Maildir.
+mail_inbox_path =
 mail_uid = vmail
 mail_gid = vmail
 mail_privileged_group = vmail
@@ -283,6 +287,11 @@ protocol imap {
   mail_plugins {
     imap_quota = yes
   }
+}
+# Debian's 20-lmtp.conf strips the domain for system users; mailboxes here
+# are full addresses.
+protocol lmtp {
+  auth_username_format = %{user | lower}
 }
 quota "User quota" {
 }
@@ -406,14 +415,27 @@ func openPorts(ctx context.Context, logf func(string, ...any), ports ...string) 
 	logf("Đã mở cổng %s trên tường lửa (ufw)", strings.Join(ports, ", "))
 }
 
-// writeAtomic replaces a file only when its content changed.
-func writeAtomic(path string, data []byte, mode os.FileMode) (bool, error) {
+// writeAtomic replaces a file only when its content changed. With a group,
+// the new file gets it before the swap: a daemon re-reading the file in
+// between must never see an unreadable file (Dovecot then keeps stale users).
+func writeAtomic(path string, data []byte, mode os.FileMode, group ...string) (bool, error) {
 	if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, data) {
 		return false, nil
 	}
 	tmp := path + ".new"
+	_ = os.Remove(tmp)
 	if err := os.WriteFile(tmp, data, mode); err != nil {
 		return false, err
+	}
+	if len(group) > 0 {
+		g, err := user.LookupGroup(group[0])
+		if err != nil {
+			return false, err
+		}
+		gid, _ := strconv.Atoi(g.Gid)
+		if err := os.Chown(tmp, 0, gid); err != nil {
+			return false, err
+		}
 	}
 	return true, os.Rename(tmp, path)
 }
@@ -562,14 +584,24 @@ func Sync(ctx context.Context, p agentproto.MailSyncParams) (agentproto.MailSync
 		users.WriteString(strings.Join(extra, " "))
 		users.WriteString("\n")
 	}
-	if _, err := writeAtomic(dovecotUsrs, []byte(users.String()), 0o640); err != nil {
+	changed, err := writeAtomic(dovecotUsrs, []byte(users.String()), 0o640, "dovecot")
+	if err != nil {
 		return res, err
 	}
-	if err := run.Cmd(ctx, "chown", "root:dovecot", dovecotUsrs); err != nil {
-		return res, err
+	if changed {
+		// Dovecot notices a new user list by mtime (seconds) and size, so two
+		// same-size changes within a second could be missed: reload so new
+		// passwords and suspensions apply at once (open sessions stay).
+		if err := run.Cmd(ctx, "doveadm", "reload"); err != nil {
+			return res, err
+		}
+		// Suspension also ends sessions that are already open.
+		for _, b := range p.Mailboxes {
+			if b.Suspended {
+				_ = run.Cmd(ctx, "doveadm", "kick", b.Address)
+			}
+		}
 	}
-	// Changed passwords/suspensions must not linger in Dovecot's auth cache.
-	_ = run.Cmd(ctx, "doveadm", "auth", "cache", "flush")
 
 	if err := syncDKIM(ctx, p, &res); err != nil {
 		return res, err
@@ -609,11 +641,11 @@ func syncDKIM(ctx context.Context, p agentproto.MailSyncParams, res *agentproto.
 		fmt.Fprintf(&keyTable, "%s._domainkey.%s %s:%s:%s\n", selector, d.Domain, d.Domain, selector, private)
 		fmt.Fprintf(&signTable, "*@%s %s._domainkey.%s\n", d.Domain, selector, d.Domain)
 	}
-	c1, err := writeAtomic(filepath.Join(dkimDir, "KeyTable"), []byte(keyTable.String()), 0o640)
+	c1, err := writeAtomic(filepath.Join(dkimDir, "KeyTable"), []byte(keyTable.String()), 0o640, "opendkim")
 	if err != nil {
 		return err
 	}
-	c2, err := writeAtomic(filepath.Join(dkimDir, "SigningTable"), []byte(signTable.String()), 0o640)
+	c2, err := writeAtomic(filepath.Join(dkimDir, "SigningTable"), []byte(signTable.String()), 0o640, "opendkim")
 	if err != nil {
 		return err
 	}
