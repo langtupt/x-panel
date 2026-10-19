@@ -178,7 +178,7 @@ export default function LoginPage() {
                 {error}
               </p>
             )}
-            <Button className="h-10 w-full" disabled={loading}>
+            <Button type="submit" className="h-10 w-full" disabled={loading}>
               {loading
                 ? "Đang đăng nhập…"
                 : needCode

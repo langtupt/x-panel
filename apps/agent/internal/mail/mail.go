@@ -174,7 +174,7 @@ func configurePostfix(ctx context.Context, host string) error {
 		"smtpd_relay_restrictions = permit_sasl_authenticated, defer_unauth_destination",
 		"smtpd_recipient_restrictions = permit_sasl_authenticated, reject_unauth_destination",
 		"smtpd_restriction_classes = xpanel_local",
-		"xpanel_local = reject_sender_login_mismatch",
+		"xpanel_local = check_sender_access hash:" + mapDir + "/local_senders",
 		"smtpd_sender_restrictions = check_client_access cidr:" + mapDir + "/local.cidr",
 		// The sendmail command cannot authenticate a sender: root only.
 		"authorized_submit_users = root",
@@ -419,9 +419,11 @@ func writeAtomic(path string, data []byte, mode os.FileMode) (bool, error) {
 }
 
 func writeMaps(ctx context.Context, p agentproto.MailSyncParams) error {
-	var domains, boxes, aliases, senders strings.Builder
+	var domains, boxes, aliases, senders, localSenders strings.Builder
 	for _, d := range p.Domains {
 		fmt.Fprintf(&domains, "%s OK\n", d.Domain)
+		// Local (unauthenticated) clients must not use hosted senders.
+		fmt.Fprintf(&localSenders, "%s REJECT Authenticate on port 587 to send as this domain\n", d.Domain)
 	}
 	owner := map[string]string{} // address -> mailbox allowed to send as it
 	for _, b := range p.Mailboxes {
@@ -454,7 +456,7 @@ func writeMaps(ctx context.Context, p agentproto.MailSyncParams) error {
 	}
 	changed := false
 	for name, content := range map[string]string{"domains": domains.String(), "mailboxes": boxes.String(),
-		"aliases": aliases.String(), "senders": senders.String()} {
+		"aliases": aliases.String(), "senders": senders.String(), "local_senders": localSenders.String()} {
 		path := filepath.Join(mapDir, name)
 		c, err := writeAtomic(path, []byte(content), 0o644)
 		if err != nil {
@@ -544,7 +546,12 @@ func Sync(ctx context.Context, p agentproto.MailSyncParams) (agentproto.MailSync
 	v24 := dovecot24(ctx)
 	var users strings.Builder
 	for _, b := range p.Mailboxes {
-		fmt.Fprintf(&users, "%s:{BLF-CRYPT}%s::::::", b.Address, b.PasswordHash)
+		hash := "{BLF-CRYPT}" + b.PasswordHash
+		if b.Suspended {
+			// No password can match; the entry stays so mail is still delivered.
+			hash = "{CRYPT}!"
+		}
+		fmt.Fprintf(&users, "%s:%s::::::", b.Address, hash)
 		var extra []string
 		if b.QuotaMB > 0 {
 			extra = append(extra, quotaField(v24, b.QuotaMB))

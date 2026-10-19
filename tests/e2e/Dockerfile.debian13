@@ -1,4 +1,4 @@
 FROM debian:13
-RUN apt-get update -q && apt-get install -y -q systemd systemd-sysv iproute2 && apt-get clean
+RUN apt-get update -q && apt-get install -y -q systemd systemd-sysv iproute2 e2fsprogs && apt-get clean
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]
