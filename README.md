@@ -32,8 +32,14 @@ Mở địa chỉ đó trên trình duyệt (cảnh báo chứng chỉ lần đ�
 | Tự đặt mật khẩu admin khi cài | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| ADMIN_PASSWORD='MatKhau12345' bash` |
 | **Cập nhật** lên bản mới (giữ nguyên dữ liệu) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| bash` |
 | Quên mật khẩu admin | như dòng đầu, với mật khẩu mới |
-| **Gỡ sạch** X-Panel (xóa cả dữ liệu khách) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| bash` |
+| Gỡ panel và dữ liệu khách (giữ các gói dịch vụ) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| bash` |
+| **Gỡ toàn bộ**, gồm các gói nginx/PHP/database/mail/FTP | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_PURGE_PACKAGES=1 bash` |
 | Gỡ panel nhưng giữ website/database/email | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_KEEP_DATA=1 bash` |
+
+Chế độ `XPANEL_PURGE_PACKAGES=1` có thể chạy tiếp sau khi đã gỡ panel; nó xóa toàn bộ
+gói và dữ liệu của các dịch vụ hosting kể trên, kể cả cài ngoài X-Panel. Không dùng
+cùng `XPANEL_KEEP_DATA=1`. Swap, quota, cấu hình mạng và file do bạn tự tải trong
+`/root` được giữ nguyên; gỡ phần mềm không tương đương cài lại hệ điều hành.
 
 📘 **Hướng dẫn chi tiết từ A đến Z** (chuẩn bị VPS, mở cổng, đăng nhập SSH từ Windows, các bước sau khi cài,
 email, sao lưu, xử lý lỗi): **[docs/CAI-DAT.md](docs/CAI-DAT.md)**

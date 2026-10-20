@@ -188,6 +188,11 @@ Tuỳ chọn (đặt trước `bash`):
 
 Ví dụ gỡ sạch hoàn toàn, kể cả phần mềm: `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh | XPANEL_PURGE_PACKAGES=1 bash`.
 
+Có thể chạy lệnh purge này sau khi đã gỡ panel bằng lệnh mặc định. Lệnh mặc định
+giữ các gói dịch vụ; purge xóa cả gói và dữ liệu dịch vụ, kể cả được cài ngoài panel.
+Không kết hợp purge với `XPANEL_KEEP_DATA=1`. Swap, quota, mạng và các file tự tải
+trong `/root` vẫn được giữ; muốn VPS trở về trạng thái hệ điều hành mới, hãy cài lại OS.
+
 Cách "sạch" nhất vẫn là **cài lại hệ điều hành** từ trang quản lý của nhà cung cấp VPS.
 
 ## 10. Xử lý lỗi thường gặp
