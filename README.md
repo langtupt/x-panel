@@ -101,6 +101,13 @@ khởi động API/agent/nginx/PostgreSQL/MariaDB và bật quota ext4 thành c�
 
 ## Dành cho nhà phát triển
 
+### Tự tối ưu CPU/RAM
+
+Bản cài từ v1.1.4 tự tính profile nginx, MariaDB, PostgreSQL và PHP theo CPU/RAM,
+giữ bộ nhớ cho hệ điều hành/ứng dụng, bật slow-query log và chia PHP worker theo
+ngân sách của tài khoản. Xem [cấu hình, cách tắt và kết quả kiểm thử tải](docs/TUNING.md).
+Profile không thay thế kiểm thử website thực tế hoặc việc chọn VPS đủ tài nguyên.
+
 ### Kiến trúc
 
 ```

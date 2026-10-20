@@ -101,6 +101,11 @@ func installPostgres(ctx context.Context, d distro.Distro, major string, logf fu
 	if err := step("systemctl", "enable", fmt.Sprintf("postgresql@%s-%s", major, PGCluster)); err != nil {
 		return err
 	}
+	if _, err := os.Stat("/var/lib/xpanel/performance-profile.txt"); err == nil {
+		if err := step("bash", "/opt/xpanel/bin/tuning.sh", "--postgres"); err != nil {
+			return err
+		}
+	}
 	// PHP sites need the pgsql extension to talk to it.
 	if err := installPHPPgsql(ctx, d, php.Installed(d), logf); err != nil {
 		return err

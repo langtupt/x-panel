@@ -26,7 +26,7 @@ cp -r out "$OUT/web"
 echo "==> Installer"
 cp -r "$ROOT/deploy" "$OUT/deploy"
 rm -f "$OUT/deploy/docker-compose.dev.yml"
-install -m 0755 "$ROOT/installer/install.sh" "$ROOT/installer/enable-quota.sh" "$ROOT/uninstall.sh" "$OUT/"
+install -m 0755 "$ROOT/installer/install.sh" "$ROOT/installer/enable-quota.sh" "$ROOT/installer/tuning.sh" "$ROOT/uninstall.sh" "$OUT/"
 
 tar -C "$ROOT/dist" -czf "$OUT.tar.gz" "xpanel-linux-$ARCH"
 (cd "$ROOT/dist" && sha256sum "xpanel-linux-$ARCH.tar.gz" >"xpanel-linux-$ARCH.tar.gz.sha256")

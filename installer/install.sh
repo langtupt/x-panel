@@ -54,33 +54,18 @@ if [ "$MEM_MB" -lt 4096 ] && [ "$(swapon --noheadings 2>/dev/null | wc -l)" = 0 
       || { warn "Không tạo được swap"; rm -f /swapfile; }
   fi
 fi
-install -m 0644 /dev/stdin /etc/sysctl.d/90-xpanel.conf <<'EOF'
-# Managed by X-Panel
-vm.swappiness = 10
-net.core.somaxconn = 1024
-net.ipv4.tcp_max_syn_backlog = 2048
-fs.inotify.max_user_watches = 524288
-EOF
-sysctl -q --system >/dev/null 2>&1 || true
-# Keep the journal from filling small disks.
+AUTO_TUNE="${XPANEL_AUTO_TUNE:-1}"
+if [ "$AUTO_TUNE" = 1 ]; then
+  . "$SRC/tuning.sh"
+  xpanel_profile "$MEM_MB" "$(nproc)"
+  xpanel_tune_kernel
+  xpanel_tune_mariadb
+  xpanel_tune_postgres
+  xpanel_tune_php
+fi
 install -d /etc/systemd/journald.conf.d
 printf '[Journal]\nSystemMaxUse=300M\nMaxRetentionSec=1month\n' >/etc/systemd/journald.conf.d/90-xpanel.conf
 systemctl restart systemd-journald 2>/dev/null || true
-
-# Customer databases: MariaDB on localhost only, no anonymous users / test DB.
-# Buffer pool sized to the machine: 1/8 of RAM, 64 MB – 2 GB.
-POOL_MB=$(( MEM_MB / 8 )); [ "$POOL_MB" -lt 64 ] && POOL_MB=64; [ "$POOL_MB" -gt 2048 ] && POOL_MB=2048
-install -m 0644 /dev/stdin /etc/mysql/mariadb.conf.d/90-xpanel.cnf <<EOF
-# Managed by X-Panel
-[mysqld]
-bind-address = 127.0.0.1
-character-set-server = utf8mb4
-collation-server = utf8mb4_unicode_ci
-innodb_buffer_pool_size = ${POOL_MB}M
-performance_schema = OFF
-max_connections = 150
-EOF
-systemctl restart mariadb
 mariadb <<'EOF'
 DELETE FROM mysql.global_priv WHERE User = '';
 DROP DATABASE IF EXISTS test;
@@ -141,7 +126,7 @@ pg psql -tAc "SELECT 1 FROM pg_database WHERE datname='xpanel'" | grep -q 1 || p
 log "Cài đặt vào $PREFIX"
 install -d -m 0755 "$PREFIX/bin"
 systemctl stop xpanel-api xpanel-agent 2>/dev/null || true
-install -m 0755 "$SRC/bin/xpanel-api" "$SRC/bin/xpanel-agent" "$SRC/enable-quota.sh" "$SRC/uninstall.sh" "$PREFIX/bin/"
+install -m 0755 "$SRC/bin/xpanel-api" "$SRC/bin/xpanel-agent" "$SRC/enable-quota.sh" "$SRC/uninstall.sh" "$SRC/tuning.sh" "$PREFIX/bin/"
 ln -sf "$PREFIX/bin/uninstall.sh" /usr/local/sbin/xpanel-uninstall
 rm -rf "$PREFIX/web.new" && cp -r "$SRC/web" "$PREFIX/web.new" && rm -rf "$PREFIX/web" && mv "$PREFIX/web.new" "$PREFIX/web"
 chmod -R a+rX "$PREFIX/web"
@@ -210,8 +195,13 @@ EOF
   done
 } >/etc/nginx/conf.d/00-xpanel-tuning.conf
 
-nginx -t
-systemctl reload nginx
+if [ "$AUTO_TUNE" = 1 ]; then
+  xpanel_tune_nginx
+  xpanel_tuning_summary
+else
+  nginx -t
+  systemctl reload nginx
+fi
 
 # ---------------------------------------------------------------- firewall
 if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then

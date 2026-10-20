@@ -24,6 +24,7 @@ import (
 	"xpanel/apps/agent/internal/netguard"
 	"xpanel/apps/agent/internal/run"
 	"xpanel/pkg/agentproto"
+	"xpanel/pkg/phpconfig"
 	"xpanel/pkg/validate"
 )
 
@@ -49,12 +50,6 @@ func stopUnit(ctx context.Context, unit string) error {
 	return nil
 }
 func Managed(t string) bool { return Dynamic(t) || t == "php" || t == "laravel" }
-func maxWorkers(mem int) int {
-	if mem <= 0 {
-		return 10
-	}
-	return min(50, max(2, mem/64))
-}
 func ready(ctx context.Context, user string, site agentproto.WebSite) error {
 	network, address := "tcp", fmt.Sprintf("127.0.0.1:%d", site.Port)
 	if site.AppType == "php" || site.AppType == "laravel" {
@@ -200,6 +195,7 @@ func Sync(ctx context.Context, distroForPHP distro.Distro, p agentproto.WebSyncP
 		return err
 	}
 	want := map[string]bool{}
+	poolCount := agentproto.PHPPoolCount(p.Sites)
 	for _, site := range p.Sites {
 		if err := Validate(site); err != nil {
 			return err
@@ -238,12 +234,12 @@ func Sync(ctx context.Context, distroForPHP distro.Distro, p agentproto.WebSyncP
 			// The socket belongs to the customer's own group: nginx is a member of
 			// every customer group, other customers are not, so no account can
 			// talk FastCGI to another account's PHP.
-			fpm := fmt.Sprintf("[global]\ndaemonize=no\nerror_log=syslog\n[www]\nlisten=%s\nlisten.group=%s\nlisten.mode=0660\npm=ondemand\npm.max_children=%d\npm.process_idle_timeout=30s\nclear_env=no\ncatch_workers_output=yes\nphp_admin_value[open_basedir]=%s/:/tmp/\n", Socket(p.Username, site.Domain), p.Username, maxWorkers(p.MemMB), u.HomeDir)
-			workers := maxWorkers(p.MemMB)
+			fpm := fmt.Sprintf("[global]\ndaemonize=no\nerror_log=syslog\n[www]\nlisten=%s\nlisten.group=%s\nlisten.mode=0660\npm=ondemand\npm.max_children=%d\npm.process_idle_timeout=30s\npm.max_requests=500\nlisten.backlog=511\nclear_env=no\ncatch_workers_output=yes\nphp_admin_value[open_basedir]=%s/:/tmp/\n", Socket(p.Username, site.Domain), p.Username, phpconfig.Workers(p.MemMB, poolCount), u.HomeDir)
+			workers := phpconfig.Workers(p.MemMB, poolCount)
 			if site.PHPConfig.Workers > 0 {
 				workers = min(workers, site.PHPConfig.Workers)
 			}
-			fpm = strings.Replace(fpm, fmt.Sprintf("pm.max_children=%d", maxWorkers(p.MemMB)), fmt.Sprintf("pm.max_children=%d", workers), 1)
+			fpm = strings.Replace(fpm, fmt.Sprintf("pm.max_children=%d", phpconfig.Workers(p.MemMB, poolCount)), fmt.Sprintf("pm.max_children=%d", workers), 1)
 			fpm += fmt.Sprintf("request_terminate_timeout=%ds\n", site.PHPConfig.RequestTimeout)
 			// Root-owned directory prevents customer symlink replacement of trace files.
 			slowPath, err := prepareSlowLog(unit, u.Uid, u.Gid)

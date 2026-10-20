@@ -10,7 +10,7 @@ printf '#!/bin/sh\necho 0\n' >"$TMP/bin/id"
 for cmd in runuser nginx; do
   printf '#!/bin/sh\nexit 1\n' >"$TMP/bin/$cmd"
 done
-printf '#!/bin/sh\ncase "$1" in list-*) exit 0 ;; *) exit 1 ;; esac\n' >"$TMP/bin/systemctl"
+printf '#!/bin/sh\ncase "$1" in cat) exit 1 ;; *) exit 0 ;; esac\n' >"$TMP/bin/systemctl"
 for cmd in nft sysctl pg_lsclusters pkill groupdel; do
   printf '#!/bin/sh\nexit 0\n' >"$TMP/bin/$cmd"
 done
@@ -31,7 +31,7 @@ cat >"$TMP/bin/apt-get" <<'EOF'
 echo "apt-get $*" >>"$CALLS"
 exit "${APT_FAIL:-0}"
 EOF
-for cmd in rm userdel; do
+for cmd in rm userdel sed mv sshd postconf; do
   printf '#!/bin/sh\necho "%s $*" >>"$CALLS"\n' "$cmd" >"$TMP/bin/$cmd"
 done
 chmod +x "$TMP/bin/"*

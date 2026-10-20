@@ -62,6 +62,9 @@ func Install(ctx context.Context, d distro.Distro, version string) (string, erro
 		err = step(apt, "apt-get", append([]string{"install", "-y", "-q"}, d.PHPPackages(version)...)...)
 	}
 	if err == nil {
+		err = WritePerformanceDefaults(version)
+	}
+	if err == nil {
 		err = step(run.Opts{Timeout: time.Minute}, "systemctl", "enable", "--now", d.PHPFPMService(version))
 	}
 	return log.String(), err

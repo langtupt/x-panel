@@ -121,6 +121,8 @@ rm -f /etc/nginx/conf.d/xpanel-panel.conf /etc/nginx/conf.d/xpanel-webmail.conf 
 rm -rf /etc/nginx/conf.d/xpanel /var/log/nginx/xpanel
 for pool in /etc/php/*/fpm/pool.d/xpanel-*.conf; do [ -e "$pool" ] && rm -f "$pool"; done
 rm -f /etc/php/*/fpm/conf.d/99-xpanel.ini
+rm -f /etc/php/*/fpm/conf.d/98-xpanel-performance.ini
+rm -f /etc/postgresql/*/*/conf.d/90-xpanel-performance.conf
 for v in $(ls /etc/php 2>/dev/null); do q systemctl reload-or-restart "php$v-fpm"; done
 if [ "$KEEP" != 1 ]; then
   rm -rf /opt/xpanel /etc/xpanel /var/lib/xpanel /etc/xpanel-cron /etc/xpanel-site-apps /run/xpanel*
@@ -135,6 +137,18 @@ rm -f /usr/local/sbin/xpanel-uninstall /etc/logrotate.d/xpanel-nginx /etc/sysctl
       /etc/dovecot/conf.d/99-xpanel.conf /etc/systemd/system/opendkim.service.d/xpanel.conf /etc/apt/sources.list.d/xpanel-php.list \
       /var/log/xpanel-install.log
 rm -f /etc/logrotate.d/xpanel-php
+rm -f /etc/logrotate.d/xpanel-mariadb
+rm -rf /var/log/mysql/xpanel
+rm -f /etc/nginx/modules-enabled/99-xpanel-performance.conf
+rm -f /etc/systemd/system/nginx.service.d/xpanel-performance.conf
+# Restore only the worker_connections value we manage; preserve later nginx edits.
+if [ -f /etc/nginx/nginx.conf.xpanel-before-tuning ] && [ -f /etc/nginx/nginx.conf ]; then
+  old_connections=$(awk '/^[[:space:]]*worker_connections[[:space:]]/ {gsub(";", "", $2); print $2; exit}' /etc/nginx/nginx.conf.xpanel-before-tuning)
+  if [[ "$old_connections" =~ ^[0-9]+$ ]]; then
+    sed -i -E "s/^([[:space:]]*worker_connections[[:space:]]+)[0-9]+/\1$old_connections/" /etc/nginx/nginx.conf
+  fi
+  rm -f /etc/nginx/nginx.conf.xpanel-before-tuning
+fi
 rm -rf /var/log/xpanel
 [ -f /etc/dovecot/conf.d/10-auth.conf.dpkg-xpanel ] && mv -f /etc/dovecot/conf.d/10-auth.conf.dpkg-xpanel /etc/dovecot/conf.d/10-auth.conf
 

@@ -47,7 +47,7 @@ var vhostTmpl = template.Must(template.New("vhost").Parse(`# Managed by X-Panel 
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection $xpanel_conn_upgrade;
         proxy_read_timeout 300s;
     }
 {{- else if .PHPSocket}}

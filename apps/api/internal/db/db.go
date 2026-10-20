@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -16,7 +17,15 @@ import (
 var migrationsFS embed.FS
 
 func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(ctx, url)
+	config, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, err
+	}
+	// Bound CPU-based pgx defaults on large hosts, preserving explicit DSN choices.
+	if !strings.Contains(url, "pool_max_conns") {
+		config.MaxConns = int32(min(16, max(4, runtime.NumCPU()*2)))
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, err
 	}

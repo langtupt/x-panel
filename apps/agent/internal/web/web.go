@@ -20,6 +20,7 @@ import (
 	"xpanel/apps/agent/internal/run"
 	"xpanel/apps/agent/internal/siteapp"
 	"xpanel/pkg/agentproto"
+	"xpanel/pkg/phpconfig"
 	"xpanel/pkg/validate"
 )
 
@@ -153,7 +154,7 @@ func (s *Syncer) syncPools(ctx context.Context, p agentproto.WebSyncParams, home
 		var buf bytes.Buffer
 		if err := poolTmpl.Execute(&buf, poolData{RunDir: s.D.FPMRunDir(v, p.Username), Unit: strings.TrimSuffix(unit, ".service"),
 			Username: p.Username, Home: home, Socket: s.D.PHPFPMSocket(v, p.Username), NginxUser: s.D.NginxUser(),
-			MaxChildren: maxChildren(p.MemMB)}); err != nil {
+			MaxChildren: phpconfig.Workers(p.MemMB, agentproto.PHPPoolCount(p.Sites))}); err != nil {
 			return err
 		}
 		if err := os.MkdirAll(filepath.Dir(conf), 0o755); err != nil {
@@ -184,14 +185,6 @@ func (s *Syncer) syncPools(ctx context.Context, p agentproto.WebSyncParams, home
 		}
 	}
 	return nil
-}
-
-// maxChildren sizes the pool from the package RAM (≈64 MB per PHP worker).
-func maxChildren(memMB int) int {
-	if memMB <= 0 {
-		return 10
-	}
-	return min(50, max(2, memMB/64))
 }
 
 // ensureUnitTemplate writes the systemd template for a PHP version.
