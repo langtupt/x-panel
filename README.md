@@ -27,17 +27,20 @@ Trình duyệt ──HTTPS :8888──▶ nginx ──▶ xpanel-api (Go, user "
 
 ## Cài đặt nhanh (1 lệnh)
 
-Trên VPS **mới** chạy Debian 12/13 hoặc Ubuntu 22.04/24.04 (quyền root, tối thiểu 1 GB RAM):
+Trên VPS **mới** chạy Debian 12/13 hoặc Ubuntu 22.04/24.04, đăng nhập bằng **root** (tối thiểu 1 GB RAM):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/installer/bootstrap.sh | sudo bash
+apt-get update && apt-get install -y curl ca-certificates && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/installer/bootstrap.sh | bash
 ```
 
 Đặt sẵn mật khẩu admin (không có thì sinh ngẫu nhiên, in ra cuối quá trình và lưu ở `/root/xpanel-admin.txt`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/installer/bootstrap.sh | sudo ADMIN_PASSWORD='MatKhauManh123' bash
+apt-get update && apt-get install -y curl ca-certificates && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/installer/bootstrap.sh | ADMIN_PASSWORD='MatKhauManh123' bash
 ```
+
+Đăng nhập bằng user thường có quyền sudo thì thay `| bash` bằng `| sudo bash` (và thêm `sudo` trước `apt-get`).
+Bản cài tối giản của Debian/Ubuntu thường chưa có `curl` và `sudo`, nên lệnh trên cài `curl` trước.
 
 Script tải bản phát hành mới nhất cho CPU của máy (amd64/arm64), kiểm tra SHA-256, cài đặt, bật quota ổ đĩa
 và tối ưu VPS (swap khi RAM thấp, giới hạn log, MariaDB theo RAM, gzip, fail2ban). Chạy lại lệnh = nâng cấp.

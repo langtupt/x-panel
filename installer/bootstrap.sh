@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # X-Panel one-line installer:
-#   curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/installer/bootstrap.sh | sudo bash
+#   (root) apt-get update && apt-get install -y curl ca-certificates && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/installer/bootstrap.sh | bash
 # Options (environment variables):
 #   ADMIN_PASSWORD=...   admin password (default: random, printed at the end)
 #   XPANEL_VERSION=v1.0.0  release tag (default: latest)
@@ -12,7 +12,7 @@ REPO="${XPANEL_REPO:-langtupt/x-panel}"
 VERSION="${XPANEL_VERSION:-latest}"
 
 die() { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
-[ "$(id -u)" -eq 0 ] || die "Cần chạy bằng root: curl -fsSL ... | sudo bash"
+[ "$(id -u)" -eq 0 ] || die "Cần chạy bằng root (đăng nhập root, hoặc: ... | sudo bash)"
 case "$(uname -m)" in
   x86_64|amd64) ARCH=amd64 ;;
   aarch64|arm64) ARCH=arm64 ;;
