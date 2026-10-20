@@ -35,6 +35,8 @@ type SiteInput struct {
 	Aliases    []string          `json:"aliases"`
 	PHPVersion string            `json:"php_version"`
 	DocRoot    string            `json:"doc_root"`
+	// Commands after the build; nil keeps the current script.
+	DeployScript *string `json:"deploy_script"`
 }
 
 // SiteResult is a site plus non-fatal notes from the agent (e.g. missing certificate).
@@ -236,6 +238,9 @@ func (s *Service) CreateSite(ctx context.Context, actor *users.User, in SiteInpu
 
 	site := &sites.Site{UserID: owner.ID, Username: owner.Username, Domain: domain, Aliases: aliases,
 		PHPVersion: in.PHPVersion, DocRoot: in.DocRoot, AppType: in.AppType, Runtime: in.Runtime, Env: in.Env}
+	if in.DeployScript != nil {
+		site.DeployScript = *in.DeployScript
+	}
 	if err := allocateAppPort(ctx, tx, site); err != nil {
 		return nil, err
 	}
@@ -303,6 +308,9 @@ func (s *Service) UpdateSite(ctx context.Context, actor *users.User, id int64, i
 	aliasesChanged := !slices.Equal(cur.Aliases, aliases)
 	cur.Aliases, cur.PHPVersion, cur.DocRoot = aliases, in.PHPVersion, in.DocRoot
 	cur.AppType, cur.Runtime, cur.Env = in.AppType, in.Runtime, in.Env
+	if in.DeployScript != nil {
+		cur.DeployScript = *in.DeployScript
+	}
 	if err := allocateAppPort(ctx, tx, cur); err != nil {
 		return nil, err
 	}

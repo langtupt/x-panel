@@ -185,6 +185,8 @@ type SiteAppParams struct {
 	Username string  `json:"username"`
 	Site     WebSite `json:"site"`
 	Sample   bool    `json:"sample"`
+	// Run after the standard build steps, as the account (build only).
+	DeployScript string `json:"deploy_script,omitempty"`
 }
 type SiteDetectResult struct {
 	AppType string `json:"app_type"`

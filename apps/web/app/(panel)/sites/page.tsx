@@ -36,6 +36,7 @@ type FormState = {
   app_type: string;
   runtime: string;
   envText: string;
+  deploy: string;
   sample: boolean;
   user_id: number | null;
   domain: string;
@@ -43,6 +44,14 @@ type FormState = {
   aliases: string;
   php_version: string;
   doc_root: string;
+};
+
+const DEPLOY_HINT: Record<string, string> = {
+  laravel: "php artisan migrate --force\nphp artisan storage:link",
+  php: "composer install --no-dev",
+  nodejs: "npx prisma migrate deploy",
+  nextjs: "npx prisma migrate deploy",
+  go: "go test ./...",
 };
 
 function SiteForm({
@@ -66,6 +75,7 @@ function SiteForm({
           envText: Object.entries(editing.env ?? {})
             .map(([k, v]) => k + "=" + v)
             .join("\n"),
+          deploy: editing.deploy_script ?? "",
           sample: false,
           user_id: editing.user_id,
           domain: editing.domain,
@@ -80,6 +90,7 @@ function SiteForm({
           app_type: "php",
           runtime: "",
           envText: "",
+          deploy: "",
           sample: false,
           user_id: owners?.[0]?.id ?? null,
           domain: "",
@@ -114,6 +125,7 @@ function SiteForm({
       app_type: f.app_type,
       runtime: f.runtime,
       env,
+      deploy_script: f.deploy,
       sample: f.sample,
       user_id: f.user_id,
       domain,
@@ -294,6 +306,23 @@ function SiteForm({
           {translate("Lưu cấu hình rồi Build & restart để áp dụng.")}
         </p>
       </div>
+      {f.app_type !== "html" && (
+        <div>
+          <label className="label">
+            {translate("Lệnh triển khai (chạy sau mỗi lần Build, dưới quyền tài khoản)")}
+          </label>
+          <textarea
+            className="input font-mono"
+            rows={4}
+            placeholder={DEPLOY_HINT[f.app_type] ?? ""}
+            value={f.deploy}
+            onChange={(e) => setF({ ...f, deploy: e.target.value })}
+          />
+          <p className="text-xs text-slate-500">
+            {translate("Ví dụ chạy migration, build tài nguyên. Lệnh php / composer dùng đúng phiên bản PHP của website; lệnh lỗi sẽ dừng Build.")}
+          </p>
+        </div>
+      )}
       {!editing && (
         <label className="flex gap-2 text-sm">
           <input
