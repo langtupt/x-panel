@@ -20,7 +20,7 @@ set -euo pipefail
 main() {
 
 REPO="${XPANEL_REPO:-langtupt/x-panel}"
-VERSION="${XPANEL_VERSION:-latest}"
+XP_VERSION="${XPANEL_VERSION:-latest}"
 LOG=/var/log/xpanel-install.log
 
 say()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -30,8 +30,12 @@ die()  { printf '\033[1;31mxx %s\033[0m\n' "$*" >&2; exit 1; }
 # ---------------------------------------------------------------- checks
 [ "$(id -u)" -eq 0 ] || die "Cần quyền root. Đăng nhập bằng tài khoản root (hoặc chạy: sudo -i) rồi dán lại lệnh."
 [ -r /etc/os-release ] || die "Không nhận diện được hệ điều hành."
-. /etc/os-release
-case "${ID:-}:${VERSION_ID:-}" in
+# Read in a subshell: os-release defines VERSION, NAME… which must not
+# overwrite this script's variables.
+OS_ID=$(. /etc/os-release && echo "${ID:-}")
+OS_VER=$(. /etc/os-release && echo "${VERSION_ID:-}")
+PRETTY_NAME=$(. /etc/os-release && echo "${PRETTY_NAME:-$OS_ID $OS_VER}")
+case "$OS_ID:$OS_VER" in
   debian:12*|debian:13*|ubuntu:22.04|ubuntu:24.04) ;;
   *) die "Hệ điều hành chưa hỗ trợ: ${PRETTY_NAME:-không rõ}. X-Panel cần Debian 12/13 hoặc Ubuntu 22.04/24.04 (bản mới cài)." ;;
 esac
@@ -69,10 +73,10 @@ if ! command -v curl >/dev/null || ! command -v sha256sum >/dev/null; then
   apt-get update -q </dev/null >/dev/null && apt-get install -y -q curl ca-certificates coreutils </dev/null >/dev/null
 fi
 
-if [ "$VERSION" = latest ]; then
+if [ "$XP_VERSION" = latest ]; then
   BASE="https://github.com/$REPO/releases/latest/download"
 else
-  BASE="https://github.com/$REPO/releases/download/$VERSION"
+  BASE="https://github.com/$REPO/releases/download/$XP_VERSION"
 fi
 FILE="xpanel-linux-$ARCH.tar.gz"
 TMP="$(mktemp -d)"
@@ -80,7 +84,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 echo
 say "X-Panel — ${PRETTY_NAME}, ${ARCH}, RAM ${MEM_MB} MB$( [ "$UPGRADE" = 1 ] && echo ", NÂNG CẤP bản đang cài")"
-say "Tải bản phát hành ($VERSION)…"
+say "Tải bản phát hành ($XP_VERSION)…"
 curl -fsSL --retry 3 -o "$TMP/$FILE" "$BASE/$FILE" || die "Không tải được $BASE/$FILE (kiểm tra kết nối Internet của VPS)."
 curl -fsSL --retry 3 -o "$TMP/$FILE.sha256" "$BASE/$FILE.sha256" || die "Không tải được tệp SHA-256."
 (cd "$TMP" && sha256sum -c --quiet "$FILE.sha256") || die "SHA-256 không khớp: tệp tải về bị hỏng, hãy chạy lại lệnh."
