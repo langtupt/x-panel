@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strconv"
 
 	"xpanel/apps/api/internal/audit"
 	"xpanel/pkg/agentproto"
@@ -57,4 +58,27 @@ func (s *Server) handleSystemReboot(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit.Record(r.Context(), audit.Entry{ActorID: &currentUser(r).ID, Action: "system.reboot", TargetType: "server", IP: clientIP(r)})
 	writeJSON(w, http.StatusAccepted, map[string]any{"scheduled": true, "delay_seconds": 10})
+}
+
+// GET /api/stats/accounts?range=24h|7d|30d[&user_id=]
+func (s *Server) handleAccountStats(w http.ResponseWriter, r *http.Request) {
+	rng := r.URL.Query().Get("range")
+	if rng == "" {
+		rng = "24h"
+	}
+	var only int64
+	if v := r.URL.Query().Get("user_id"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 {
+			writeErr(w, http.StatusBadRequest, "user_id không hợp lệ")
+			return
+		}
+		only = n
+	}
+	list, err := s.accounts.Stats(r.Context(), currentUser(r), rng, only)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
 }

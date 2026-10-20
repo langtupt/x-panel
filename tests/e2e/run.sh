@@ -16,6 +16,8 @@ export MSYS_NO_PATHCONV=1
 NAME="xpanel-e2e-$DISTRO"
 IMG="xpanel-e2e-sysd-$DISTRO"
 
+# Fake Google Drive for backup.sh.
+(cd "$ROOT" && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o "$(hostpath "$HERE")/fakedrive/fakedrive" ./tests/e2e/fakedrive)
 docker build -q -t "$IMG" -f "$(hostpath "$HERE")/Dockerfile.$DISTRO" "$(hostpath "$HERE")" >/dev/null
 docker network create xpanel-e2e >/dev/null 2>&1 || true
 docker rm -f xpanel-e2e-pebble "$NAME" >/dev/null 2>&1 || true
@@ -37,8 +39,10 @@ printf "XPANEL_ACME_DIR=https://pebble:14000/dir\nXPANEL_ACME_INSECURE=true\n" >
 systemctl restart xpanel-agent
 apt-get install -y -q jq >/dev/null 2>&1'
 
-for t in ${TESTS:-web db ftp-files-pma auth-cron limits applications isolation ssl mail}; do
+for t in ${TESTS:-web db ftp-files-pma files auth-cron limits applications isolation ssl mail backup stats}; do
   echo "======== $t"
-  docker exec "$NAME" bash "/e2e/$t.sh"
+  docker exec "$NAME" bash "/e2e/$t.sh" || FAILED="${FAILED:-} $t"
 done
 echo "Container $NAME is left running for inspection (docker rm -f $NAME xpanel-e2e-pebble)."
+if [ -n "${FAILED:-}" ]; then echo "SUITES FAILED:$FAILED"; exit 1; fi
+echo "ALL SUITES PASSED"

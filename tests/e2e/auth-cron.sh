@@ -34,6 +34,8 @@ c t1 POST /auth/login '{"username":"acust","password":"Changed12345","code":"123
 c t1 POST /auth/login "{\"username\":\"acust\",\"password\":\"Changed12345\",\"code\":\"$(oathtool --totp -b $SECRET)\"}" | cut -c1-60
 c t1 GET /me | jq -c '{username, totp_enabled}' 2>/dev/null || jq -c '{username, totp_enabled}' /tmp/out
 c t1 POST /me/2fa/disable '{"password":"Changed12345","code":"000000"}'
+echo "replayed code (expect 401):"; c t2 POST /auth/login "{\"username\":\"acust\",\"password\":\"Changed12345\",\"code\":\"$(oathtool --totp -b $SECRET)\"}" | cut -c1-60
+sleep $((31 - $(date +%s) % 30))  # a code works only once: wait for the next one
 c t1 POST /me/2fa/disable "{\"password\":\"Changed12345\",\"code\":\"$(oathtool --totp -b $SECRET)\"}"
 c t2 POST /auth/login '{"username":"acust","password":"Changed12345"}' | cut -c1-40
 
@@ -72,4 +74,4 @@ step "REGRESSION: delete account succeeds (userdel), crontab + home gone"
 c admin DELETE /users/$U
 id acust 2>&1 | tail -1; ls /home/acust 2>&1 | tail -1; ls /etc/xpanel-cron/acust 2>/dev/null | wc -l | sed "s/^/cron state files: /"; getent group acust || echo "group gone"
 step "REGRESSION: phpMyAdmin login page"
-curl -sk $B/phpmyadmin/ | grep -o 'name="pma_username"' | head -1 || echo "NO LOGIN FORM"; ls -ld /var/lib/xpanel | cut -c1-10
+curl -skL $B/phpmyadmin/ | grep -o 'name="pma_username"' | head -1 || echo "NO LOGIN FORM"; ls -ld /var/lib/xpanel | cut -c1-10

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+
+	"xpanel/pkg/gdrive"
 )
 
 const DefaultSocket = "/run/xpanel/agent.sock"
@@ -68,7 +70,7 @@ type FTPLockParams struct {
 // FSRequest is one file-manager operation, executed as the owner inside a
 // chroot of their home directory. Paths are absolute within that home.
 type FSRequest struct {
-	Op      string   `json:"op"` // list read write mkdir rename delete chmod extract compress upload download
+	Op      string   `json:"op"` // list read write mkdir rename move copy delete chmod extract compress upload download
 	Path    string   `json:"path,omitempty"`
 	To      string   `json:"to,omitempty"`
 	Paths   []string `json:"paths,omitempty"`
@@ -419,4 +421,76 @@ type MailStatus struct {
 	Installed bool   `json:"installed"`
 	Webmail   bool   `json:"webmail"`
 	Hostname  string `json:"hostname"`
+}
+
+const ActionStatsCollect = "stats.collect" // StatsParams -> StatsResult
+
+// StatsParams names the hosting accounts to measure and what they own.
+type StatsParams struct {
+	Accounts []StatsAccount `json:"accounts"`
+}
+
+type StatsAccount struct {
+	Username    string   `json:"username"`
+	Domains     []string `json:"domains"`      // websites (access logs)
+	MailDomains []string `json:"mail_domains"` // stored mail
+}
+
+type StatsResult struct {
+	At       time.Time                    `json:"at"`
+	Accounts map[string]AccountStatSample `json:"accounts"`
+}
+
+type AccountStatSample struct {
+	CPUUsageUsec uint64 `json:"cpu_usage_usec"` // cumulative, from the account's cgroup
+	MemoryBytes  uint64 `json:"memory_bytes"`
+	Tasks        int    `json:"tasks"`
+	MailBytes    int64  `json:"mail_bytes"`
+	// Bytes sent to visitors since the previous collection.
+	BandwidthBytes int64 `json:"bandwidth_bytes"`
+	Requests       int64 `json:"requests"`
+}
+
+const (
+	ActionBackupCreate  = "backup.create"  // BackupCreateParams -> BackupCreateResult
+	ActionBackupRestore = "backup.restore" // BackupRestoreParams -> TaskLog
+)
+
+// BackupDB is a customer database inside a backup.
+type BackupDB struct {
+	Name   string `json:"name"`
+	Engine string `json:"engine"` // mariadb | postgresql
+	User   string `json:"user"`   // owning database user
+}
+
+// BackupCreateParams: archive one account (home, databases, mail), encrypt
+// it with Passphrase and stream it to Google Drive.
+type BackupCreateParams struct {
+	Username    string          `json:"username"`
+	Databases   []BackupDB      `json:"databases"`
+	MailDomains []string        `json:"mail_domains"`
+	Drive       gdrive.Creds    `json:"drive"`
+	FolderID    string          `json:"folder_id"`
+	FileName    string          `json:"file_name"`
+	Passphrase  string          `json:"passphrase"`
+	Manifest    json.RawMessage `json:"manifest"` // panel records of the account, stored as manifest.json
+}
+
+type BackupCreateResult struct {
+	FileID string `json:"file_id"`
+	Size   int64  `json:"size"`
+	Log    string `json:"log"`
+}
+
+// BackupRestoreParams: restore the selected parts of a backup into the same
+// account. Only the listed databases and mail domains (owned by the account
+// now) are written.
+type BackupRestoreParams struct {
+	Username    string       `json:"username"`
+	Drive       gdrive.Creds `json:"drive"`
+	FileID      string       `json:"file_id"`
+	Passphrase  string       `json:"passphrase"`
+	Files       bool         `json:"files"`
+	Databases   []BackupDB   `json:"databases"`
+	MailDomains []string     `json:"mail_domains"`
 }

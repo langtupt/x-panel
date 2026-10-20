@@ -28,6 +28,14 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 
 // clientIP trusts X-Real-IP only when the request comes from the local nginx.
 func clientIP(r *http.Request) string {
+	// Only nginx sets X-Real-IP: in production it is the only client of the
+	// API's unix socket (empty or "@" remote address).
+	if r.RemoteAddr == "" || r.RemoteAddr == "@" {
+		if real := r.Header.Get("X-Real-IP"); net.ParseIP(real) != nil {
+			return real
+		}
+		return "unix"
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		host = r.RemoteAddr

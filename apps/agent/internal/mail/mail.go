@@ -233,7 +233,27 @@ func quotaField(v24 bool, mb int) string {
 	return "userdb_quota_rule=*:storage=" + strconv.Itoa(mb) + "M"
 }
 
-const dovecotListeners = `service lmtp {
+const dovecotListeners = `# Standard folders exist from the first login, so webmail and mail apps can
+# file sent mail, drafts, spam and deleted mail.
+namespace inbox {
+  mailbox Drafts {
+    auto = subscribe
+    special_use = \Drafts
+  }
+  mailbox Sent {
+    auto = subscribe
+    special_use = \Sent
+  }
+  mailbox Junk {
+    auto = subscribe
+    special_use = \Junk
+  }
+  mailbox Trash {
+    auto = subscribe
+    special_use = \Trash
+  }
+}
+service lmtp {
   unix_listener /var/spool/postfix/private/dovecot-lmtp {
     mode = 0600
     user = postfix
@@ -718,4 +738,30 @@ func protectLogins(ctx context.Context, logf func(string, ...any)) {
 		return
 	}
 	logf("Đã bật fail2ban cho SMTP/IMAP/POP3")
+}
+
+// MigrateDovecot rewrites the Dovecot configuration of installs made by
+// older versions (no standard folders). Run at agent start.
+func MigrateDovecot(ctx context.Context) error {
+	if !Installed() {
+		return nil
+	}
+	b, err := os.ReadFile("/etc/dovecot/conf.d/99-xpanel.conf")
+	if err != nil || strings.Contains(string(b), "auto = subscribe") {
+		return nil
+	}
+	vmail, err := user.Lookup("vmail")
+	if err != nil {
+		return err
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if err := configureDovecot(ctx, vmail); err != nil {
+		return err
+	}
+	if out, err := run.Output(ctx, "doveconf", "-n"); err != nil {
+		_ = os.WriteFile("/etc/dovecot/conf.d/99-xpanel.conf", b, 0o644)
+		return fmt.Errorf("dovecot config test failed: %s", out)
+	}
+	return run.Cmd(ctx, "systemctl", "reload", "dovecot")
 }

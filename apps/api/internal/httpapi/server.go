@@ -21,6 +21,7 @@ import (
 	"xpanel/apps/api/internal/databases"
 	"xpanel/apps/api/internal/ftpaccounts"
 	"xpanel/apps/api/internal/packages"
+	"xpanel/apps/api/internal/secretbox"
 	"xpanel/apps/api/internal/sites"
 	"xpanel/apps/api/internal/tasks"
 	"xpanel/apps/api/internal/users"
@@ -49,6 +50,7 @@ func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
 	authSvc := auth.NewService(pool, repo, cfg.JWTSecret)
 	svc := accounts.NewService(pool, repo, packages.NewRepo(pool), sites.NewRepo(pool), databases.NewRepo(pool), ftpaccounts.NewRepo(pool), cronjobs.NewRepo(pool), agent, authSvc, log)
 	queue := tasks.NewQueue(pool, log)
+	svc.SetSecrets(secretbox.New(cfg.JWTSecret, "settings"))
 	svc.RegisterTasks(queue)
 	return &Server{
 		cfg:      cfg,
@@ -67,6 +69,8 @@ func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
 func (s *Server) Background(ctx context.Context) {
 	go s.tasks.Run(ctx, 2)
 	go s.accounts.RunRenewals(ctx)
+	go s.accounts.RunStats(ctx)
+	go s.accounts.RunBackups(ctx)
 }
 
 func (s *Server) Handler() http.Handler {
@@ -121,6 +125,15 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/ftp", s.handleCreateFTP)
 			r.Patch("/ftp/{id}/password", s.handleFTPPassword)
 			r.Delete("/ftp/{id}", s.handleDeleteFTP)
+			r.Get("/stats/accounts", s.handleAccountStats)
+			r.Get("/backups/settings", s.handleBackupSettings)
+			r.Put("/backups/settings", s.handleSaveBackupSettings)
+			r.Post("/backups/drive", s.handleConnectDrive)
+			r.Delete("/backups/drive", s.handleDisconnectDrive)
+			r.Get("/backups", s.handleListBackups)
+			r.Post("/backups", s.handleCreateBackup)
+			r.Post("/backups/{id}/restore", s.handleRestoreBackup)
+			r.Delete("/backups/{id}", s.handleDeleteBackup)
 			r.Get("/mail/status", s.handleMailStatus)
 			r.Get("/mail/domains", s.handleListMailDomains)
 			r.Post("/mail/domains", s.handleCreateMailDomain)
@@ -130,6 +143,7 @@ func (s *Server) Handler() http.Handler {
 			r.Patch("/mail/mailboxes/{id}", s.handleUpdateMailbox)
 			r.Delete("/mail/mailboxes/{id}", s.handleDeleteMailbox)
 			r.Post("/mail/domains/{id}/aliases", s.handleCreateAlias)
+			r.Patch("/mail/aliases/{id}", s.handleUpdateAlias)
 			r.Delete("/mail/aliases/{id}", s.handleDeleteAlias)
 			r.Get("/files", s.handleListFiles)
 			r.Post("/files/op", s.handleFileOp)
@@ -199,6 +213,12 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "same-origin")
+		// The UI is a static export with inline bootstrap scripts; everything
+		// else must come from the panel itself.
+		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; "+
+			"style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; "+
+			"connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'")
+		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		next.ServeHTTP(w, r)
 	})
 }

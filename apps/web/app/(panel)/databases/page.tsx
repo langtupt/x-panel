@@ -7,6 +7,7 @@ import {
   fmtBytes,
   genPassword,
   type Database,
+  dbToolURL,
   type PMAStatus,
   type Task,
   type User,
@@ -261,7 +262,7 @@ function PhpMyAdmin({ admin }: { admin: boolean }) {
       {st.installed ? (
         <a
           className="btn-primary px-3 py-1.5 text-xs"
-          href="/phpmyadmin/"
+          href={dbToolURL("phpmyadmin")}
           target="_blank"
           rel="noreferrer"
         >
@@ -440,7 +441,7 @@ export default function DatabasesPage() {
                       target="_blank"
                       rel="noreferrer"
                       href={
-                        d.engine === "postgresql" ? "/adminer/" : "/phpmyadmin/"
+                        dbToolURL(d.engine === "postgresql" ? "adminer" : "phpmyadmin")
                       }
                     >
                       {d.engine === "postgresql" ? "Adminer" : "phpMyAdmin"}

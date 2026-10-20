@@ -11,9 +11,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"xpanel/apps/agent/internal/distro"
 	"xpanel/apps/agent/internal/fetch"
+	"xpanel/apps/agent/internal/nginxctl"
 	"xpanel/apps/agent/internal/php"
 	"xpanel/apps/agent/internal/pma"
 	"xpanel/apps/agent/internal/run"
@@ -190,6 +192,9 @@ func InstallWebmail(ctx context.Context, d distro.Distro, version string, logf f
 	if err := run.Cmd(ctx, "systemctl", "reload-or-restart", d.PHPFPMService(phpV)); err != nil {
 		return err
 	}
+	if err := pma.WaitSocket(webmailSocket, 20*time.Second); err != nil {
+		return err
+	}
 	// Own port = own browser origin: script injected through a message cannot
 	// call the panel API with the viewer's panel session.
 	if err := os.WriteFile(webmailServerConf, []byte(webmailServer), 0o644); err != nil {
@@ -208,7 +213,7 @@ func InstallWebmail(ctx context.Context, d distro.Distro, version string, logf f
 func RemoveWebmail(ctx context.Context, d distro.Distro) error {
 	_ = os.Remove(filepath.Join(pma.SnippetDir, webmailSnippet))
 	_ = os.Remove(webmailServerConf)
-	_ = run.Cmd(ctx, "systemctl", "reload", "nginx")
+	_ = nginxctl.Reload(ctx)
 	for _, v := range php.Installed(d) {
 		if err := os.Remove(webmailPoolFile(d, v)); err == nil {
 			_ = run.Cmd(ctx, "systemctl", "reload-or-restart", d.PHPFPMService(v))
@@ -305,9 +310,12 @@ location ^~ /webmail/ {
     index index.php;
     location ~ ^/webmail/(config|temp|logs|bin|SQL|installer|vendor|program/include|program/lib)/ { deny all; }
     location ~ /\. { deny all; }
-    location ~ \.php$ {
+    # Roundcube 1.7 serves its CSS/JS through static.php/<path> (PATH_INFO).
+    location ~ ^/webmail/([A-Za-z0-9_./-]+?\.php)(/.*)?$ {
         include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME $request_filename;
+        fastcgi_param SCRIPT_FILENAME ` + WebmailDir + `/public_html/$1;
+        fastcgi_param SCRIPT_NAME /webmail/$1;
+        fastcgi_param PATH_INFO $2;
         fastcgi_param HTTPS on;
         fastcgi_pass unix:` + webmailSocket + `;
         fastcgi_read_timeout 300s;
@@ -315,3 +323,20 @@ location ^~ /webmail/ {
 }
 }
 `
+
+// MigrateWebmail rewrites the webmail server block written by older versions
+// (no PATH_INFO: Roundcube 1.7 loaded without CSS/JS). Run at agent start.
+func MigrateWebmail(ctx context.Context) error {
+	old, err := os.ReadFile(webmailServerConf)
+	if err != nil || string(old) == webmailServer {
+		return nil
+	}
+	if err := os.WriteFile(webmailServerConf, []byte(webmailServer), 0o644); err != nil {
+		return err
+	}
+	if out, err := run.Output(ctx, "nginx", "-t"); err != nil {
+		_ = os.WriteFile(webmailServerConf, old, 0o644)
+		return fmt.Errorf("nginx config test failed: %s", out)
+	}
+	return nginxctl.Reload(ctx)
+}

@@ -16,7 +16,7 @@ import (
 
 const TaskPMAInstall = "pma.install"
 
-var fileOps = []string{"list", "read", "write", "mkdir", "rename", "delete", "chmod", "extract", "compress"}
+var fileOps = []string{"list", "read", "write", "mkdir", "rename", "move", "copy", "delete", "chmod", "extract", "compress"}
 
 // fileOwner resolves whose home the actor is browsing.
 func (s *Service) fileOwner(ctx context.Context, actor *users.User, userID *int64) (*users.User, error) {

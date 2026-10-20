@@ -47,3 +47,13 @@ func DocRoot(p string) error {
 	}
 	return nil
 }
+
+var usernameRe = regexp.MustCompile(`^[a-z][a-z0-9_]{2,31}$`)
+
+// Username checks a hosting account's Linux user name.
+func Username(s string) error {
+	if !usernameRe.MatchString(s) {
+		return fmt.Errorf("invalid username %q", s)
+	}
+	return nil
+}

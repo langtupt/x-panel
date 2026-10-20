@@ -52,6 +52,8 @@ func (s *Service) RegisterTasks(q *tasks.Queue) {
 	q.Handle(TaskSiteBuild, s.runSiteBuild)
 	q.Handle(TaskSSLIssue, s.runSSLIssue)
 	q.Handle(TaskPanelSSL, s.runPanelSSL)
+	q.Handle(TaskBackupCreate, s.runBackupCreate)
+	q.Handle(TaskBackupRestore, s.runBackupRestore)
 	q.Handle(TaskPHPInstall, s.runPHPInstall)
 	q.Handle(TaskPMAInstall, s.runPMAInstall)
 }

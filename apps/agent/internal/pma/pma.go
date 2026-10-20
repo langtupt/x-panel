@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"xpanel/apps/agent/internal/distro"
+	"xpanel/apps/agent/internal/nginxctl"
 	"xpanel/apps/agent/internal/php"
 	"xpanel/apps/agent/internal/run"
 	"xpanel/pkg/agentproto"
@@ -31,7 +32,6 @@ const (
 	sysUser     = "xpanel-pma"
 	socket      = "/run/php/xpanel-pma.sock"
 	snippetDir  = "/etc/xpanel/nginx/panel.d"
-	snippetFile = snippetDir + "/phpmyadmin.conf"
 	downloadURL = "https://www.phpmyadmin.net/downloads/phpMyAdmin-latest-all-languages.tar.gz"
 )
 
@@ -116,10 +116,10 @@ func InstallVersion(ctx context.Context, d distro.Distro, version string) (strin
 	}
 	_ = os.RemoveAll(Dir + ".old")
 
-	if err := InstallSnippet(ctx, snippetFile, nginxSnippet); err != nil {
+	if err := InstallTool(ctx, "phpmyadmin", nginxSnippet); err != nil {
 		return log.String(), err
 	}
-	logf("phpMyAdmin đã sẵn sàng tại /phpmyadmin/")
+	logf("phpMyAdmin đã sẵn sàng tại https://<máy chủ>:%s/phpmyadmin/", ToolsPort)
 	return log.String(), nil
 }
 
@@ -333,7 +333,10 @@ func EnsurePool(ctx context.Context, d distro.Distro, logf func(string, ...any))
 	if out, err := run.Output(ctx, d.PHPFPMBinary(v), "-t"); err != nil {
 		return fmt.Errorf("php-fpm config test failed: %s", out)
 	}
-	return run.Cmd(ctx, "systemctl", "reload-or-restart", d.PHPFPMService(v))
+	if err := run.Cmd(ctx, "systemctl", "reload-or-restart", d.PHPFPMService(v)); err != nil {
+		return err
+	}
+	return WaitSocket(socket, 20*time.Second)
 }
 
 // InstallSnippet adds an nginx snippet to the panel server block and reloads.
@@ -348,7 +351,7 @@ func InstallSnippet(ctx context.Context, file, content string) error {
 		_ = os.Remove(file)
 		return fmt.Errorf("nginx config test failed: %s", out)
 	}
-	return run.Cmd(ctx, "systemctl", "reload", "nginx")
+	return nginxctl.Reload(ctx)
 }
 
 // Socket is where the tools pool listens.

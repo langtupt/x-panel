@@ -153,3 +153,21 @@ func (s *Server) handleDeleteAlias(w http.ResponseWriter, r *http.Request) {
 	s.auditMail(r, "mail.alias_delete", "mail_alias", a.ID, a.Address)
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// PATCH /api/mail/aliases/{id} {destinations}
+func (s *Server) handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	var in struct {
+		Destinations []string `json:"destinations"`
+	}
+	if !ok || !decode(w, r, &in) {
+		return
+	}
+	a, err := s.accounts.UpdateAlias(r.Context(), currentUser(r), id, in.Destinations)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.auditMail(r, "mail.alias_update", "mail_alias", a.ID, a.Address)
+	writeJSON(w, http.StatusOK, a)
+}

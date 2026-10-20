@@ -6,7 +6,7 @@ Phân cấp tài khoản **Admin → Đại lý (Reseller) → Người dùng** 
 ## Kiến trúc
 
 ```
-Trình duyệt ──HTTPS :8888──▶ nginx ──▶ xpanel-api (Go, user "xpanel", 127.0.0.1:8889)
+Trình duyệt ──HTTPS :8888──▶ nginx ──▶ xpanel-api (Go, user "xpanel", unix socket chỉ nginx mở được)
                                           │  phục vụ UI Next.js (static export) + REST API
                                           │  PostgreSQL qua unix socket (peer auth)
                                           ▼
@@ -47,8 +47,8 @@ và tối ưu VPS (swap khi RAM thấp, giới hạn log, MariaDB theo RAM, gzip
 
 Sau khi cài: mở **https://IP-VPS:8888**, vào **Applications** cài PHP, Node.js…, **Mail server** và
 **Roundcube Webmail** nếu cần (webmail chạy ở **https://IP-VPS:2096/webmail/**).
-Cổng cần mở ở firewall của nhà cung cấp VPS: 21, 22, 80, 443, 8888, 30000–30100 (FTP passive),
-và khi dùng mail: 25, 465, 587, 110, 143, 993, 995, 2096.
+Cổng cần mở ở firewall của nhà cung cấp VPS: 21, 22, 80, 443, 8888, 8890 (phpMyAdmin/Adminer), 30000–30100
+(FTP passive), và khi dùng mail: 25, 465, 587, 110, 143, 993, 995, 2096 (webmail).
 
 ## Cài từ mã nguồn
 
@@ -58,7 +58,7 @@ scp dist/xpanel-linux-amd64.tar.gz root@server:
 ssh root@server 'tar xzf xpanel-linux-amd64.tar.gz && cd xpanel-linux-amd64 && ADMIN_PASSWORD="..." ./install.sh'
 ```
 
-Panel chạy ở **https://IP-server:8888** (nginx giữ cổng 8888 và chuyển vào API nội bộ 127.0.0.1:8889).
+Panel chạy ở **https://IP-server:8888** (nginx giữ cổng 8888 và chuyển vào API qua unix socket /run/xpanel-api/api.sock).
 
 Installer sẽ cài nginx, PostgreSQL, MariaDB (chỉ nghe 127.0.0.1), quota; tạo user hệ thống `xpanel`, DB,
 chứng chỉ self-signed, mở cổng 80/443/8888 nếu ufw đang bật; tạo tài khoản `admin` (mật khẩu lấy từ `ADMIN_PASSWORD`,
@@ -222,7 +222,42 @@ Mọi request thay đổi dữ liệu phải gửi header `X-XPanel: 1` (chống
 - [x] Tuần 7–8: database MariaDB, FTP/SFTP, quản lý file, phpMyAdmin
 - [x] Bổ sung MVP: 2FA TOTP, đăng nhập thay, tự đổi mật khẩu, cron, trang nhật ký, e2e trong `tests/e2e`
 - [x] Tuần 9–10 (phần 1): giới hạn CPU/RAM theo tài khoản (cgroups, PHP-FPM riêng)
-- [ ] Tiếp theo: backup/restore, thống kê tài nguyên theo tài khoản, rà soát bảo mật, bản v0.1
+- [x] Email (Postfix, Dovecot, DKIM), Roundcube Webmail, chứng chỉ SSL (Let's Encrypt / tải lên / tự ký)
+- [x] Backup/restore mã hóa lên Google Drive, thống kê tài nguyên theo tài khoản, rà soát bảo mật
+
+## Sao lưu lên Google Drive
+
+Trang **Sao lưu** (admin):
+
+1. Vào [Google Cloud Console](https://console.cloud.google.com/apis/credentials), bật **Google Drive API**, tạo
+   **OAuth client ID** loại **TVs and Limited Input devices** (màn hình đồng ý: thêm email của bạn vào *Test users*).
+2. Dán Client ID / Client secret vào panel → panel hiện mã → mở `google.com/device`, nhập mã, đồng ý.
+3. Đặt **passphrase mã hóa** (≥ 12 ký tự), lịch (hằng ngày / hằng tuần), giờ chạy và số bản giữ lại.
+
+Mỗi bản backup gồm thư mục home (website), dump database (MariaDB/PostgreSQL) và hộp thư của một tài khoản; được
+nén và mã hóa AES-256-GCM (khóa scrypt từ passphrase) rồi tải thẳng lên Drive theo luồng, không cần chỗ trống trên
+VPS. Panel chỉ dùng quyền `drive.file` (chỉ thấy file do chính nó tạo). File home được đọc và ghi lại **dưới quyền
+của chính tài khoản đó**, nên symlink cài cắm không thể kéo file hệ thống vào backup. Khách hàng và đại lý thấy,
+tạo và khôi phục backup của tài khoản mình quản lý; **mất passphrase thì không khôi phục được**.
+
+## Thống kê tài nguyên
+
+Trang **Thống kê tài nguyên** đo mỗi 5 phút cho từng tài khoản: CPU và RAM (cgroup `xpanel-<user>.slice`, gồm PHP,
+ứng dụng Node/Go, build và cron), số tiến trình, ổ đĩa (quota), database, hộp thư, băng thông và lượt truy cập
+(đọc dần từ log nginx của từng website). Biểu đồ 24 giờ / 7 ngày / 30 ngày, so với giới hạn của gói; lưu 35 ngày.
+Admin xem mọi tài khoản, đại lý xem khách của mình, khách chỉ xem chính mình.
+
+## Các lớp bảo mật chính
+
+- Mỗi tài khoản là một user Linux riêng: PHP-FPM, ứng dụng, cron chạy dưới user đó trong slice giới hạn CPU/RAM;
+  nginx không đi theo symlink sang file của người khác; cổng ứng dụng nội bộ bị nftables chặn với tài khoản khác.
+- API chỉ nghe trên unix socket mà nginx mở được (khách không gọi thẳng API hay giả IP được); cookie
+  HttpOnly + SameSite=Strict, header chống CSRF, CSP, HSTS; giới hạn đăng nhập sai theo IP và theo tài khoản;
+  mã 2FA chỉ dùng được một lần.
+- phpMyAdmin/Adminer (cổng 8890) và Roundcube (cổng 2096) chạy ở origin riêng, tách khỏi phiên đăng nhập panel.
+- Mail: không relay cho tiến trình nội bộ, không mạo danh địa chỉ của tài khoản khác, `sendmail` chỉ cho root,
+  DKIM chỉ ký thư đã xác thực; fail2ban cho SSH, FTP, SMTP, IMAP/POP3.
+- Bí mật trong database (token Google, passphrase backup, khóa 2FA) được mã hóa bằng khóa riêng của máy chủ.
 
 ## Applications và ứng dụng website
 

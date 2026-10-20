@@ -371,3 +371,8 @@ export interface AppInfo {
   installed_labels?: Record<string, string>;
   error?: string;
 }
+
+/** phpMyAdmin / Adminer run on their own port (separate browser origin). */
+export function dbToolURL(tool: "phpmyadmin" | "adminer") {
+  return `https://${window.location.hostname}:8890/${tool}/`;
+}

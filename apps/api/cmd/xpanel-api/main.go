@@ -13,9 +13,13 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"os/user"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -133,11 +137,43 @@ func run(cmd string, args []string, log *slog.Logger) error {
 			defer cancel()
 			_ = srv.Shutdown(shutdownCtx)
 		}()
+		ln, err := listen(cfg.Listen)
+		if err != nil {
+			return err
+		}
 		log.Info("xpanel-api listening", "addr", cfg.Listen)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
 		return nil
 	}
 	return fmt.Errorf("unknown command %q (serve | migrate | create-admin | reset-password)", cmd)
+}
+
+// listen opens "host:port" or "unix:/path". In production the API listens on
+// a unix socket that only nginx may connect to (group www-data, 0660):
+// customers' processes on the same machine cannot reach the API directly or
+// forge the X-Real-IP header the login rate limit relies on.
+func listen(addr string) (net.Listener, error) {
+	path, ok := strings.CutPrefix(addr, "unix:")
+	if !ok {
+		return net.Listen("tcp", addr)
+	}
+	_ = os.Remove(path)
+	ln, err := net.Listen("unix", path)
+	if err != nil {
+		return nil, err
+	}
+	if g, err := user.LookupGroup("www-data"); err == nil {
+		gid, _ := strconv.Atoi(g.Gid)
+		if err := os.Chown(path, -1, gid); err != nil {
+			ln.Close()
+			return nil, fmt.Errorf("chown %s: %w", path, err)
+		}
+	}
+	if err := os.Chmod(path, 0o660); err != nil {
+		ln.Close()
+		return nil, err
+	}
+	return ln, nil
 }

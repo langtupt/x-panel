@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 	"xpanel/apps/agent/internal/mail"
+	"xpanel/apps/agent/internal/pma"
 	"xpanel/apps/agent/internal/run"
 )
 
@@ -47,20 +48,9 @@ func (c *Catalog) Remove(ctx context.Context, id, version string) (string, error
 		return "Đã xóa runtime " + version, nil
 	case "phpmyadmin", "adminer":
 		dir := "/opt/xpanel/" + id
-		snippet := "/etc/xpanel/nginx/panel.d/" + id + ".conf"
-		backup := snippet + ".disabled"
-		if err := os.Rename(snippet, backup); err != nil && !os.IsNotExist(err) {
+		if err := pma.RemoveTool(ctx, id); err != nil {
 			return "", err
 		}
-		if out, err := run.Output(ctx, "nginx", "-t"); err != nil {
-			_ = os.Rename(backup, snippet)
-			return out, err
-		}
-		if err := run.Cmd(ctx, "systemctl", "reload", "nginx"); err != nil {
-			_ = os.Rename(backup, snippet)
-			return "", err
-		}
-		_ = os.Remove(backup)
 		return "Đã gỡ " + id, os.RemoveAll(dir)
 	case "roundcube":
 		return "Đã gỡ Roundcube", mail.RemoveWebmail(ctx, c.D)

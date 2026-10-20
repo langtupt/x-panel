@@ -72,8 +72,9 @@ c admin POST /phpmyadmin; T=$(jq .id /tmp/out)
 for i in $(seq 1 120); do st=$(curl -sk -b /tmp/admin "${H[@]}" $B/api/tasks/$T | jq -r .status); [ "$st" = done ] || [ "$st" = failed ] && break; sleep 2; done
 curl -sk -b /tmp/admin "${H[@]}" $B/api/tasks/$T | jq -r '.status + " | " + (.log | split("\n") | map(select(length>0)) | .[-2:] | join(" / "))'
 c admin GET /phpmyadmin
-curl -sk -o /tmp/pma.html -w "phpmyadmin %{http_code} " $B/phpmyadmin/; grep -o 'name="pma_username"' /tmp/pma.html | head -1
-curl -sk -o /dev/null -w "libraries %{http_code}\n" $B/phpmyadmin/libraries/classes/Config.php
+curl -sk -o /dev/null -w "panel port redirects %{http_code} %{redirect_url}\n" $B/phpmyadmin/
+curl -sk -o /tmp/pma.html -w "phpmyadmin %{http_code} " https://127.0.0.1:8890/phpmyadmin/; grep -o 'name="pma_username"' /tmp/pma.html | head -1
+curl -sk -o /dev/null -w "libraries %{http_code}\n" https://127.0.0.1:8890/phpmyadmin/libraries/classes/Config.php
 
 step "delete account -> FTP logins + Linux user removed"
 c admin DELETE /users/$U; pure-pw show fcust_site -f /etc/pure-ftpd/pureftpd.passwd >/dev/null 2>&1 && echo "ftp still exists" || echo "ftp login gone"; id fcust 2>&1 | tail -1

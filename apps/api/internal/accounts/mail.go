@@ -398,24 +398,9 @@ func (s *Service) CreateAlias(ctx context.Context, actor *users.User, domainID i
 	if err := validate.LocalPart(local); err != nil {
 		return nil, apperr.Invalid("%s", err.Error())
 	}
-	var dests []string
-	for _, dst := range in.Destinations {
-		dst = strings.TrimSpace(dst)
-		if dst == "" {
-			continue
-		}
-		if err := validate.ForwardAddress(dst); err != nil {
-			return nil, apperr.Invalid("%s", err.Error())
-		}
-		if strings.EqualFold(dst, local+"@"+d.Domain) {
-			return nil, apperr.Invalid("không thể chuyển tiếp về chính địa chỉ này")
-		}
-		if !slices.Contains(dests, dst) {
-			dests = append(dests, dst)
-		}
-	}
-	if len(dests) == 0 || len(dests) > 50 {
-		return nil, apperr.Invalid("cần 1–50 địa chỉ nhận")
+	dests, err := aliasDestinations(in.Destinations, local+"@"+d.Domain)
+	if err != nil {
+		return nil, err
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -491,4 +476,63 @@ func (s *Service) mailAccountChanged(ctx context.Context, q db.Querier, owner *u
 		}
 	}
 	return nil
+}
+
+// aliasDestinations cleans and checks a forwarder's destination list.
+func aliasDestinations(in []string, self string) ([]string, error) {
+	var dests []string
+	for _, dst := range in {
+		dst = strings.TrimSpace(dst)
+		if dst == "" {
+			continue
+		}
+		if err := validate.ForwardAddress(dst); err != nil {
+			return nil, apperr.Invalid("%s", err.Error())
+		}
+		if strings.EqualFold(dst, self) {
+			return nil, apperr.Invalid("không thể chuyển tiếp về chính địa chỉ này")
+		}
+		if !slices.Contains(dests, dst) {
+			dests = append(dests, dst)
+		}
+	}
+	if len(dests) == 0 || len(dests) > 50 {
+		return nil, apperr.Invalid("cần 1–50 địa chỉ nhận")
+	}
+	return dests, nil
+}
+
+// UpdateAlias replaces a forwarder's destinations.
+func (s *Service) UpdateAlias(ctx context.Context, actor *users.User, id int64, destinations []string) (*mailrepo.Alias, error) {
+	a, err := s.mail().Alias(ctx, id)
+	if errors.Is(err, mailrepo.ErrNotFound) {
+		return nil, apperr.NotFound("không tìm thấy chuyển tiếp")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if _, _, err := s.accessibleMailDomain(ctx, actor, a.DomainID); err != nil {
+		return nil, apperr.NotFound("không tìm thấy chuyển tiếp")
+	}
+	dests, err := aliasDestinations(destinations, a.Address)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `UPDATE mail_aliases SET destinations=$2 WHERE id=$1`, id, dests); err != nil {
+		return nil, err
+	}
+	if _, err := s.syncMail(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		_, _ = s.syncMail(context.WithoutCancel(ctx), s.pool)
+		return nil, err
+	}
+	a.Destinations = dests
+	return a, nil
 }

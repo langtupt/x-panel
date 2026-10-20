@@ -5,6 +5,8 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -34,11 +36,17 @@ type Service struct {
 	secret  []byte
 	box     secretBox
 	limiter *failLimiter
+	// Per account, so guessing from many addresses is limited too. Higher
+	// than the per-IP limit: the owner keeps a margin to log in meanwhile.
+	accountLimiter *failLimiter
+
+	usedMu    sync.Mutex
+	usedCodes map[string]time.Time // "userID:code" -> when it stops being valid
 }
 
 func NewService(pool *pgxpool.Pool, repo *users.Repo, secret []byte) *Service {
 	return &Service{pool: pool, users: repo, secret: secret, box: newSecretBox(secret),
-		limiter: newFailLimiter(10, 15*time.Minute)}
+		limiter: newFailLimiter(10, 15*time.Minute), accountLimiter: newFailLimiter(30, 15*time.Minute), usedCodes: map[string]time.Time{}}
 }
 
 func (s *Service) Secret() []byte { return s.secret }
@@ -58,6 +66,21 @@ func (s *Service) checkTOTP(u *users.User, code string) error {
 	if !VerifyTOTP(secret, code, time.Now()) {
 		return ErrTOTPInvalid
 	}
+	// A code works once: one seen over the user's shoulder or replayed from
+	// a captured request is refused for the rest of its validity window.
+	s.usedMu.Lock()
+	defer s.usedMu.Unlock()
+	now := time.Now()
+	for k, until := range s.usedCodes {
+		if now.After(until) {
+			delete(s.usedCodes, k)
+		}
+	}
+	key := fmt.Sprintf("%d:%s", u.ID, code)
+	if _, used := s.usedCodes[key]; used {
+		return ErrTOTPInvalid
+	}
+	s.usedCodes[key] = now.Add(3 * time.Minute)
 	return nil
 }
 
@@ -109,8 +132,13 @@ func (s *Service) Login(ctx context.Context, username, password, code, ip, ua st
 	if err != nil {
 		return nil, Tokens{}, err
 	}
+	if s.accountLimiter.Blocked(u.Username) {
+		s.limiter.Fail(ip)
+		return nil, Tokens{}, ErrTooManyAttempts
+	}
 	if !CheckPassword(u.PasswordHash, password) {
 		s.limiter.Fail(ip)
+		s.accountLimiter.Fail(u.Username)
 		return nil, Tokens{}, ErrInvalidCredentials
 	}
 	if u.Status != users.StatusActive {
@@ -119,6 +147,7 @@ func (s *Service) Login(ctx context.Context, username, password, code, ip, ua st
 	if err := s.checkTOTP(u, code); err != nil {
 		if errors.Is(err, ErrTOTPInvalid) {
 			s.limiter.Fail(ip)
+			s.accountLimiter.Fail(u.Username)
 		}
 		return nil, Tokens{}, err
 	}

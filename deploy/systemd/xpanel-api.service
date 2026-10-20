@@ -10,6 +10,9 @@ Group=xpanel
 EnvironmentFile=/etc/xpanel/xpanel.env
 ExecStart=/opt/xpanel/bin/xpanel-api serve
 Restart=on-failure
+# Socket directory nginx can traverse; the socket itself is xpanel:www-data 0660.
+RuntimeDirectory=xpanel-api
+RuntimeDirectoryMode=0755
 RestartSec=3
 
 # The API never touches the system directly; everything goes through the agent.

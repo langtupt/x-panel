@@ -73,6 +73,8 @@ n=$(imap_count info@corp.example.com MailPass12345); [ "${n:-0}" -ge 2 ] && ok "
 curl -sk "imaps://127.0.0.1/INBOX;UID=1" -u info@corp.example.com:MailPass12345 > /tmp/m1 2>/dev/null
 grep -q "^DKIM-Signature:.*d=corp.example.com" /tmp/m1 && ok "message is DKIM-signed" || bad "no DKIM signature"
 curl -sk "pop3s://127.0.0.1/" -u info@corp.example.com:MailPass12345 2>/dev/null | grep -q . && ok "POP3S login works" || bad "POP3S failed"
+curl -sk "imaps://127.0.0.1/" -u info@corp.example.com:MailPass12345 > /tmp/folders 2>/dev/null
+for f in Sent Drafts Trash Junk; do grep -qw "$f" /tmp/folders && ok "folder $f exists" || bad "folder $f missing"; done
 
 echo "### abuse protection"
 IP=$(hostname -I | awk '{print $1}')
@@ -107,6 +109,9 @@ install_app roundcube
 expect "$(curl -sk -o /dev/null -w '%{http_code} %{redirect_url}' $B/webmail/)" "302 https://127.0.0.1:2096/webmail/" "panel port redirects to the webmail port"
 expect "$(curl -sk -o /tmp/rc -w '%{http_code}' $W/webmail/)" 200 "webmail page"
 grep -qi roundcube /tmp/rc && ok "Roundcube login form" || bad "not Roundcube"
+for asset in $(grep -oE '(href|src)="static.php/[^"]+.(css|js)[^"]*"' /tmp/rc | sed -E 's/^(href|src)="//; s/"$//' | head -3); do
+  expect "$(curl -sk -o /dev/null -w '%{http_code}' "$W/webmail/$asset")" 200 "webmail asset ${asset%%\?*}"
+done
 code=$(curl -sk -o /dev/null -w "%{http_code}" $W/webmail/config/config.inc.php); [ "$code" = 403 ] || [ "$code" = 404 ] && ok "config not reachable ($code)" || bad "config reachable ($code)"
 TOK=$(curl -sk -c /tmp/rcj -b /tmp/rcj $W/webmail/ | grep -o 'name="_token" value="[^"]*"' | sed 's/.*value="//;s/"//')
 code=$(curl -sk -c /tmp/rcj -b /tmp/rcj -o /dev/null -w '%{http_code} %{redirect_url}' "$W/webmail/?_task=login" \

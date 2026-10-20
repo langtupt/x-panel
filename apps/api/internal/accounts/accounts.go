@@ -20,6 +20,7 @@ import (
 	"xpanel/apps/api/internal/ftpaccounts"
 	"xpanel/apps/api/internal/mailrepo"
 	"xpanel/apps/api/internal/packages"
+	"xpanel/apps/api/internal/secretbox"
 	"xpanel/apps/api/internal/sites"
 	"xpanel/apps/api/internal/tasks"
 	"xpanel/apps/api/internal/users"
@@ -27,17 +28,18 @@ import (
 )
 
 type Service struct {
-	pool  *pgxpool.Pool
-	users *users.Repo
-	pkgs  *packages.Repo
-	sites *sites.Repo
-	dbs   *databases.Repo
-	ftp   *ftpaccounts.Repo
-	cron  *cronjobs.Repo
-	tasks *tasks.Queue // set by RegisterTasks
-	agent agentproto.Caller
-	auth  *auth.Service
-	log   *slog.Logger
+	pool    *pgxpool.Pool
+	users   *users.Repo
+	pkgs    *packages.Repo
+	sites   *sites.Repo
+	dbs     *databases.Repo
+	ftp     *ftpaccounts.Repo
+	cron    *cronjobs.Repo
+	tasks   *tasks.Queue // set by RegisterTasks
+	agent   agentproto.Caller
+	auth    *auth.Service
+	secrets *secretbox.Box
+	log     *slog.Logger
 }
 
 func NewService(pool *pgxpool.Pool, u *users.Repo, p *packages.Repo, st *sites.Repo, dbs *databases.Repo, ftp *ftpaccounts.Repo, cron *cronjobs.Repo, agent agentproto.Caller, a *auth.Service, log *slog.Logger) *Service {

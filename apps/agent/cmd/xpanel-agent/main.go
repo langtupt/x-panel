@@ -15,6 +15,7 @@ import (
 	"xpanel/apps/agent/internal/accounts"
 	"xpanel/apps/agent/internal/acme"
 	"xpanel/apps/agent/internal/apps"
+	"xpanel/apps/agent/internal/backup"
 	"xpanel/apps/agent/internal/cron"
 	"xpanel/apps/agent/internal/distro"
 	"xpanel/apps/agent/internal/files"
@@ -28,6 +29,7 @@ import (
 	"xpanel/apps/agent/internal/quota"
 	"xpanel/apps/agent/internal/server"
 	"xpanel/apps/agent/internal/siteapp"
+	"xpanel/apps/agent/internal/stats"
 	"xpanel/apps/agent/internal/sysinfo"
 	"xpanel/apps/agent/internal/web"
 	"xpanel/pkg/agentproto"
@@ -69,6 +71,16 @@ func main() {
 	// nftables rules do not survive a reboot: restore the app-port isolation.
 	if err := netguard.Rebuild(context.Background(), siteapp.ConfigRoot, d.NginxUser()); err != nil {
 		log.Error("restore application port isolation", "err", err)
+	}
+	// Database tools from older versions ran on the panel's origin.
+	if err := pma.MigrateTools(context.Background()); err != nil {
+		log.Error("move database tools to their own port", "err", err)
+	}
+	if err := mail.MigrateWebmail(context.Background()); err != nil {
+		log.Error("update webmail nginx config", "err", err)
+	}
+	if err := mail.MigrateDovecot(context.Background()); err != nil {
+		log.Error("update dovecot config", "err", err)
 	}
 
 	srv := server.New(log)
@@ -241,6 +253,15 @@ func main() {
 	})
 	srv.Register(agentproto.ActionPanelSSLIssue, server.Typed(func(ctx context.Context, p agentproto.PanelSSLParams) (any, error) {
 		return issuer.IssuePanel(ctx, p)
+	}))
+	srv.Register(agentproto.ActionBackupCreate, server.Typed(func(ctx context.Context, p agentproto.BackupCreateParams) (any, error) {
+		return backup.Create(ctx, p)
+	}))
+	srv.Register(agentproto.ActionBackupRestore, server.Typed(func(ctx context.Context, p agentproto.BackupRestoreParams) (any, error) {
+		return backup.Restore(ctx, p)
+	}))
+	srv.Register(agentproto.ActionStatsCollect, server.Typed(func(ctx context.Context, p agentproto.StatsParams) (any, error) {
+		return stats.Collect(ctx, p)
 	}))
 	srv.Register(agentproto.ActionMailSync, server.Typed(func(ctx context.Context, p agentproto.MailSyncParams) (any, error) {
 		return mail.Sync(ctx, p)

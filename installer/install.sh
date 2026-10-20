@@ -12,6 +12,7 @@ PREFIX=/opt/xpanel
 ETC=/etc/xpanel
 ENV_FILE=$ETC/xpanel.env
 PANEL_PORT=8888
+API_SOCK=/run/xpanel-api/api.sock
 
 log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*"; }
@@ -146,7 +147,7 @@ FIRST_INSTALL=0
 if [ ! -f "$ENV_FILE" ]; then
   FIRST_INSTALL=1
   cat >"$ENV_FILE" <<EOF
-XPANEL_LISTEN=127.0.0.1:8889
+XPANEL_LISTEN=unix:$API_SOCK
 XPANEL_DATABASE_URL=postgres:///xpanel?host=/var/run/postgresql
 XPANEL_JWT_SECRET=$(openssl rand -hex 32)
 XPANEL_AGENT_SOCKET=/run/xpanel/agent.sock
@@ -156,6 +157,11 @@ EOF
   chown root:xpanel "$ENV_FILE"
   chmod 0640 "$ENV_FILE"
 fi
+# Older versions listened on 127.0.0.1:8889, reachable by every customer's
+# processes: move to the socket only nginx can open.
+sed -i "s#^XPANEL_LISTEN=127.0.0.1:8889\$#XPANEL_LISTEN=unix:$API_SOCK#" "$ENV_FILE"
+# The API gives its socket to group www-data (nginx).
+usermod -aG www-data xpanel
 
 # Self-signed certificate for the panel port; can be replaced with a real one later.
 install -d -m 0750 -o root -g root "$ETC/ssl"
@@ -174,6 +180,22 @@ systemctl restart pure-ftpd
 # ---------------------------------------------------------------- nginx
 install -d -m 0755 /etc/nginx/conf.d/xpanel /var/lib/xpanel/acme /var/log/nginx/xpanel
 install -m 0644 "$SRC/deploy/nginx/xpanel-panel.conf" /etc/nginx/conf.d/xpanel-panel.conf
+# Website logs live outside /var/log/nginx/*.log, which the distribution
+# rotates; without this they grow until the disk is full.
+install -m 0644 /dev/stdin /etc/logrotate.d/xpanel-nginx <<'EOF'
+/var/log/nginx/xpanel/*.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+        [ -s /run/nginx.pid ] && kill -USR1 "$(cat /run/nginx.pid)"
+    endscript
+}
+EOF
 # Performance/security defaults, only where nginx.conf does not set them itself.
 {
   echo "# Managed by X-Panel"
@@ -249,10 +271,10 @@ systemctl enable xpanel-agent xpanel-api
 systemctl restart xpanel-agent xpanel-api
 
 for _ in $(seq 1 30); do
-  curl -sf -o /dev/null http://127.0.0.1:8889/api/health && break
+  curl -sf -o /dev/null --unix-socket "$API_SOCK" http://xpanel/api/health && break
   sleep 0.5
 done
-curl -sf -o /dev/null http://127.0.0.1:8889/api/health \
+curl -sf -o /dev/null --unix-socket "$API_SOCK" http://xpanel/api/health \
   || die "xpanel-api không khởi động được, xem: journalctl -u xpanel-api"
 
 # The one-line installer turns on disk quotas here, so the login details

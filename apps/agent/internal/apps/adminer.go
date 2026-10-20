@@ -73,7 +73,7 @@ func installAdminer(ctx context.Context, d distro.Distro, selected string, logf 
 	if err := os.WriteFile(filepath.Join(pma.AdminerDir, "index.php"), []byte(adminerWrapper), 0o644); err != nil {
 		return err
 	}
-	if err := pma.InstallSnippet(ctx, filepath.Join(pma.SnippetDir, "adminer.conf"), adminerSnippet); err != nil {
+	if err := pma.InstallTool(ctx, "adminer", adminerSnippet); err != nil {
 		return err
 	}
 	logf("Adminer %s sẵn sàng tại /adminer/", version)

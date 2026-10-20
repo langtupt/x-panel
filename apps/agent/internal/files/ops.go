@@ -8,6 +8,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"bufio"
+	"compress/bzip2"
 	"compress/gzip"
 	"errors"
 	"fmt"
@@ -45,6 +46,10 @@ func dispatch(req agentproto.FSRequest, in io.Reader, out io.Writer) (*agentprot
 		return nil, os.Mkdir(clean(req.Path), 0o755)
 	case "rename":
 		return nil, rename(clean(req.Path), clean(req.To))
+	case "move":
+		return nil, move(req.Paths, clean(req.To))
+	case "copy":
+		return nil, copyAll(req.Paths, clean(req.To))
 	case "delete":
 		return nil, remove(req.Paths)
 	case "chmod":
@@ -218,10 +223,15 @@ func download(p string, out io.Writer) error {
 	return err
 }
 
-// compress zips files and directories (symlinks are skipped) into dest.
+// compress packs files and directories (symlinks are skipped) into dest:
+// .zip, or .tar.gz / .tgz.
 func compress(paths []string, dest string) error {
-	if !strings.HasSuffix(dest, ".zip") {
-		return errors.New("file nén phải có đuôi .zip")
+	lower := strings.ToLower(dest)
+	if strings.HasSuffix(lower, ".tar.gz") || strings.HasSuffix(lower, ".tgz") {
+		return compressTarGz(paths, dest)
+	}
+	if !strings.HasSuffix(lower, ".zip") {
+		return errors.New("file nén phải có đuôi .zip hoặc .tar.gz")
 	}
 	f, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
@@ -301,6 +311,13 @@ func extract(archive, destDir string) error {
 			return err
 		}
 		return extractTar(tar.NewReader(gz), destDir)
+	case strings.HasSuffix(lower, ".tar.bz2"), strings.HasSuffix(lower, ".tbz2"):
+		f, err := os.Open(archive)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		return extractTar(tar.NewReader(bzip2.NewReader(bufio.NewReader(f))), destDir)
 	case strings.HasSuffix(lower, ".tar"):
 		f, err := os.Open(archive)
 		if err != nil {
@@ -309,7 +326,7 @@ func extract(archive, destDir string) error {
 		defer f.Close()
 		return extractTar(tar.NewReader(f), destDir)
 	}
-	return errors.New("chỉ hỗ trợ .zip, .tar, .tar.gz, .tgz")
+	return errors.New("chỉ hỗ trợ .zip, .tar, .tar.gz, .tgz, .tar.bz2")
 }
 
 func target(destDir, name string) string { return path.Join(destDir, clean(name)) }

@@ -16,6 +16,7 @@ import {
 import { Operations } from "@/components/operations";
 import {
   Activity,
+  BarChart3,
   Blocks,
   ChevronRight,
   Clock3,
@@ -23,6 +24,7 @@ import {
   FileCode2,
   FolderOpen,
   Globe2,
+  HardDriveDownload,
   LayoutDashboard,
   LogOut,
   Mail,
@@ -121,6 +123,20 @@ const NAV: NavItem[] = [
     roles: ["admin", "reseller"],
     icon: Package,
     group: "Quản trị",
+  },
+  {
+    href: "/backups/",
+    label: "Sao lưu",
+    roles: ALL,
+    icon: HardDriveDownload,
+    group: "Hệ thống",
+  },
+  {
+    href: "/stats/",
+    label: "Thống kê tài nguyên",
+    roles: ALL,
+    icon: BarChart3,
+    group: "Hệ thống",
   },
   {
     href: "/tasks/",
