@@ -1,0 +1,444 @@
+# X-Panel
+
+[English](README.md) · **Tiếng Việt**
+
+**Control panel hosting gọn nhẹ, cài bằng 1 lệnh** cho VPS **Ubuntu 22.04/24.04** và **Debian 12/13**:
+website (HTML, PHP, Laravel, Node.js, Next.js, Go), database MariaDB/PostgreSQL, FTP/SFTP, quản lý file
+có trình soạn thảo code, cron, SSL Let's Encrypt, email (Postfix + Dovecot + DKIM) và Roundcube Webmail,
+sao lưu mã hóa lên Google Drive, thống kê tài nguyên. Phân cấp **Admin → Đại lý → Khách hàng** với gói
+giới hạn ổ đĩa / CPU / RAM, mỗi khách cách ly hoàn toàn.
+
+## 🚀 Cài đặt — 1 lệnh
+
+**1.** Tạo VPS **mới** (Ubuntu 24.04 khuyên dùng, RAM ≥ 1 GB), mở cổng **22, 80, 443, 8888** ở firewall của
+nhà cung cấp.<br>
+**2.** Đăng nhập VPS bằng tài khoản **root** (Windows: mở PowerShell, gõ `ssh root@IP-VPS`).<br>
+**3.** Dán lệnh sau rồi nhấn Enter:
+
+```bash
+apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update && apt-get -o Acquire::Retries=3 install -y curl ca-certificates && curl -fSL --retry 3 -o /tmp/xpanel-install.sh https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh && bash /tmp/xpanel-install.sh
+```
+
+Sau 3–10 phút, màn hình hiện **địa chỉ panel, tài khoản `admin` và mật khẩu** (chỉ hiện một lần — hãy ghi lại):
+
+```
+  Địa chỉ   : https://IP-VPS:8888
+  Tài khoản : admin
+  Mật khẩu  : Xk3pQ9vT2mLw8RzA
+```
+
+Mở địa chỉ đó trên trình duyệt (cảnh báo chứng chỉ lần đầu: chọn *Advanced → Proceed*) và đăng nhập.
+
+| Việc cần làm | Lệnh (chạy bằng root) |
+|---|---|
+| Tự đặt mật khẩu admin khi cài | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| ADMIN_PASSWORD='MatKhau12345' bash` |
+| **Cập nhật** lên bản mới (giữ nguyên dữ liệu) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| bash` |
+| Quên mật khẩu admin | như dòng đầu, với mật khẩu mới |
+| Gỡ panel và dữ liệu khách (giữ các gói dịch vụ) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| bash` |
+| **Gỡ toàn bộ**, gồm các gói nginx/PHP/database/mail/FTP | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_PURGE_PACKAGES=1 bash` |
+| Gỡ panel nhưng giữ website/database/email | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_KEEP_DATA=1 bash` |
+
+Chế độ `XPANEL_PURGE_PACKAGES=1` có thể chạy tiếp sau khi đã gỡ panel; nó xóa toàn bộ
+gói và dữ liệu của các dịch vụ hosting kể trên, kể cả cài ngoài X-Panel. Không dùng
+cùng `XPANEL_KEEP_DATA=1`. Swap, quota, cấu hình mạng và file do bạn tự tải trong
+`/root` được giữ nguyên; gỡ phần mềm không tương đương cài lại hệ điều hành.
+
+📘 **Hướng dẫn chi tiết từ A đến Z** (chuẩn bị VPS, mở cổng, đăng nhập SSH từ Windows, các bước sau khi cài,
+email, sao lưu, xử lý lỗi): **[docs/CAI-DAT.md](docs/CAI-DAT.md)**
+
+Trình cài đặt tự kiểm tra hệ điều hành / RAM / ổ đĩa, **từ chối cài lên máy đã có panel hoặc web server khác**,
+tải bản phát hành mới nhất cho CPU của máy (amd64/arm64) và kiểm tra SHA-256, rồi tối ưu VPS (swap khi RAM thấp,
+giới hạn log, MariaDB theo RAM, gzip, fail2ban, firewall).
+
+Cổng dùng thêm khi cần: 8890 (phpMyAdmin/Adminer), 21 + 30000–30100 (FTP), 25, 465, 587, 993, 995 (email),
+2096 (webmail).
+
+### Không tải được gói: `Temporary failure resolving`
+
+Ví dụ `Temporary failure resolving 'deb.debian.org'` hoặc `security.debian.org`:
+VPS chưa phân giải được DNS, nên APT chưa cài được curl và **script X-Panel chưa chạy**.
+`apt-get update` có thể chỉ cảnh báo rồi dùng danh sách gói cũ; lệnh ở trên yêu cầu
+APT dừng nếu có kho không cập nhật được. `--fix-missing` không sửa được DNS.
+
+Kiểm tra bằng root (không cần cài thêm gói):
+
+```bash
+ip route
+cat /etc/resolv.conf
+getent hosts deb.debian.org security.debian.org raw.githubusercontent.com github.com
+```
+
+Nếu không có default route, kiểm tra cấu hình mạng/gateway trong console của nhà cung cấp VPS.
+Nếu có route nhưng không phân giải được tên miền, cấu hình DNS do nhà cung cấp cung cấp,
+hoặc thử DNS công cộng `1.1.1.1` và `8.8.8.8` nếu mạng cho phép. Với systemd-resolved
+đang hoạt động, áp dụng tạm cho card mạng ra Internet:
+
+```bash
+iface=$(ip -4 route show default | awk '/default/ {print $5; exit}')
+test -n "$iface" && resolvectl dns "$iface" 1.1.1.1 8.8.8.8
+resolvectl flush-caches
+```
+
+Nếu **không dùng systemd-resolved**, sao lưu rồi sửa danh sách DNS tạm thời:
+
+```bash
+cp -L /etc/resolv.conf "/root/resolv.conf.before-xpanel-$(date +%Y%m%d-%H%M%S)" && printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf
+```
+
+Chạy lại `getent hosts deb.debian.org raw.githubusercontent.com`; khi có địa chỉ IP,
+chạy lại lệnh cài đặt. Nếu vẫn lỗi, kiểm tra firewall/nhà cung cấp có chặn DNS (UDP/TCP 53)
+hoặc truy cập Internet không. Cấu hình tạm có thể bị DHCP/cloud-init ghi đè sau reboot;
+lưu DNS lâu dài trong cấu hình mạng đang quản lý VPS (netplan, NetworkManager, systemd-networkd
+hoặc giao diện nhà cung cấp). Script không tự ghi đè DNS hệ thống.
+
+Nếu `/etc/resolv.conf` chỉ có dòng `Generated by dhcpcd` và không có `nameserver`,
+DNS chưa được ghi vào resolver dù `/etc/network/interfaces` có `dns-nameservers`.
+Kiểm tra hook quản lý DNS của ifupdown/dhcpcd. Khi dùng dhcpcd, có thể đặt các dòng
+`nameserver` vào `/etc/resolv.conf.head` để dhcpcd giữ chúng khi tạo lại resolver.
+Không cần khởi động lại card mạng trong phiên SSH chỉ để sửa file DNS.
+
+Đã kiểm thử cài trực tiếp trên VPS Debian 13 (không Docker) ngày 20/10/2026:
+sửa resolver rỗng, cài với tài khoản Linux `xpanel` đã tồn tại, chạy migration 0014,
+khởi động API/agent/nginx/PostgreSQL/MariaDB và bật quota ext4 thành công.
+
+## Dành cho nhà phát triển
+
+### Tự tối ưu CPU/RAM
+
+Bản cài từ v1.1.4 tự tính profile nginx, MariaDB, PostgreSQL và PHP theo CPU/RAM,
+giữ bộ nhớ cho hệ điều hành/ứng dụng, bật slow-query log và chia PHP worker theo
+ngân sách của tài khoản. Xem [cấu hình, cách tắt và kết quả kiểm thử tải](docs/TUNING.md).
+Profile không thay thế kiểm thử website thực tế hoặc việc chọn VPS đủ tài nguyên.
+
+### Kiến trúc
+
+```
+Trình duyệt ──HTTPS :8888──▶ nginx ──▶ xpanel-api (Go, user "xpanel", unix socket chỉ nginx mở được)
+                                          │  phục vụ UI Next.js (static export) + REST API
+                                          │  PostgreSQL qua unix socket (peer auth)
+                                          ▼
+                              /run/xpanel/agent.sock (0660 root:xpanel)
+                                          ▼
+                              xpanel-agent (Go, root) — chỉ chạy action trong whitelist
+```
+
+| Thư mục | Nội dung |
+|---|---|
+| `apps/api` | Go API: auth (JWT 15 phút + refresh token xoay vòng), RBAC, users, audit log, migrations |
+| `apps/agent` | Go agent chạy root: nhận diện distro (Debian/Ubuntu), user Linux, quota, vhost nginx, PHP-FPM, SSL |
+| `apps/web` | Next.js 16 + Tailwind 4, build ra file tĩnh (`out/`) |
+| `pkg/agentproto` | Giao thức API ↔ agent (danh sách action + client) |
+| `deploy/` | systemd unit, nginx config, docker-compose cho dev |
+| `installer/install.sh` | Script cài đặt 1 lệnh |
+| `scripts/build-release.sh` | Đóng gói `dist/xpanel-linux-<arch>.tar.gz` |
+
+## Cài từ mã nguồn
+
+```bash
+./scripts/build-release.sh amd64          # trên máy dev
+scp dist/xpanel-linux-amd64.tar.gz root@server:
+ssh root@server 'tar xzf xpanel-linux-amd64.tar.gz && cd xpanel-linux-amd64 && ADMIN_PASSWORD="..." ./install.sh'
+```
+
+Panel chạy ở **https://IP-server:8888** (nginx giữ cổng 8888 và chuyển vào API qua unix socket /run/xpanel-api/api.sock).
+
+Installer sẽ cài nginx, PostgreSQL, MariaDB (chỉ nghe 127.0.0.1), quota; tạo user hệ thống `xpanel`, DB,
+chứng chỉ self-signed, mở cổng 80/443/8888 nếu ufw đang bật; tạo tài khoản `admin` (mật khẩu lấy từ `ADMIN_PASSWORD`,
+không có thì sinh ngẫu nhiên; chỉ hiển thị trên màn hình, không lưu thành file). Chạy lại script = nâng cấp, giữ nguyên
+cấu hình và dữ liệu; chạy lại kèm `ADMIN_PASSWORD=...` để đặt lại mật khẩu admin.
+
+Đổi mật khẩu một tài khoản bất kỳ trên server:
+
+```bash
+sudo -u xpanel env $(sudo cat /etc/xpanel/xpanel.env | xargs) /opt/xpanel/bin/xpanel-api reset-password -username admin -password '...'
+```
+
+### Bật quota ổ đĩa
+
+Giới hạn dung lượng của gói chỉ có hiệu lực khi phân vùng chứa `/home` bật user quota:
+
+```bash
+sudo ./enable-quota.sh
+```
+
+- **ext4**: bật ngay (thêm `usrquota` vào fstab, remount, `quotaon`), không cần reboot.
+- **xfs**: thêm `uquota` vào fstab (và `rootflags=uquota` vào kernel nếu `/home` nằm trên `/`), **cần reboot**.
+
+Sau khi bật, mở từng gói và lưu lại để áp quota cho các tài khoản đã tạo trước đó.
+
+## Phát triển (Windows/macOS/Linux)
+
+```bash
+docker compose -f deploy/docker-compose.dev.yml up -d   # PostgreSQL trên 127.0.0.1:5433
+
+export XPANEL_DATABASE_URL="postgres://xpanel:xpanel@127.0.0.1:5433/xpanel?sslmode=disable"
+export XPANEL_JWT_SECRET="dev-secret-dev-secret-dev-secret-0123456789"
+export XPANEL_SECURE_COOKIES=false
+export XPANEL_LISTEN=127.0.0.1:8888
+export XPANEL_AGENT_DRY_RUN=true          # chỉ dùng khi dev trên máy không có agent (Windows/macOS)
+go run ./apps/api/cmd/xpanel-api create-admin -username admin -password 'Admin@123!'
+go run ./apps/api/cmd/xpanel-api serve                   # API + UI trên http://127.0.0.1:8888
+
+cd apps/web && npm install && npm run dev                # UI trên http://localhost:3000 (proxy /api)
+```
+
+Agent chỉ chạy trên Linux. Gọi thử một action trên server: `xpanel-agent -call system.info`.
+
+```bash
+go test ./...                 # unit test (phân quyền, quy tắc gói, quota, TOTP, SQL/cron escaping…)
+cd apps/web && npm run lint   # kiểm tra TypeScript
+
+# End-to-end: cài bản release vào container systemd (Debian/Ubuntu) và chạy API thật
+./scripts/build-release.sh amd64
+./tests/e2e/run.sh debian     # hoặc ubuntu — website, PHP, SSL (Pebble), DB, FTP/SFTP, file, cron, 2FA
+```
+
+## Tài khoản và gói dịch vụ
+
+- **Admin** tạo gói *đại lý* (tổng dung lượng cấp cho khách, số tài khoản tối đa, oversell) và gói *người dùng*.
+- **Đại lý** tạo gói người dùng của riêng mình; mỗi giới hạn không được vượt gói đại lý. Khi tạo khách hoặc
+  tăng gói, tổng dung lượng đã cấp không được vượt gói đại lý (trừ khi bật oversell); số tài khoản luôn bị giới hạn.
+- Chỉ tài khoản **người dùng** là tài khoản hosting: có user Linux riêng (`/home/<tên>`, quyền 750, shell
+  nologin) và quota ổ đĩa theo gói. Khóa tài khoản = hết hạn user Linux + đăng xuất mọi phiên.
+  Xóa tài khoản = xóa user Linux và thư mục home.
+- Agent chỉ đụng tới user Linux mang nhãn `xpanel` (GECOS), không bao giờ sửa/xóa user hệ thống.
+
+## Website, PHP và SSL
+
+- **PHP**: admin cài từng phiên bản 7.4–8.5 ở trang *Applications* (chạy nền). Debian dùng `packages.sury.org`,
+  Ubuntu dùng `ppa:ondrej/php`. Các phiên bản chạy song song.
+- **Website**: mã nguồn ở `/home/<user>/www/<domain>/<thư mục gốc>`. Mỗi site PHP/Laravel có một PHP-FPM pool và service
+  riêng, chạy bằng chính user Linux đó, `open_basedir=/home/<user>/:/tmp/`.
+  nginx được thêm vào group của user để đọc file tĩnh; các khách hàng khác không đọc được file của nhau.
+- Mỗi thay đổi, agent dựng lại *toàn bộ* vhost + pool của user đó (`/etc/nginx/conf.d/xpanel/<user>/`),
+  chạy `nginx -t` và chờ socket ứng dụng sẵn sàng trước khi trả thành công. Cấu hình nginx được khôi phục nếu kiểm tra cú pháp thất bại.
+- Giới hạn từ gói: số website, phiên bản PHP được phép. Tên miền và alias là duy nhất trên toàn máy chủ.
+- Khóa tài khoản → mọi website trả 503 "tạm ngưng" và pool PHP bị gỡ. Xóa website giữ lại mã nguồn.
+- **SSL**: Let's Encrypt qua HTTP-01 (webroot `/var/lib/xpanel/acme`, thư viện lego), chạy dạng tác vụ nền.
+  Tự gia hạn khi còn dưới 30 ngày (quét 12 giờ/lần). Đổi alias của site đang có SSL sẽ tự cấp lại.
+  Tên miền phải trỏ về máy chủ và cổng 80 phải mở. Thử với CA khác (ví dụ Pebble) bằng
+  `/etc/xpanel/agent.env`: `XPANEL_ACME_DIR=...`, `XPANEL_ACME_INSECURE=true`.
+
+## Database (MariaDB)
+
+- MariaDB chỉ nghe `127.0.0.1`; website kết nối bằng host `localhost` (socket) hoặc `127.0.0.1`.
+- Database và user cùng tên, luôn có dạng `<tài khoản>_<tên>`; mỗi user chỉ có quyền trên database của mình
+  (dấu `_` được escape trong `GRANT` để không thành ký tự đại diện). Agent kiểm tra lại tiền tố này.
+- Tên/mật khẩu được kiểm tra theo bộ ký tự chặt trước khi đưa vào SQL; mật khẩu chỉ hiển thị một lần khi tạo.
+- Giới hạn số database theo gói. Khóa tài khoản → `ACCOUNT LOCK` mọi user database; xóa tài khoản → xóa luôn database.
+
+## SFTP, FTP, quản lý file, phpMyAdmin
+
+- **SFTP** (cổng 22): mỗi tài khoản hosting đăng nhập bằng *mật khẩu panel*, bị chroot trong `/home/<user>`
+  (home thuộc `root:<user>` 0750, user ghi trong `www/`, `tmp/`, `logs/`), chỉ SFTP, không có shell.
+- **FTP** (cổng 21, FTPS explicit, passive 30000–30100): Pure-FTPd chỉ dùng virtual user của X-Panel
+  (`<user>_<tên>`), mỗi tài khoản chroot vào một thư mục trong home, ghi file bằng uid của user (tính quota).
+  Giới hạn theo gói (`max_ftp`). Khóa tài khoản → chặn đăng nhập FTP; xóa tài khoản → xóa luôn tài khoản FTP.
+- **Quản lý file**: danh sách, tạo/sửa file (trình soạn thảo, Ctrl+S), đổi tên, phân quyền, xóa, nén .zip,
+  giải nén .zip/.tar/.tar.gz, tải lên (tối đa 1 GB, có tiến độ), tải về. Mọi thao tác chạy trong tiến trình
+  `xpanel-agent fshelper` đã `chroot` vào home và hạ quyền về uid/gid của user — symlink hay `../` không
+  thoát ra ngoài được, quyền đúng như chính user đó.
+- **phpMyAdmin**: admin bấm cài ở trang *Database* (tải bản mới nhất, kiểm tra SHA-256), chạy ở
+  `https://IP:8888/phpmyadmin/` bằng pool PHP-FPM riêng (user `xpanel-pma`), đăng nhập bằng user database.
+
+## Giới hạn CPU/RAM theo tài khoản
+
+Mỗi site PHP/Laravel và ứng dụng Node.js/Next.js/Go có service riêng (`xpanel-app-<user>-<hash>.service`),
+cấu hình trong `/etc/xpanel-site-apps/<user>/`, chạy trong cgroup `xpanel-<user>.slice`. CPU % và RAM của gói
+được áp vào slice (`CPUQuota`, `MemoryMax`, không swap) qua `systemctl set-property` — có hiệu lực ngay khi đổi gói.
+Request vượt RAM bị kernel kill (nginx trả 502) mà không ảnh hưởng website của khách khác. `pm.max_children`
+tính theo RAM của gói (~64 MB/worker). Khóa tài khoản dừng các master này.
+Lưu ý: cron và phiên SFTP chưa nằm trong slice này.
+
+## Bảo mật tài khoản, cron, nhật ký
+
+- **Xác thực 2 lớp (TOTP)** ở trang *Tài khoản của tôi*: quét QR (Google Authenticator, Authy…), secret
+  được mã hóa AES-GCM trong DB (khóa dẫn xuất từ `XPANEL_JWT_SECRET` — đổi secret này thì 2FA phải bật lại).
+  Tự đổi mật khẩu cũng ở đây (đăng xuất mọi phiên khác; với tài khoản hosting đổi luôn mật khẩu SFTP).
+- **Đăng nhập thay**: admin/đại lý mở panel với quyền của tài khoản mình quản lý (có thanh báo và nút quay lại,
+  ghi nhật ký; không đổi được mật khẩu/2FA trong lúc đăng nhập thay; không lồng nhau).
+- **Cron**: lịch 5 trường hoặc `@hourly/@daily/...`, chạy bằng user Linux của tài khoản (ngoài chroot,
+  như PHP); giới hạn theo gói (`max_cron`); tự dừng khi tài khoản bị khóa (cron kiểm tra tài khoản hết hạn).
+- **Nhật ký**: admin xem tất cả, đại lý xem của mình và khách, người dùng xem của mình.
+
+## API hiện có
+
+| Method | Path | Quyền |
+|---|---|---|
+| POST | `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout` | công khai |
+| GET | `/api/me`, `/api/me/overview` | đã đăng nhập |
+| POST | `/api/me/password`, `/api/me/2fa/setup`, `/api/me/2fa/enable`, `/api/me/2fa/disable` | đã đăng nhập (không khi đang đăng nhập thay) |
+| POST | `/api/auth/impersonate` / `/api/auth/unimpersonate` | admin, reseller (tài khoản mình quản lý) |
+| GET/POST, PUT/DELETE | `/api/cron`, `/api/cron/{id}` | chủ tài khoản hoặc tài khoản quản lý |
+| GET | `/api/audit?before=` | đã đăng nhập (phạm vi theo vai trò) |
+| GET/POST | `/api/users` | admin (tất cả), reseller (khách của mình) |
+| PATCH | `/api/users/{id}/status`, `/api/users/{id}/password` | admin, reseller (khách của mình) |
+| PATCH | `/api/users/{id}/package` | tài khoản cha trực tiếp |
+| DELETE | `/api/users/{id}` | admin, reseller (khách của mình) |
+| GET/POST | `/api/packages` | admin, reseller (gói của mình) |
+| PUT/DELETE | `/api/packages/{id}` | chủ sở hữu gói |
+| GET/POST | `/api/sites` | admin (tất cả), reseller (site của khách), user (site của mình) |
+| PUT/DELETE | `/api/sites/{id}` | chủ site hoặc tài khoản quản lý |
+| POST/DELETE | `/api/sites/{id}/ssl` | chủ site hoặc tài khoản quản lý (POST tạo tác vụ) |
+| GET/POST | `/api/databases` | admin (tất cả), reseller (của khách), user (của mình) |
+| PATCH | `/api/databases/{id}/password` | chủ database hoặc tài khoản quản lý |
+| DELETE | `/api/databases/{id}` | chủ database hoặc tài khoản quản lý |
+| GET/POST | `/api/ftp` | admin (tất cả), reseller (của khách), user (của mình) |
+| PATCH/DELETE | `/api/ftp/{id}/password`, `/api/ftp/{id}` | chủ tài khoản FTP hoặc tài khoản quản lý |
+| GET | `/api/files?user_id=&path=` | chủ home hoặc tài khoản quản lý |
+| POST | `/api/files/op` (`list read write mkdir rename delete chmod extract compress`) | như trên |
+| POST/GET | `/api/files/upload`, `/api/files/download` (stream) | như trên |
+| GET/POST | `/api/phpmyadmin` | trạng thái: đã đăng nhập; cài đặt: admin |
+| GET | `/api/php` | đã đăng nhập |
+| POST | `/api/php/{version}` | admin (tạo tác vụ cài đặt) |
+| GET | `/api/tasks`, `/api/tasks/{id}` | admin (tất cả), người tạo tác vụ |
+| GET | `/api/system/info` | admin |
+
+Mọi request thay đổi dữ liệu phải gửi header `X-XPanel: 1` (chống CSRF).
+
+## Lộ trình
+
+- [x] Tuần 1–2: monorepo, API, agent, đăng nhập/RBAC, UI cơ bản, installer cho 3 distro
+- [x] Tuần 3–4: gói dịch vụ (CRUD, giới hạn reseller), tạo Linux user + disk quota khi tạo tài khoản
+- [x] Tuần 5–6: website (nginx vhost, PHP-FPM nhiều phiên bản sury/ondrej), SSL Let's Encrypt, hàng đợi task
+- [x] Tuần 7–8: database MariaDB, FTP/SFTP, quản lý file, phpMyAdmin
+- [x] Bổ sung MVP: 2FA TOTP, đăng nhập thay, tự đổi mật khẩu, cron, trang nhật ký, e2e trong `tests/e2e`
+- [x] Tuần 9–10 (phần 1): giới hạn CPU/RAM theo tài khoản (cgroups, PHP-FPM riêng)
+- [x] Email (Postfix, Dovecot, DKIM), Roundcube Webmail, chứng chỉ SSL (Let's Encrypt / tải lên / tự ký)
+- [x] Backup/restore mã hóa lên Google Drive, thống kê tài nguyên theo tài khoản, rà soát bảo mật
+
+## Sao lưu lên Google Drive
+
+Trang **Sao lưu** (admin):
+
+1. Vào [Google Cloud Console](https://console.cloud.google.com/apis/credentials), bật **Google Drive API**, tạo
+   **OAuth client ID** loại **TVs and Limited Input devices** (màn hình đồng ý: thêm email của bạn vào *Test users*).
+2. Dán Client ID / Client secret vào panel → panel hiện mã → mở `google.com/device`, nhập mã, đồng ý.
+3. Đặt **passphrase mã hóa** (≥ 12 ký tự), lịch (hằng ngày / hằng tuần), giờ chạy và số bản giữ lại.
+
+Mỗi bản backup gồm thư mục home (website), dump database (MariaDB/PostgreSQL) và hộp thư của một tài khoản; được
+nén và mã hóa AES-256-GCM (khóa scrypt từ passphrase) rồi tải thẳng lên Drive theo luồng, không cần chỗ trống trên
+VPS. Panel chỉ dùng quyền `drive.file` (chỉ thấy file do chính nó tạo). File home được đọc và ghi lại **dưới quyền
+của chính tài khoản đó**, nên symlink cài cắm không thể kéo file hệ thống vào backup. Khách hàng và đại lý thấy,
+tạo và khôi phục backup của tài khoản mình quản lý; **mất passphrase thì không khôi phục được**.
+
+## Thống kê tài nguyên
+
+Trang **Thống kê tài nguyên** đo mỗi 5 phút cho từng tài khoản: CPU và RAM (cgroup `xpanel-<user>.slice`, gồm PHP,
+ứng dụng Node/Go, build và cron), số tiến trình, ổ đĩa (quota), database, hộp thư, băng thông và lượt truy cập
+(đọc dần từ log nginx của từng website). Biểu đồ 24 giờ / 7 ngày / 30 ngày, so với giới hạn của gói; lưu 35 ngày.
+Admin xem mọi tài khoản, đại lý xem khách của mình, khách chỉ xem chính mình.
+
+## Các lớp bảo mật chính
+
+- Mỗi tài khoản là một user Linux riêng: PHP-FPM, ứng dụng, cron chạy dưới user đó trong slice giới hạn CPU/RAM;
+  nginx không đi theo symlink sang file của người khác; cổng ứng dụng nội bộ bị nftables chặn với tài khoản khác.
+- API chỉ nghe trên unix socket mà nginx mở được (khách không gọi thẳng API hay giả IP được); cookie
+  HttpOnly + SameSite=Strict, header chống CSRF, CSP, HSTS; giới hạn đăng nhập sai theo IP và theo tài khoản;
+  mã 2FA chỉ dùng được một lần.
+- phpMyAdmin/Adminer (cổng 8890) và Roundcube (cổng 2096) chạy ở origin riêng, tách khỏi phiên đăng nhập panel.
+- Mail: không relay cho tiến trình nội bộ, không mạo danh địa chỉ của tài khoản khác, `sendmail` chỉ cho root,
+  DKIM chỉ ký thư đã xác thực; fail2ban cho SSH, FTP, SMTP, IMAP/POP3.
+- Bí mật trong database (token Google, passphrase backup, khóa 2FA) được mã hóa bằng khóa riêng của máy chủ.
+
+## Applications và ứng dụng website
+
+Trang **Applications** (admin) liệt kê PHP, Composer, Node.js, Go,
+MariaDB, PostgreSQL, phpMyAdmin và Adminer. Chọn phiên bản rồi cài; tác vụ chạy nền,
+có trạng thái và nhật ký ở trang Tasks. Mỗi lần chỉ chạy một tác vụ cài đặt.
+API cũ /api/php và /api/phpmyadmin vẫn tương thích.
+
+- GET /api/apps; POST /api/apps/{id}/install với {"version":"24"} (admin).
+- Tạo database với engine=mariadb (mặc định) hoặc engine=postgresql. Database cũ
+  được migration sang mariadb. PostgreSQL khách hàng ở 127.0.0.1:5433 trong cluster
+  customers, tách khỏi database panel; quản trị qua /adminer/ sau khi cài Adminer.
+  MariaDB dùng localhost:3306 và /phpmyadmin/. Tên database vẫn duy nhất giữa hai engine.
+- Website hỗ trợ html, php, laravel, nodejs, nextjs, go. Cài runtime cần dùng trong
+  Applications trước. PHP/Laravel chọn php_version; Node.js/Go chọn runtime
+  (để trống: mới nhất đã cài). Laravel dùng document root public.
+- Mỗi site PHP/Laravel hoặc app chạy tiến trình có service systemd riêng trong
+  xpanel-<user>.slice, chia sẻ giới hạn CPU/RAM của tài khoản. HTML do nginx phục vụ.
+  Node.js/Next.js/Go được cấp cổng 10000–59999 và nginx reverse proxy về localhost.
+  App Node.js tự viết phải đọc PORT/HOST và bind 127.0.0.1; Go cũng phải dùng PORT.
+- Tải mã nguồn vào ~/www/<domain>, sửa site rồi bấm **Nhận diện từ mã nguồn** để
+  gợi ý loại app. Có thể chọn **Tạo dự án mẫu** khi tạo site; thư mục phải trống.
+  Next.js mẫu dùng package phiên bản latest ở lần tạo đầu, sau đó npm tạo lockfile.
+- **Build & restart** chạy npm ci/install + build, go build, hoặc Composer + Laravel
+  config/view cache bằng user Linux của khách trong slice của tài khoản (tối đa 30 phút).
+  Không tự chạy database migrations. Node cần script start trong package.json.
+- Biến môi trường riêng từng site nhập theo KEY=value; PORT, HOST, PATH, HOME do
+  panel quản lý. PHP giữ môi trường trong pool riêng. Cấu hình được lưu ở DB panel
+  và EnvironmentFile root-owned (0600); không đưa mật khẩu vào mã nguồn. Các biến hiển thị cho chủ site
+  và tài khoản quản lý site. Logs đọc tối đa 200 dòng journal của service.
+- GET /api/sites/{id}/detect, GET /api/sites/{id}/logs,
+  POST /api/sites/{id}/build: chủ site hoặc tài khoản quản lý. Cấu hình app/env nằm trong
+  POST/PUT /api/sites. Suspend dừng service và khóa user database của cả hai engine;
+  activate phục hồi app đã build; xóa tài khoản gỡ service trước khi xóa Linux user.
+
+Kiểm tra bổ sung: tests/e2e/applications.sh có assertions cho cài runtime qua API,
+site mẫu, nginx, slice, database, suspend/activate và dọn service. Chạy trong container
+systemd đã cài panel như tests/e2e/run.sh. Cài runtime cần truy cập các nguồn chính thức.
+
+Kiểm thử trực tiếp trên VPS Ubuntu 24.04 ngày 19/10/2026: cài PHP 8.3, Node.js 24,
+Go 1.27.2, PostgreSQL 18, Composer, Adminer, phpMyAdmin; sáu site mẫu hoạt động qua nginx;
+MariaDB/PostgreSQL đổi mật khẩu; suspend/activate; dọn service; cô lập database giữa hai
+khách; RBAC Applications; biến môi trường có ký tự đặc biệt. User quota đã xác minh
+on sau khi cài module quota_v2 đúng kernel. Chưa hoàn tất bộ kiểm thử Debian trên VPS.
+
+### Cập nhật danh sách phiên bản Applications
+
+Danh sách lưu đệm 5 phút, có nút **Làm mới phiên bản**, nguồn và thời điểm kiểm tra.
+PHP lấy các dòng stable từ php.net và đối chiếu gói thực tế trong Sury/Ondřej APT;
+hiển thị cả bản vá cài được (hiện có PHP 8.5.11), không đưa RC/beta vào danh sách.
+PHP 7.4/8.0/8.1 vẫn giữ cho website cũ, đã hết hỗ trợ upstream.
+Composer, phpMyAdmin, Adminer hiển thị số phiên bản thực thay vì nhãn latest.
+PHP/Node.js có nút cập nhật bản vá; cập nhật có thể khởi động lại runtime.
+Lỗi nguồn được hiển thị rõ, dữ liệu cũ có cảnh báo và bị chặn cài cho đến khi xác minh lại.
+
+Redis và Memcached có trong catalog, cài phiên bản từ kho APT hệ điều hành,
+bao gồm bản vá bảo mật của distro; không cam kết trùng phiên bản upstream mới nhất.
+Đây là dịch vụ cache dùng chung trên localhost, chưa có phân tách dữ liệu theo khách hàng.
+MariaDB cài cùng panel; nâng cấp major MariaDB/PostgreSQL chưa có trong giao diện.
+
+### Giao diện workspace và vận hành máy chủ
+
+UI mặc định dùng preset shadcn `b1FQfCxG4` (Base Nova / neutral / Lucide),
+sidebar responsive, Inter hỗ trợ tiếng Việt, các biểu mẫu mở bằng Dialog có focus trap.
+Cài ứng dụng có bước xác nhận; thao tác ghi dữ liệu, build và cài đặt mở popup
+trạng thái/nhật ký, có thể thu nhỏ và mở lại. Tải file hiển thị tiến độ upload thực.
+Nhật ký cài đặt xuất hiện khi agent trả dữ liệu; không giả lập phần trăm cài đặt.
+
+Dashboard admin tự lấy thông số máy chủ mỗi 5 giây: CPU, RAM, swap, ổ đĩa,
+uptime, CPU model, kernel và tổng lưu lượng mạng từ lúc boot (không gồm loopback).
+Biểu đồ CPU giữ tối đa 30 mẫu trong phiên xem hiện tại.
+
+`POST /api/system/reboot` chỉ admin, yêu cầu JSON `{"confirmation":"REBOOT"}`,
+chặn phiên impersonation và tác vụ pending/running; ghi audit rồi lên lịch
+systemd reboot sau 10 giây. UI theo dõi boot ID để xác nhận máy chủ trở lại.
+Kiểm thử scheduler dùng command giả; triển khai không tự reboot VPS.
+
+Preview UI độc lập với VPS: chạy `python tests/ui/preview.py`, mở localhost:3010.
+Toàn bộ dữ liệu và cài đặt trong preview đều mô phỏng; không dùng credential thật.
+
+### Interface language
+
+X-Panel supports Vietnamese (default) and English. Use the language selector on the sign-in page or in the panel header. The selection is saved in this browser and shared between tabs; routes, usernames, application identifiers and stored data are unchanged. Switching language closes open forms, so save edits first. Server-generated logs retain their original text.
+
+English UI messages are maintained in `apps/web/lib/locales/en.json`. Use `translate(message, [parameters])` for display text and `localeTag()` for dates and numbers. Keep API values and internal identifiers independent of translated labels.
+
+
+### Mô-đun và thiết lập PHP
+
+Admin mở **PHP** (`/php/`) để chọn phiên bản đã cài. Tab **Mô-đun PHP** lấy danh sách gói từ chỉ mục APT đang cấu hình trên server, hiển thị trạng thái/phiên bản và cho phép cài hoặc gỡ bằng tác vụ nền có popup nhật ký. Các gói nền tảng CLI/FPM/common/dev được bảo vệ; gỡ bị chặn nếu APT dự định gỡ thêm gói phụ thuộc khác.
+
+Tab **Thiết lập PHP** cung cấp 40 directive thông dụng (memory/upload limits, timeout, timezone, session và OPcache), tìm kiếm, sửa nhiều dòng và khôi phục mặc định từng dòng. Ghi đè nằm ở `/etc/php/<version>/fpm/conf.d/99-xpanel.ini`; không sửa php.ini gốc hay cấu hình CLI. File được ghi nguyên tử, kiểm tra FPM trước khi áp dụng và khôi phục file cũ nếu lỗi. Các master PHP-FPM đang chạy của phiên bản đó, bao gồm service riêng của website/tài khoản, nhận USR2 để nạp lại cấu hình. Thiết lập trong pool/site có thể ghi đè giá trị toàn phiên bản. Chỉ admin được gọi API quản lý PHP; mọi thay đổi được ghi audit.
+
+
+### PHP nâng cao
+
+- **PHP → Mô-đun** phân biệt gói đã cài, bật cho FPM và extension thực sự được nạp bởi FPM SAPI. Các extension tích hợp/bảo vệ không cho gỡ. Module của gói nhiều extension được bật/tắt cùng nhau; CLI giữ nguyên. Nút cập nhật kho chạy `apt-get update` bằng task nền; ứng dụng so sánh phiên bản bằng `dpkg --compare-versions` và cung cấp cập nhật gói đã cài.
+- **Website → PHP**: ghi đè các directive phù hợp ở cấp pool, kế thừa cấu hình chung khi bỏ ghi đè. Có workers, request timeout, slow-log threshold; workers bị chặn bởi mức tính từ RAM gói hosting. Chỉ admin thay đổi worker count; khách/đại lý được chỉnh directive và timeout của website họ quản lý. Các directive khởi tạo OPcache/cache hệ thống chỉ sửa ở trang PHP chung.
+- Nhật ký phiên bản đọc tối đa 200 dòng journal của các service PHP tương ứng. Nhật ký website thêm tối đa 64 KiB cuối slow log; file riêng trong `/var/log/xpanel/php` có quyền 0600, xoay vòng với logrotate (7 bản, ngưỡng 10M khi logrotate chạy). Slow timeout mặc định 0 (tắt).
+- Trang PHP khôi phục task đang chạy từ API sau khi tải lại. Thay đổi chưa lưu được cảnh báo khi đóng popup website, chuyển trang, đổi ngôn ngữ hoặc tải lại tab. Popup nội bộ dùng giao diện X-Panel; tải lại/đóng tab dùng cảnh báo chuẩn trình duyệt.
+
+Kiểm thử VPS Ubuntu: install/disable/enable/remove `php8.5-bz2`, cập nhật APT, tạo website tạm `.invalid`, xác minh `ini_get` qua HTTP, thu slow trace thực tế, reset cấu hình, chặn directive không được phép và dọn website thử. Không chạy nâng cấp hàng loạt các gói production để thử chức năng cập nhật.
