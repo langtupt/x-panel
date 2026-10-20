@@ -57,6 +57,8 @@ func (d *DryRun) Call(_ context.Context, action string, params, out any) error {
 		res = WebSyncResult{}
 	case ActionMailSync:
 		res = MailSyncResult{DKIM: map[string]DNSRecord{}, ServerIP: "127.0.0.1"}
+	case ActionMailUsage:
+		res = MailUsage{Bytes: map[string]int64{}}
 	case ActionMailStatus:
 		res = MailStatus{Installed: true, Hostname: "mail.dry-run"}
 	case ActionPanelSSLInfo:

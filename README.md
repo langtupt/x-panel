@@ -64,8 +64,8 @@ Swap, quota settings, network configuration and downloaded files in `/root` rema
 
 | Area | Capabilities |
 |---|---|
-| Accounts | Admin → reseller → customer hierarchy, hosting packages, suspension and audit logs |
-| Resources | Separate Linux users, disk quotas and account-level CPU/RAM limits |
+| Accounts | Admin → reseller → customer hierarchy, hosting packages, suspension, audit logs, TOTP 2FA with one-time recovery codes |
+| Resources | Separate Linux users, disk quotas (mailboxes count towards the package), account-level CPU/RAM limits, monthly bandwidth limit (sites pause when used up) |
 | Websites | HTML, PHP, Laravel, Node.js, Next.js and Go; nginx virtual hosts and reverse proxies |
 | Applications | Live version discovery, background installation tasks, installed versions and supported uninstall actions |
 | PHP | Parallel versions, extensions, global FPM settings, site overrides and logs |
@@ -73,7 +73,8 @@ Swap, quota settings, network configuration and downloaded files in `/root` rema
 | Files | Browser file manager, code editor, uploads, FTP and SFTP |
 | TLS | Let's Encrypt certificates |
 | Email | Postfix, Dovecot, DKIM and Roundcube webmail |
-| Backups | Encrypted backups to Google Drive |
+| Backups | Encrypted per-account backups to the account's own Google Drive; restore, or move an account to a new server (sites, databases, mailboxes and cron are recreated, passwords kept) — see [docs/SAO-LUU.md](docs/SAO-LUU.md) |
+| Security | Malware scanning (own rules + ClamAV, quarantine, analysis and cleaning with ChatGPT using each account's own API key), firewall against floods/DDoS and password guessing (nftables, nginx limits, fail2ban, panel login lockout), in-panel and email alerts — see [docs/BAO-MAT.md](docs/BAO-MAT.md) |
 | Operations | Cron jobs, task logs, server metrics and administrator-controlled reboot |
 | Languages | Vietnamese and English with flag selectors |
 

@@ -82,7 +82,7 @@ func (s *Service) UpdatePackage(ctx context.Context, actor *users.User, id int64
 			return nil, err
 		}
 		for _, name := range names {
-			if err := s.applyQuota(ctx, name, &in); err != nil {
+			if err := s.applyQuota(ctx, tx, name, &in); err != nil {
 				return nil, err
 			}
 		}

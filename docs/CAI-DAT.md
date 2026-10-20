@@ -132,7 +132,8 @@ Nhật ký cài đặt (không chứa mật khẩu) nằm ở `/var/log/xpanel-i
    thêm tên miền, tạo hộp thư, rồi tạo các bản ghi DNS (MX, SPF, DKIM, DMARC) hiển thị ở tab **DNS**.
    Webmail: `https://IP-VPS:2096/webmail/`.
 8. **Sao lưu**: mỗi tài khoản hosting tự kết nối **Google Drive của mình** ở trang *Sao lưu*
-   (làm theo 3 bước hướng dẫn trên trang), đặt passphrase mã hóa và lịch tự động.
+   (hướng dẫn tạo OAuth client từng bước: [SAO-LUU.md](SAO-LUU.md)), đặt passphrase mã hóa và lịch tự động.
+   Chuyển tài khoản sang máy chủ mới cũng làm ở đây (xem mục 4 của SAO-LUU.md).
 
 ## 7. Cập nhật lên phiên bản mới
 

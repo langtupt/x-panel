@@ -127,3 +127,14 @@ func (s *Server) handleDeleteBackup(w http.ResponseWriter, r *http.Request) {
 	s.auditBackup(r, "backup.delete", id, map[string]any{"file": b.FileName})
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// POST /api/backups/import -> {"added": n}: backups found on Drive that this
+// server does not list yet (made on another server).
+func (s *Server) handleImportBackups(w http.ResponseWriter, r *http.Request) {
+	n, err := s.accounts.ImportBackups(r.Context(), currentUser(r))
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"added": n})
+}

@@ -47,6 +47,7 @@ type Account = {
   bandwidth_bytes: number;
   requests: number;
   month_bandwidth_bytes: number;
+  bandwidth_blocked?: boolean;
   points: Point[];
 };
 
@@ -370,6 +371,10 @@ function AccountCard({ a, onOpen }: { a: Account; onOpen: () => void }) {
         {a.status === "suspended" ? (
           <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-600">
             {translate("tạm ngưng")}
+          </span>
+        ) : a.bandwidth_blocked ? (
+          <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+            {translate("hết băng thông")}
           </span>
         ) : (
           <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600">

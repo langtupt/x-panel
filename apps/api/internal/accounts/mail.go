@@ -47,6 +47,8 @@ type MailDomainDetail struct {
 	MailboxList []mailrepo.Mailbox `json:"mailbox_list"`
 	AliasList   []mailrepo.Alias   `json:"alias_list"`
 	DNS         []MailDNSRecord    `json:"dns"`
+	// MB the package still allows for new or bigger mailboxes; nil = no limit.
+	MailFreeMB *int `json:"mail_free_mb"`
 }
 
 type MailDNSRecord struct {
@@ -148,13 +150,29 @@ func (s *Service) mailHostname(ctx context.Context) string {
 }
 
 func (s *Service) MailDomain(ctx context.Context, actor *users.User, id int64) (*MailDomainDetail, error) {
-	d, _, err := s.accessibleMailDomain(ctx, actor, id)
+	d, owner, err := s.accessibleMailDomain(ctx, actor, id)
 	if err != nil {
 		return nil, err
 	}
 	out := &MailDomainDetail{Domain: d}
 	if out.MailboxList, err = s.mail().Mailboxes(ctx, id); err != nil {
 		return nil, err
+	}
+	var usage agentproto.MailUsage
+	if err := s.agent.Call(ctx, agentproto.ActionMailUsage, agentproto.MailUsageParams{Domain: d.Domain}, &usage); err == nil {
+		for i := range out.MailboxList {
+			// No directory yet: nothing delivered.
+			mb := float64(usage.Bytes[out.MailboxList[i].LocalPart]) / (1 << 20)
+			out.MailboxList[i].UsedMB = &mb
+		}
+	}
+	if owner.PackageID != nil {
+		if p, err := s.pkgs.ByID(ctx, *owner.PackageID); err == nil && p.DiskMB > 0 {
+			if alloc, err := mailAllocMB(ctx, s.pool, owner.Username); err == nil {
+				free := max(p.DiskMB-minFilesMB-alloc, 0)
+				out.MailFreeMB = &free
+			}
+		}
 	}
 	if out.AliasList, err = s.mail().Aliases(ctx, id); err != nil {
 		return nil, err
@@ -223,7 +241,7 @@ func (s *Service) CreateMailDomain(ctx context.Context, actor *users.User, in Ma
 }
 
 func (s *Service) DeleteMailDomain(ctx context.Context, actor *users.User, id int64) (*mailrepo.Domain, error) {
-	d, _, err := s.accessibleMailDomain(ctx, actor, id)
+	d, owner, err := s.accessibleMailDomain(ctx, actor, id)
 	if err != nil {
 		return nil, err
 	}
@@ -236,6 +254,10 @@ func (s *Service) DeleteMailDomain(ctx context.Context, actor *users.User, id in
 		return nil, err
 	}
 	if _, err := s.syncMail(ctx, tx); err != nil {
+		return nil, err
+	}
+	// The freed mail space goes back to the files quota.
+	if err := s.reapplyQuota(ctx, tx, owner); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -294,6 +316,9 @@ func (s *Service) CreateMailbox(ctx context.Context, actor *users.User, domainID
 			return nil, apperr.Conflict("gói %q chỉ cho phép %d hộp thư", p.Name, p.MaxMailboxes)
 		}
 	}
+	if err := s.checkMailQuota(ctx, tx, owner, 0, in.QuotaMB); err != nil {
+		return nil, err
+	}
 	if taken, err := r.LocalPartTaken(ctx, domainID, local); err != nil {
 		return nil, err
 	} else if taken {
@@ -306,6 +331,9 @@ func (s *Service) CreateMailbox(ctx context.Context, actor *users.User, domainID
 		return nil, err
 	}
 	if _, err := s.syncMail(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := s.reapplyQuota(ctx, tx, owner); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -331,7 +359,7 @@ func (s *Service) accessibleMailbox(ctx context.Context, actor *users.User, id i
 }
 
 func (s *Service) UpdateMailbox(ctx context.Context, actor *users.User, id int64, in MailboxUpdate) (*mailrepo.Mailbox, error) {
-	m, _, err := s.accessibleMailbox(ctx, actor, id)
+	m, owner, err := s.accessibleMailbox(ctx, actor, id)
 	if err != nil {
 		return nil, err
 	}
@@ -340,6 +368,7 @@ func (s *Service) UpdateMailbox(ctx context.Context, actor *users.User, id int64
 			return nil, err
 		}
 	}
+	oldQuota := m.QuotaMB
 	if in.QuotaMB != nil {
 		if *in.QuotaMB < 0 || *in.QuotaMB > 1<<20 {
 			return nil, apperr.Invalid("dung lượng hộp thư không hợp lệ")
@@ -351,11 +380,24 @@ func (s *Service) UpdateMailbox(ctx context.Context, actor *users.User, id int64
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	if in.QuotaMB != nil && m.QuotaMB != oldQuota {
+		if err := s.users.WithTx(tx).LockForUpdate(ctx, owner.ID); err != nil {
+			return nil, err
+		}
+		if err := s.checkMailQuota(ctx, tx, owner, oldQuota, m.QuotaMB); err != nil {
+			return nil, err
+		}
+	}
 	if err := mailrepo.NewRepo(tx).UpdateMailbox(ctx, m); err != nil {
 		return nil, err
 	}
 	if _, err := s.syncMail(ctx, tx); err != nil {
 		return nil, err
+	}
+	if in.QuotaMB != nil && m.QuotaMB != oldQuota {
+		if err := s.reapplyQuota(ctx, tx, owner); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		_, _ = s.syncMail(context.WithoutCancel(ctx), s.pool)
@@ -365,7 +407,7 @@ func (s *Service) UpdateMailbox(ctx context.Context, actor *users.User, id int64
 }
 
 func (s *Service) DeleteMailbox(ctx context.Context, actor *users.User, id int64) (*mailrepo.Mailbox, error) {
-	m, _, err := s.accessibleMailbox(ctx, actor, id)
+	m, owner, err := s.accessibleMailbox(ctx, actor, id)
 	if err != nil {
 		return nil, err
 	}
@@ -378,6 +420,9 @@ func (s *Service) DeleteMailbox(ctx context.Context, actor *users.User, id int64
 		return nil, err
 	}
 	if _, err := s.syncMail(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := s.reapplyQuota(ctx, tx, owner); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {

@@ -19,8 +19,10 @@ import (
 	"xpanel/apps/agent/internal/cron"
 	"xpanel/apps/agent/internal/distro"
 	"xpanel/apps/agent/internal/files"
+	"xpanel/apps/agent/internal/firewall"
 	"xpanel/apps/agent/internal/ftp"
 	"xpanel/apps/agent/internal/mail"
+	"xpanel/apps/agent/internal/malware"
 	"xpanel/apps/agent/internal/mysqldb"
 	"xpanel/apps/agent/internal/netguard"
 	"xpanel/apps/agent/internal/pgdb"
@@ -39,6 +41,16 @@ func main() {
 	// Confined file-manager helper, spawned by the agent itself (see package files).
 	if len(os.Args) > 1 && os.Args[1] == "fshelper" {
 		files.HelperMain(os.Args[2:])
+		return
+	}
+	// fail2ban action: ban / unban an IP in the X-Panel firewall.
+	if len(os.Args) > 1 && os.Args[1] == "fwban" {
+		firewall.CLIMain(os.Args[2:])
+		return
+	}
+	// Confined malware scanner helper (see package malware).
+	if len(os.Args) > 1 && os.Args[1] == "malscan" {
+		malware.HelperMain(os.Args[2:])
 		return
 	}
 
@@ -82,6 +94,9 @@ func main() {
 	if err := mail.MigrateDovecot(context.Background()); err != nil {
 		log.Error("update dovecot config", "err", err)
 	}
+	if err := firewall.Restore(context.Background()); err != nil {
+		log.Error("restore firewall", "err", err)
+	}
 
 	srv := server.New(log)
 	srv.Register(agentproto.ActionSystemReboot, func(ctx context.Context, _ json.RawMessage) (any, error) { return nil, sysinfo.Reboot(ctx) })
@@ -103,11 +118,51 @@ func main() {
 		uid, home, err := accounts.Create(ctx, p.Username)
 		return agentproto.UserCreateResult{UID: uid, Home: home}, err
 	}))
+	srv.Register(agentproto.ActionFirewallApply, server.Typed(func(ctx context.Context, p agentproto.FirewallConfig) (any, error) {
+		return firewall.Apply(ctx, p)
+	}))
+	srv.Register(agentproto.ActionFirewallBans, func(ctx context.Context, _ json.RawMessage) (any, error) {
+		return firewall.Bans(ctx)
+	})
+	srv.Register(agentproto.ActionFirewallBan, server.Typed(func(ctx context.Context, p agentproto.FirewallBanParams) (any, error) {
+		return nil, firewall.Ban(ctx, p)
+	}))
+	srv.Register(agentproto.ActionFirewallUnban, server.Typed(func(ctx context.Context, p agentproto.FirewallBanParams) (any, error) {
+		return nil, firewall.Unban(ctx, p)
+	}))
+	srv.Register(agentproto.ActionNotifyEmail, server.Typed(func(ctx context.Context, p agentproto.NotifyEmailParams) (any, error) {
+		return nil, mail.Notify(ctx, p)
+	}))
+	srv.Register(agentproto.ActionMalwareStatus, func(ctx context.Context, _ json.RawMessage) (any, error) {
+		return malware.Status(ctx), nil
+	})
+	srv.Register(agentproto.ActionMalwareInstall, func(ctx context.Context, _ json.RawMessage) (any, error) {
+		return malware.Install(ctx)
+	})
+	srv.Register(agentproto.ActionMalwareScan, server.Typed(func(ctx context.Context, p agentproto.MalwareScanParams) (any, error) {
+		return malware.Scan(ctx, p)
+	}))
+	srv.Register(agentproto.ActionMalwareRead, server.Typed(func(ctx context.Context, p agentproto.MalwareFileParams) (any, error) {
+		return malware.Read(ctx, p)
+	}))
+	srv.Register(agentproto.ActionMalwareQuarantine, server.Typed(func(ctx context.Context, p agentproto.MalwareQuarantineParams) (any, error) {
+		return malware.Quarantine(ctx, p)
+	}))
+	srv.Register(agentproto.ActionMalwareRestore, server.Typed(func(ctx context.Context, p agentproto.MalwareQuarantineParams) (any, error) {
+		return nil, malware.Restore(ctx, p)
+	}))
+	srv.Register(agentproto.ActionMalwareWrite, server.Typed(func(ctx context.Context, p agentproto.MalwareWriteParams) (any, error) {
+		return nil, malware.Write(ctx, p)
+	}))
+	srv.Register(agentproto.ActionMalwareDrop, server.Typed(func(_ context.Context, p agentproto.MalwareQuarantineParams) (any, error) {
+		return nil, malware.Drop(p)
+	}))
 	srv.Register(agentproto.ActionUserDelete, server.Typed(func(ctx context.Context, p agentproto.UserParams) (any, error) {
 		if err := accounts.Delete(ctx, p.Username); err != nil {
 			return nil, err
 		}
 		web.RemoveSlice(p.Username)
+		_ = malware.RemoveAccount(p.Username)
 		return nil, nil
 	}))
 	srv.Register(agentproto.ActionUserLock, server.Typed(func(ctx context.Context, p agentproto.UserLockParams) (any, error) {
@@ -266,6 +321,9 @@ func main() {
 	srv.Register(agentproto.ActionBackupCreate, server.Typed(func(ctx context.Context, p agentproto.BackupCreateParams) (any, error) {
 		return backup.Create(ctx, p)
 	}))
+	srv.Register(agentproto.ActionBackupManifest, server.Typed(func(ctx context.Context, p agentproto.BackupManifestParams) (any, error) {
+		return backup.ReadManifest(ctx, p)
+	}))
 	srv.Register(agentproto.ActionBackupRestore, server.Typed(func(ctx context.Context, p agentproto.BackupRestoreParams) (any, error) {
 		return backup.Restore(ctx, p)
 	}))
@@ -274,6 +332,9 @@ func main() {
 	}))
 	srv.Register(agentproto.ActionMailSync, server.Typed(func(ctx context.Context, p agentproto.MailSyncParams) (any, error) {
 		return mail.Sync(ctx, p)
+	}))
+	srv.Register(agentproto.ActionMailUsage, server.Typed(func(_ context.Context, p agentproto.MailUsageParams) (any, error) {
+		return mail.Usage(p)
 	}))
 	srv.Register(agentproto.ActionMailDeleteBox, server.Typed(func(_ context.Context, p agentproto.MailDeleteParams) (any, error) {
 		return nil, mail.DeleteStored(p)

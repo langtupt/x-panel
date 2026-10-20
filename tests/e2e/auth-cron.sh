@@ -9,6 +9,7 @@ SFTP() { printf "$3" > /tmp/b; sshpass -p "$2" sftp -o BatchMode=no -o StrictHos
 export DEBIAN_FRONTEND=noninteractive; apt-get install -y -qq oathtool sshpass openssh-client >/dev/null 2>&1
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "acust ares" "Cron1" "R"
 c admin POST /packages '{"name":"Cron1","kind":"user","disk_mb":500,"max_cron":1}' >/dev/null; P=$(jq .id /tmp/out)
 c admin POST /users "{\"username\":\"acust\",\"password\":\"Client12345\",\"role\":\"user\",\"package_id\":$P}" >/dev/null; U=$(jq .id /tmp/out)
 c admin POST /packages '{"name":"R","kind":"reseller","disk_mb":0}' >/dev/null; RP=$(jq .id /tmp/out)

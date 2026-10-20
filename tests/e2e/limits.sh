@@ -12,6 +12,7 @@ web() { curl -s -o /tmp/body -w '%{http_code}' -H "Host: $1" "http://127.0.0.1${
 unit() { systemctl list-units --type=service --all --no-legend 'xpanel-app-lcust-*' | awk '{print $1}' | head -1; }
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "lcust" "Small CPU/RAM *" "Big *"
 c admin POST /packages '{"name":"Small CPU/RAM '"$(date +%s)"'","kind":"user","disk_mb":500,"max_sites":2,"cpu_pct":50,"mem_mb":128}' >/dev/null; P=$(jq .id /tmp/out)
 c admin POST /users "{\"username\":\"lcust\",\"password\":\"Client12345\",\"role\":\"user\",\"package_id\":$P}" >/dev/null; U=$(jq .id /tmp/out)
 c admin POST /sites "{\"user_id\":$U,\"domain\":\"limits.example.com\",\"aliases\":[],\"app_type\":\"php\",\"php_version\":\"8.3\",\"doc_root\":\"\"}" | cut -c1-60

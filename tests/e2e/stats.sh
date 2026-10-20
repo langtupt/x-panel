@@ -14,6 +14,7 @@ expect() { [ "$1" = "$2" ] && ok "$3 ($1)" || { bad "$3: got $1, want $2"; head 
 grep -q XPANEL_STATS_INTERVAL /etc/xpanel/xpanel.env || echo "XPANEL_STATS_INTERVAL=10s" >> /etc/xpanel/xpanel.env
 systemctl restart xpanel-api; sleep 2
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "stuser stother" "StatsPkg"
 c admin POST /packages '{"name":"StatsPkg","kind":"user","disk_mb":500,"max_sites":2,"cpu_pct":100,"mem_mb":512,"bandwidth_gb":5}' >/dev/null; PK=$(jq .id /tmp/out)
 c admin POST /users "{\"username\":\"stuser\",\"password\":\"Client12345\",\"role\":\"user\",\"package_id\":$PK}" >/dev/null; U=$(jq .id /tmp/out)
 c admin POST /users '{"username":"stother","password":"Client12345","role":"user"}' >/dev/null; O=$(jq .id /tmp/out)

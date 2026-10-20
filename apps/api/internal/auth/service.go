@@ -48,7 +48,7 @@ type Service struct {
 
 func NewService(pool *pgxpool.Pool, repo *users.Repo, secret []byte) *Service {
 	return &Service{pool: pool, users: repo, secret: secret, box: newSecretBox(secret),
-		limiter: newFailLimiter(10, 15*time.Minute), accountLimiter: newFailLimiter(30, 15*time.Minute), usedCodes: map[string]time.Time{}}
+		limiter: newFailLimiter(10, 15*time.Minute), accountLimiter: newFailLimiter(10, 15*time.Minute), usedCodes: map[string]time.Time{}}
 }
 
 func (s *Service) Secret() []byte { return s.secret }
@@ -88,25 +88,26 @@ func (s *Service) checkTOTP(u *users.User, code string) error {
 }
 
 // EnableTOTP stores secret after the user proved their app produces valid codes.
-func (s *Service) EnableTOTP(ctx context.Context, u *users.User, secret, code string) error {
+func (s *Service) EnableTOTP(ctx context.Context, u *users.User, secret, code string) ([]string, error) {
 	if u.TOTPSecret != nil {
-		return ErrTOTPEnabled
+		return nil, ErrTOTPEnabled
 	}
 	if !VerifyTOTP(secret, code, time.Now()) {
-		return ErrTOTPInvalid
+		return nil, ErrTOTPInvalid
 	}
 	sealed, err := s.box.seal(secret)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ok, err := s.users.EnableTOTP(ctx, u.ID, sealed)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !ok {
-		return ErrTOTPEnabled
+		return nil, ErrTOTPEnabled
 	}
-	return nil
+	// Shown once to the user: the way back in if the authenticator is lost.
+	return s.replaceRecoveryCodes(ctx, u.ID)
 }
 
 // DisableTOTP requires the password and a current code.
@@ -120,7 +121,11 @@ func (s *Service) DisableTOTP(ctx context.Context, u *users.User, password, code
 		}
 		return err
 	}
-	return s.users.SetTOTP(ctx, u.ID, nil)
+	if err := s.users.SetTOTP(ctx, u.ID, nil); err != nil {
+		return err
+	}
+	_, err := s.pool.Exec(ctx, `DELETE FROM totp_recovery_codes WHERE user_id=$1`, u.ID)
+	return err
 }
 
 // Impersonate starts a session as target on behalf of actor (permission is
@@ -158,11 +163,24 @@ func (s *Service) Login(ctx context.Context, username, password, code, ip, ua st
 		return nil, Tokens{}, ErrSuspended
 	}
 	if err := s.checkTOTP(u, code); err != nil {
+		// A lost authenticator: an unused recovery code is accepted instead.
 		if errors.Is(err, ErrTOTPInvalid) {
-			s.limiter.Fail(ip)
-			s.accountLimiter.Fail(u.Username)
+			used, rerr := s.useRecoveryCode(ctx, u, code)
+			if rerr != nil {
+				return nil, Tokens{}, rerr
+			}
+			if used {
+				u.RecoveryCodeUsed = true
+				err = nil
+			}
 		}
-		return nil, Tokens{}, err
+		if err != nil {
+			if errors.Is(err, ErrTOTPInvalid) {
+				s.limiter.Fail(ip)
+				s.accountLimiter.Fail(u.Username)
+			}
+			return nil, Tokens{}, err
+		}
 	}
 	s.limiter.Reset(ip)
 	t, err := s.issue(ctx, s.pool, u, nil, ip, ua)

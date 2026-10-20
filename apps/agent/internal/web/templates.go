@@ -6,18 +6,19 @@ import "text/template"
 // PHP version), so the templates do not need escaping.
 
 type vhostData struct {
-	Port      int
-	Username  string
-	Domain    string
-	Names     string // server_name list
-	Root      string
-	PHPSocket string // empty = static site
-	SSL       bool
-	CertFile  string
-	KeyFile   string
-	Suspended bool
-	ACMERoot  string
-	LogDir    string
+	Port          int
+	Username      string
+	Domain        string
+	Names         string // server_name list
+	Root          string
+	PHPSocket     string // empty = static site
+	SSL           bool
+	CertFile      string
+	KeyFile       string
+	Suspended     bool
+	OverBandwidth bool
+	ACMERoot      string
+	LogDir        string
 }
 
 var vhostTmpl = template.Must(template.New("vhost").Parse(`# Managed by X-Panel ({{.Username}}): changes will be overwritten.
@@ -35,6 +36,12 @@ var vhostTmpl = template.Must(template.New("vhost").Parse(`# Managed by X-Panel 
     location / {
         default_type text/html;
         return 503 "<!doctype html><meta charset=utf-8><title>Tạm ngưng</title><h1>Website tạm ngưng hoạt động</h1>";
+    }
+{{else if .OverBandwidth}}
+    location / {
+        default_type text/html;
+        add_header Retry-After 86400 always;
+        return 503 "<!doctype html><meta charset=utf-8><title>Hết băng thông</title><h1>Website đã dùng hết băng thông của tháng này</h1><p>Bandwidth limit exceeded.</p>";
     }
 {{else}}
     location ~ /\.(?!well-known) { deny all; }

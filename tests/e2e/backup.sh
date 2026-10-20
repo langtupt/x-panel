@@ -28,6 +28,7 @@ done
 systemctl restart xpanel-agent xpanel-api; sleep 3
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "bkcust bkother"
 
 c admin POST /users '{"username":"bkcust","password":"Client12345","role":"user"}' >/dev/null; U=$(jq .id /tmp/out)
 c admin POST /users '{"username":"bkother","password":"Client12345","role":"user"}' >/dev/null; O=$(jq .id /tmp/out)
@@ -55,6 +56,7 @@ W=/home/bkcust/www/bk.example.com
 runuser -u bkcust -- sh -c "echo 'precious-content-42' > $W/precious.txt; mkdir -p $W/sub; echo nested > $W/sub/n.txt; ln -s /etc/shadow $W/leak"
 expect "$(c admin POST /databases "{\"user_id\":$U,\"name\":\"shop\",\"password\":\"Db-Pass_12345!\",\"engine\":\"mariadb\"}")" 201 "database bkcust_shop"
 mariadb bkcust_shop -e "CREATE TABLE t (id INT PRIMARY KEY, v TEXT); INSERT INTO t VALUES (1,'row-one'),(2,'row-two');"
+expect "$(c cust POST /cron '{"schedule":"17 3 * * *","command":"echo nightly","enabled":true}')" 201 "cron job"
 MAIL=0
 if c admin GET /mail/status >/dev/null && [ "$(jq -r .installed /tmp/out)" = true ]; then
   MAIL=1
@@ -105,6 +107,33 @@ LAST=$(jq '[.[]|select(.username=="bkcust")][0].id' /tmp/out)
 expect "$(c other DELETE /backups/$LAST)" 404 "another account cannot delete it"
 expect "$(c cust DELETE /backups/$LAST)" 204 "owner deletes a backup"
 expect "$(curl -s $FD/debug/files | jq length)" 1 "deleted from Drive"
+
+echo "### move to a new server: same username, import from Drive, recreate"
+# Simulate the new server: the account and every record of it are gone.
+expect "$(c admin DELETE /users/$U)" 204 "old account deleted"
+(cd /tmp && runuser -u postgres -- psql -d xpanel -qc "DELETE FROM backups WHERE username='bkcust'")
+{ id bkcust >/dev/null 2>&1 || mariadb -N -e "SHOW DATABASES LIKE 'bkcust%'" | grep -q .; } && bad "old account still there" || ok "old account fully removed"
+c admin POST /users '{"username":"bkcust","password":"Client12345","role":"user"}' >/dev/null; U=$(jq .id /tmp/out)
+c cust POST /auth/login '{"username":"bkcust","password":"Client12345"}' >/dev/null
+c cust POST /backups/drive '{"client_id":"123-test.apps.googleusercontent.com","client_secret":"secret"}' >/dev/null
+for _ in $(seq 1 20); do c cust GET /backups/settings >/dev/null; [ "$(jq -r .connected /tmp/out)" = true ] && break; sleep 1; done
+c cust PUT /backups/settings '{"schedule":"off","hour":3,"keep":5,"passphrase":"correct horse battery staple"}' >/dev/null
+expect "$(c other POST /backups/import)" 409 "an account without its own Drive connection imports nothing"
+expect "$(c cust POST /backups/import)" 200 "import from Drive"
+expect "$(jq .added /tmp/out)" 1 "backup made on the old server found"
+c cust POST /backups/import >/dev/null; expect "$(jq .added /tmp/out)" 0 "importing again adds nothing"
+c cust GET /backups >/dev/null; IB=$(jq '.[0].id' /tmp/out); expect "$(jq -r '.[0].kind' /tmp/out)" imported "listed as imported"
+expect "$(c cust POST /backups/$IB/restore '{"files":true,"databases":true,"mail":true,"recreate":true}')" 202 "restore with recreate"
+expect "$(task)" done "restore task"
+c cust GET /sites >/dev/null; expect "$(jq -r '[.[] | select(.domain == "bk.example.com")] | length' /tmp/out)" 1 "website recreated"
+[ "$(cat $W/precious.txt 2>/dev/null)" = precious-content-42 ] && ok "files back" || bad "files missing after move"
+expect "$(mariadb -N bkcust_shop -e 'SELECT group_concat(v ORDER BY id) FROM t' 2>&1)" "row-one,row-two" "database recreated with its data"
+expect "$(MYSQL_PWD='Db-Pass_12345!' mariadb -N --protocol=TCP -h 127.0.0.1 -u bkcust_shop bkcust_shop -e 'SELECT count(*) FROM t' 2>&1)" 2 "database user keeps its old password"
+c cust GET /cron >/dev/null; jq -e '[.[] | select(.command == "echo nightly")] | length == 1' /tmp/out >/dev/null && ok "cron job recreated" || bad "cron job missing"
+if [ $MAIL = 1 ]; then
+  n=$(curl -sk "imaps://127.0.0.1/" -u info@bkmail.example.com:MailPass12345 -X 'STATUS INBOX (MESSAGES)' | grep -o 'MESSAGES [0-9]*' | awk '{print $2}')
+  [ "${n:-0}" -ge 1 ] && ok "mailbox recreated, old password works, mail back ($n)" || bad "mailbox not usable after move"
+fi
 
 expect "$(c cust DELETE /backups/drive)" 204 "disconnect drive"
 for id in $U $O; do c admin DELETE /users/$id >/dev/null; done

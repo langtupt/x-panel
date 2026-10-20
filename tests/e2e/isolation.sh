@@ -16,6 +16,7 @@ web() { curl -s -o /tmp/body -w '%{http_code}' -H "Host: $1" "http://127.0.0.1$2
 asphp() { runuser -u "$1" -- php8.3 -r "$2" 2>&1; }
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "isoa isob" "Iso *"
 c admin POST /packages '{"name":"Iso '"$(date +%s)"'","kind":"user","disk_mb":2000,"max_sites":5,"cpu_pct":100,"mem_mb":1024}' >/dev/null; PK=$(jq .id /tmp/out)
 for u in isoa isob; do
   c admin POST /users "{\"username\":\"$u\",\"password\":\"Client12345\",\"role\":\"user\",\"package_id\":$PK}" >/dev/null

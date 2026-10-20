@@ -8,6 +8,7 @@ step() { echo; echo "### $*"; }
 my() { local u=$1 p=$2 h=$3; shift 3; mariadb -u"$u" -p"$p" -h"$h" --batch --skip-column-names "$@" 2>&1 | head -3 | tr '\n' ' '; echo; }
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "dbcust other" "DB2"
 c admin POST /packages '{"name":"DB2","kind":"user","disk_mb":500,"max_dbs":2,"max_sites":1}' >/dev/null; P=$(jq .id /tmp/out)
 c admin POST /users "{\"username\":\"dbcust\",\"password\":\"Client12345\",\"role\":\"user\",\"package_id\":$P}" >/dev/null; U=$(jq .id /tmp/out)
 c admin POST /users '{"username":"other","password":"Client12345","role":"user"}' >/dev/null

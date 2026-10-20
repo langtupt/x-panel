@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [recovery, setRecovery] = useState(false);
   const [needCode, setNeedCode] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -171,18 +172,45 @@ export default function LoginPage() {
                 <label className="label" htmlFor="code">
                   {translate("Mã xác thực 2 lớp")}
                 </label>
-                <input
-                  id="code"
-                  className="input h-12 text-center font-mono text-lg tracking-[0.4em]"
-                  autoFocus
-                  required
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                />
+                {recovery ? (
+                  <input
+                    id="code"
+                    key="recovery"
+                    className="input h-12 text-center font-mono text-lg tracking-[0.2em]"
+                    autoFocus
+                    required
+                    autoComplete="off"
+                    placeholder="abcde-fghij"
+                    pattern="[A-Za-z2-7]{5}-?[A-Za-z2-7]{5}"
+                    maxLength={11}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.trim())}
+                  />
+                ) : (
+                  <input
+                    id="code"
+                    key="totp"
+                    className="input h-12 text-center font-mono text-lg tracking-[0.4em]"
+                    autoFocus
+                    required
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  />
+                )}
+                <button
+                  type="button"
+                  className="mt-2 text-xs text-muted-foreground hover:underline"
+                  onClick={() => {
+                    setRecovery(!recovery);
+                    setCode("");
+                  }}
+                >
+                  {translate(recovery ? "Dùng mã 6 số từ ứng dụng" : "Mất điện thoại? Dùng mã dự phòng")}
+                </button>
               </div>
             )}
             {error && (

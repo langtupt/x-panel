@@ -151,9 +151,12 @@ func ValidPHPVersion(v string) bool {
 // agent rewrites that user's nginx vhosts and PHP-FPM pools to match it and
 // removes anything else it previously generated for the user.
 type WebSyncParams struct {
-	Username  string    `json:"username"`
-	Suspended bool      `json:"suspended"`
-	Sites     []WebSite `json:"sites"`
+	Username  string `json:"username"`
+	Suspended bool   `json:"suspended"`
+	// The month's bandwidth allowance is used up: sites answer 503 until
+	// the next month or a bigger package (cron and apps keep running).
+	OverBandwidth bool      `json:"over_bandwidth,omitempty"`
+	Sites         []WebSite `json:"sites"`
 	// Package limits for the account's PHP-FPM slice; 0 = unlimited.
 	CPUPct int `json:"cpu_pct"`
 	MemMB  int `json:"mem_mb"`
@@ -375,6 +378,7 @@ const (
 	ActionMailSync      = "mail.sync"       // MailSyncParams -> MailSyncResult
 	ActionMailDeleteBox = "mail.delete_box" // MailDeleteParams
 	ActionMailStatus    = "mail.status"     // -> MailStatus
+	ActionMailUsage     = "mail.usage"      // MailUsageParams -> MailUsage
 )
 
 // MailSyncParams is the complete mail configuration of the server; the agent
@@ -454,8 +458,9 @@ type AccountStatSample struct {
 }
 
 const (
-	ActionBackupCreate  = "backup.create"  // BackupCreateParams -> BackupCreateResult
-	ActionBackupRestore = "backup.restore" // BackupRestoreParams -> TaskLog
+	ActionBackupCreate   = "backup.create"   // BackupCreateParams -> BackupCreateResult
+	ActionBackupRestore  = "backup.restore"  // BackupRestoreParams -> TaskLog
+	ActionBackupManifest = "backup.manifest" // BackupManifestParams -> BackupManifest
 )
 
 // BackupDB is a customer database inside a backup.
@@ -495,4 +500,165 @@ type BackupRestoreParams struct {
 	Files       bool         `json:"files"`
 	Databases   []BackupDB   `json:"databases"`
 	MailDomains []string     `json:"mail_domains"`
+}
+
+// MailUsageParams asks for the stored size of each mailbox of a domain.
+type MailUsageParams struct {
+	Domain string `json:"domain"`
+}
+
+// MailUsage maps a mailbox's local part to the bytes it stores.
+type MailUsage struct {
+	Bytes map[string]int64 `json:"bytes"`
+}
+
+// BackupManifestParams reads the manifest (panel records) of a backup.
+type BackupManifestParams struct {
+	Username   string       `json:"username"`
+	Drive      gdrive.Creds `json:"drive"`
+	FileID     string       `json:"file_id"`
+	Passphrase string       `json:"passphrase"`
+}
+
+type BackupManifest struct {
+	Manifest json.RawMessage `json:"manifest"`
+}
+
+// Malware scanning (see apps/agent/internal/malware).
+const (
+	ActionMalwareStatus     = "malware.status"     // -> MalwareStatus
+	ActionMalwareInstall    = "malware.install"    // -> TaskLog (installs ClamAV)
+	ActionMalwareScan       = "malware.scan"       // MalwareScanParams -> MalwareScanResult
+	ActionMalwareRead       = "malware.read"       // MalwareFileParams -> MalwareFile
+	ActionMalwareQuarantine = "malware.quarantine" // MalwareQuarantineParams -> MalwareFile (without content)
+	ActionMalwareRestore    = "malware.restore"    // MalwareQuarantineParams
+	ActionMalwareWrite      = "malware.write"      // MalwareWriteParams
+	ActionMalwareDrop       = "malware.drop"       // MalwareQuarantineParams: delete a quarantined copy
+)
+
+type MalwareStatus struct {
+	ClamAV    bool   `json:"clamav"`     // clamscan or clamdscan installed
+	Clamd     bool   `json:"clamd"`      // the daemon answers (fast scans)
+	DBVersion string `json:"db_version"` // signature database
+}
+
+// MalwareScanParams scans an account's home; Since (unix seconds) limits
+// the scan to files changed after it.
+type MalwareScanParams struct {
+	Username string `json:"username"`
+	Since    int64  `json:"since,omitempty"`
+}
+
+type MalwareFinding struct {
+	Path     string    `json:"path"` // relative to the home, starting with "/"
+	Engine   string    `json:"engine"`
+	Rule     string    `json:"rule"`
+	Severity string    `json:"severity"` // high | medium
+	Snippet  string    `json:"snippet"`
+	Size     int64     `json:"size"`
+	ModTime  time.Time `json:"mod_time"`
+	SHA256   string    `json:"sha256"`
+}
+
+type MalwareScanResult struct {
+	Files     int              `json:"files"`
+	Engines   []string         `json:"engines"`
+	Findings  []MalwareFinding `json:"findings"`
+	Truncated bool             `json:"truncated"`
+	Log       string           `json:"log"`
+}
+
+type MalwareFileParams struct {
+	Username string `json:"username"`
+	Path     string `json:"path"`
+}
+
+type MalwareFile struct {
+	Content []byte `json:"content,omitempty"`
+	SHA256  string `json:"sha256"`
+	Size    int64  `json:"size"`
+}
+
+// MalwareQuarantineParams: ID names the quarantined copy (hex).
+type MalwareQuarantineParams struct {
+	Username string `json:"username"`
+	Path     string `json:"path"`
+	ID       string `json:"id"`
+	SHA256   string `json:"sha256,omitempty"` // quarantine only this content
+}
+
+// MalwareWriteParams replaces a file with cleaned content after keeping the
+// original in quarantine as BackupID; ExpectSHA256 must match the file.
+type MalwareWriteParams struct {
+	Username     string `json:"username"`
+	Path         string `json:"path"`
+	Content      []byte `json:"content"`
+	ExpectSHA256 string `json:"expect_sha256"`
+	BackupID     string `json:"backup_id"`
+}
+
+// ActionNotifyEmail sends a plain-text alert through the local MTA.
+const ActionNotifyEmail = "notify.email" // NotifyEmailParams
+
+type NotifyEmailParams struct {
+	To      string `json:"to"`
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
+}
+
+// Firewall (see apps/agent/internal/firewall).
+const (
+	ActionFirewallApply = "firewall.apply" // FirewallConfig
+	ActionFirewallBans  = "firewall.bans"  // -> FirewallBans
+	ActionFirewallBan   = "firewall.ban"   // FirewallBanParams
+	ActionFirewallUnban = "firewall.unban" // FirewallBanParams
+)
+
+// FirewallConfig is the whole server firewall; 0 turns a limit off.
+type FirewallConfig struct {
+	Enabled bool `json:"enabled"`
+	// Network level (nftables), per source IP.
+	SynRate   int `json:"syn_rate"`   // new TCP connections per second
+	ConnLimit int `json:"conn_limit"` // concurrent connections to 80/443
+	// HTTP level (nginx), per source IP.
+	HTTPRate  int `json:"http_rate"`  // requests per second
+	HTTPBurst int `json:"http_burst"` // extra requests allowed in a burst
+	HTTPConn  int `json:"http_conn"`  // concurrent requests
+	// fail2ban (SSH, FTP, mail, HTTP flood).
+	MaxRetry  int  `json:"max_retry"`
+	FindMin   int  `json:"find_min"`
+	BanMin    int  `json:"ban_min"`
+	Increment bool `json:"increment"` // repeat offenders: longer bans (up to a week)
+	FloodBan  bool `json:"flood_ban"` // ban IPs that keep hitting the HTTP limits
+	// Panel login (enforced by the API).
+	PanelIPFails   int      `json:"panel_ip_fails"`   // failures per IP in 15 minutes -> firewall ban
+	PanelBanMin    int      `json:"panel_ban_min"`    //
+	AccountFails   int      `json:"account_fails"`    // failures per account in 15 minutes -> account locked
+	AccountLockMin int      `json:"account_lock_min"` //
+	Allow          []string `json:"allow"`            // IPs/CIDRs never limited or banned
+	Block          []string `json:"block"`            // IPs/CIDRs always dropped
+}
+
+type FirewallBan struct {
+	IP        string     `json:"ip"`
+	Reason    string     `json:"reason"`
+	ExpiresAt *time.Time `json:"expires_at"` // nil = until removed
+}
+
+type FirewallBans struct {
+	Active bool          `json:"active"` // the nftables table is loaded
+	Bans   []FirewallBan `json:"bans"`
+}
+
+type FirewallBanParams struct {
+	IP      string `json:"ip"`
+	Seconds int    `json:"seconds"` // 0 = until removed
+	Reason  string `json:"reason"`
+}
+
+// DefaultFirewall is the firewall of a new install.
+func DefaultFirewall() FirewallConfig {
+	return FirewallConfig{Enabled: true, SynRate: 100, ConnLimit: 300, HTTPRate: 30, HTTPBurst: 100, HTTPConn: 100,
+		MaxRetry: 6, FindMin: 10, BanMin: 60, Increment: true, FloodBan: true,
+		PanelIPFails: 10, PanelBanMin: 60, AccountFails: 10, AccountLockMin: 15, Allow: []string{}, Block: []string{}}
 }

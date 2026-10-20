@@ -32,7 +32,7 @@ type Backup = {
   username: string;
   file_name: string;
   size_bytes: number;
-  kind: "manual" | "scheduled";
+  kind: "manual" | "scheduled" | "imported";
   contents: {
     databases: { name: string }[] | null;
     mail_domains: string[] | null;
@@ -302,6 +302,8 @@ function RestoreDialog({
   const [files, setFiles] = useState(true);
   const [dbs, setDbs] = useState(true);
   const [mail, setMail] = useState(true);
+  const imported = b.kind === "imported";
+  const [recreate, setRecreate] = useState(imported);
   const [pass, setPass] = useState("");
   const [confirmText, setConfirmText] = useState("");
   const [error, setError] = useState("");
@@ -316,6 +318,7 @@ function RestoreDialog({
             files,
             databases: dbs,
             mail,
+            recreate,
             ...(pass ? { passphrase: pass } : {}),
           },
         }),
@@ -352,7 +355,7 @@ function RestoreDialog({
             Database (
             {translate(
               b.contents.databases?.map((d) => d.name).join(", ") ||
-                translate("không có"),
+                translate(imported ? "theo backup" : "không có"),
             )}
             )
           </label>
@@ -364,11 +367,28 @@ function RestoreDialog({
             />{" "}
             Email (
             {translate(
-              b.contents.mail_domains?.join(", ") || translate("không có"),
+              b.contents.mail_domains?.join(", ") ||
+                translate(imported ? "theo backup" : "không có"),
             )}
             )
           </label>
         </div>
+        <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={recreate}
+            onChange={(e) => setRecreate(e.target.checked)}
+          />
+          <span>
+            <b>{translate("Tạo lại cấu hình còn thiếu")}</b>
+            <span className="block text-xs text-slate-500">
+              {translate(
+                "Dùng khi chuyển sang máy chủ mới: tạo lại website, database, hộp thư, cron và FTP có trong backup mà tài khoản chưa có (theo giới hạn gói), rồi khôi phục dữ liệu. Database và hộp thư giữ mật khẩu cũ.",
+              )}
+            </span>
+          </span>
+        </label>
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
           {translate(
             "File cùng tên bị ghi đè bằng bản trong backup (file mới hơn không có trong backup được giữ nguyên). Database được thay bằng dữ liệu trong backup; database phải còn tồn tại (tạo lại cùng tên nếu đã xóa).",
@@ -406,7 +426,7 @@ function RestoreDialog({
           </button>
           <button
             className="btn-primary"
-            disabled={confirmText !== b.username || (!files && !dbs && !mail)}
+            disabled={confirmText !== b.username || (!files && !dbs && !mail && !recreate)}
           >
             {translate("Khôi phục")}
           </button>
@@ -453,6 +473,23 @@ export default function BackupsPage() {
   useEffect(() => {
     if (manager && ownerId === null && owners.length) setOwnerId(owners[0].id);
   }, [manager, owners, ownerId]);
+
+  const [notice, setNotice] = useState("");
+  async function importDrive() {
+    setError("");
+    setNotice("");
+    try {
+      const r = await api<{ added: number }>("/backups/import", { method: "POST" });
+      setNotice(
+        r.added > 0
+          ? translate("Đã thêm {0} bản backup từ Google Drive", [r.added])
+          : translate("Không có bản backup mới trên Google Drive"),
+      );
+      load();
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
 
   async function backupNow() {
     setError("");
@@ -501,6 +538,15 @@ export default function BackupsPage() {
                 onChange={setOwnerId}
               />
             )}
+            {hosting && st?.connected && (
+              <button
+                className="btn-ghost"
+                onClick={importDrive}
+                title={translate("Tìm backup tạo từ máy chủ khác trong thư mục Drive")}
+              >
+                {translate("Tìm backup trên Drive")}
+              </button>
+            )}
             <button
               className="btn-primary"
               onClick={backupNow}
@@ -510,6 +556,9 @@ export default function BackupsPage() {
             </button>
           </div>
         </div>
+        {notice && (
+          <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{notice}</p>
+        )}
         <ErrorBox msg={error} />
         {task && <RunningTask task={task} onDone={load} />}
         <table className="w-full text-left text-sm">
@@ -533,7 +582,9 @@ export default function BackupsPage() {
                     {translate(
                       b.kind === "scheduled"
                         ? translate("tự động")
-                        : translate("thủ công"),
+                        : b.kind === "imported"
+                          ? translate("máy chủ khác")
+                          : translate("thủ công"),
                     )}
                   </div>
                 </td>
@@ -549,9 +600,15 @@ export default function BackupsPage() {
                   </td>
                 )}
                 <td className="py-2 text-xs text-slate-600">
+                  {b.kind === "imported" ? (
+                    translate("nhập từ Google Drive")
+                  ) : (
+                    <>
                   home · {translate(b.contents.databases?.length ?? 0)} database
                   · {translate(b.contents.mail_domains?.length ?? 0)}{" "}
                   {translate("tên miền email")}
+                    </>
+                  )}
                 </td>
                 <td className="py-2">{translate(fmtBytes(b.size_bytes))}</td>
                 <td className="py-2 text-right">

@@ -10,6 +10,7 @@ FTP() { lftp -u "$1,$2" -e "set ftp:ssl-allow ${4:-no}; set ssl:verify-certifica
 export DEBIAN_FRONTEND=noninteractive; apt-get install -y -qq sshpass lftp openssh-client >/dev/null 2>&1
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "fcust fother" "FTP2"
 c admin POST /packages '{"name":"FTP2","kind":"user","disk_mb":500,"max_ftp":2,"max_sites":1}' >/dev/null; P=$(jq .id /tmp/out)
 c admin POST /users "{\"username\":\"fcust\",\"password\":\"Client12345\",\"role\":\"user\",\"package_id\":$P}" >/dev/null; U=$(jq .id /tmp/out)
 c admin POST /users '{"username":"fother","password":"Client12345","role":"user"}' >/dev/null; O=$(jq .id /tmp/out)

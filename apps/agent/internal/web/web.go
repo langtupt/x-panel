@@ -252,7 +252,7 @@ func (s *Syncer) syncVhosts(ctx context.Context, p agentproto.WebSyncParams, hom
 		if site.DocRoot != "" {
 			root = filepath.Join(root, site.DocRoot)
 		}
-		v := vhostData{Username: p.Username, Domain: site.Domain, Root: root, Suspended: p.Suspended,
+		v := vhostData{Username: p.Username, Domain: site.Domain, Root: root, Suspended: p.Suspended, OverBandwidth: p.OverBandwidth,
 			Names: strings.Join(append([]string{site.Domain}, site.Aliases...), " "), ACMERoot: ACMERoot, LogDir: LogDir}
 		if siteapp.Dynamic(site.AppType) {
 			v.Port = site.Port

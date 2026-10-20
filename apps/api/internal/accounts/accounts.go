@@ -17,6 +17,7 @@ import (
 	"xpanel/apps/api/internal/auth"
 	"xpanel/apps/api/internal/cronjobs"
 	"xpanel/apps/api/internal/databases"
+	"xpanel/apps/api/internal/db"
 	"xpanel/apps/api/internal/ftpaccounts"
 	"xpanel/apps/api/internal/mailrepo"
 	"xpanel/apps/api/internal/packages"
@@ -106,7 +107,7 @@ func (s *Service) Create(ctx context.Context, actor *users.User, in CreateInput)
 				}
 			}
 		}()
-		if err := s.applyQuota(ctx, u.Username, pkg); err != nil {
+		if err := s.applyQuota(ctx, tx, u.Username, pkg); err != nil {
 			return nil, err
 		}
 		if err := s.agent.Call(ctx, agentproto.ActionUserPassword,
@@ -201,6 +202,11 @@ func (s *Service) SetPackage(ctx context.Context, actor *users.User, id int64, p
 	if err != nil {
 		return nil, err
 	}
+	if pkg != nil && pkg.DiskMB > 0 {
+		if err := checkMailFits(ctx, tx, t.Username, pkg); err != nil {
+			return nil, err
+		}
+	}
 	if actor.Role == users.RoleReseller {
 		if err := s.checkResellerCapacity(ctx, tx, actor, t.ID, pkg); err != nil {
 			return nil, err
@@ -210,7 +216,7 @@ func (s *Service) SetPackage(ctx context.Context, actor *users.User, id int64, p
 		return nil, err
 	}
 	if t.LinuxUID != nil {
-		if err := s.applyQuota(ctx, t.Username, pkg); err != nil {
+		if err := s.applyQuota(ctx, tx, t.Username, pkg); err != nil {
 			return nil, err
 		}
 		// New CPU/RAM limits for the account's PHP-FPM slice.
@@ -361,10 +367,14 @@ func (s *Service) checkResellerCapacity(ctx context.Context, tx pgx.Tx, reseller
 	return nil
 }
 
-func (s *Service) applyQuota(ctx context.Context, username string, pkg *packages.Package) error {
+func (s *Service) applyQuota(ctx context.Context, q db.Querier, username string, pkg *packages.Package) error {
 	p := agentproto.QuotaSetParams{Username: username}
 	if pkg != nil {
-		p.DiskMB, p.Inodes = pkg.DiskMB, pkg.Inodes
+		mailMB, err := mailAllocMB(ctx, q, username)
+		if err != nil {
+			return err
+		}
+		p.DiskMB, p.Inodes = filesQuotaMB(pkg.DiskMB, mailMB), pkg.Inodes
 	}
 	var res agentproto.QuotaSetResult
 	if err := s.agent.Call(ctx, agentproto.ActionQuotaSet, p, &res); err != nil {
