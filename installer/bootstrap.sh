@@ -36,6 +36,5 @@ curl -fsSL --retry 3 -o "$TMP/$FILE.sha256" "$BASE/$FILE.sha256" || die "Không 
 
 tar -C "$TMP" -xzf "$TMP/$FILE"
 cd "$TMP/xpanel-linux-$ARCH"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-}" ./install.sh
-# Turn on disk quotas when /home supports it (needs a reboot-free remount).
-./enable-quota.sh || echo "!! Chưa bật được quota tự động (/home cần ext4 hoặc xfs); xem README."
+# install.sh also turns on disk quotas and finishes with the login details.
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-}" XPANEL_ENABLE_QUOTA=1 ./install.sh

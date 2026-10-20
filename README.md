@@ -33,7 +33,7 @@ Trên VPS **mới** chạy Debian 12/13 hoặc Ubuntu 22.04/24.04, đăng nhập
 apt-get update && apt-get install -y curl ca-certificates && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/installer/bootstrap.sh | bash
 ```
 
-Đặt sẵn mật khẩu admin (không có thì sinh ngẫu nhiên, in ra cuối quá trình và lưu ở `/root/xpanel-admin.txt`):
+Đặt sẵn mật khẩu admin (không đặt thì sinh ngẫu nhiên). Cài xong, địa chỉ panel, tài khoản và mật khẩu hiển thị ngay trên màn hình; mật khẩu **không được lưu** trên máy chủ nên hãy ghi lại:
 
 ```bash
 apt-get update && apt-get install -y curl ca-certificates && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/installer/bootstrap.sh | ADMIN_PASSWORD='MatKhauManh123' bash
@@ -62,7 +62,7 @@ Panel chạy ở **https://IP-server:8888** (nginx giữ cổng 8888 và chuyể
 
 Installer sẽ cài nginx, PostgreSQL, MariaDB (chỉ nghe 127.0.0.1), quota; tạo user hệ thống `xpanel`, DB,
 chứng chỉ self-signed, mở cổng 80/443/8888 nếu ufw đang bật; tạo tài khoản `admin` (mật khẩu lấy từ `ADMIN_PASSWORD`,
-không có thì sinh ngẫu nhiên; lưu tại `/root/xpanel-admin.txt`). Chạy lại script = nâng cấp, giữ nguyên
+không có thì sinh ngẫu nhiên; chỉ hiển thị trên màn hình, không lưu thành file). Chạy lại script = nâng cấp, giữ nguyên
 cấu hình và dữ liệu; chạy lại kèm `ADMIN_PASSWORD=...` để đặt lại mật khẩu admin.
 
 Đổi mật khẩu một tài khoản bất kỳ trên server:

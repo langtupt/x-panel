@@ -37,7 +37,7 @@ web() {
  echo "FAIL web $domain"; journalctl -u 'xpanel-app-*' -n 20 --no-pager; exit 1
 }
 apt-get install -y -qq jq >/dev/null 2>&1
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(sed -n 's/^Password: //p' /root/xpanel-admin.txt)}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin@123!}"
 req POST /auth/login "$(jq -nc --arg pw "$ADMIN_PASSWORD" '{username:"admin",password:$pw}')"
 req GET /users
 OLD=$(jq -r '.users[] | select(.username=="appcust") | .id' /tmp/apps-response)

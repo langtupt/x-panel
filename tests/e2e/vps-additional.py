@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import json,ssl,urllib.request,http.cookiejar,time,subprocess
-password=open('/root/xpanel-admin.txt').read().split('Password: ')[1].strip()
+password=__import__('os').environ['XPANEL_ADMIN_PASSWORD']
 def session():
  return urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl._create_unverified_context()),urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 admin=session()

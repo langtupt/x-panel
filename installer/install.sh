@@ -241,10 +241,9 @@ if [ "$FIRST_INSTALL" = 1 ]; then
 elif [ -n "$ADMIN_PASS" ]; then
   run_api reset-password -username admin -password "$ADMIN_PASS"
 fi
-if [ -n "$ADMIN_PASS" ]; then
-  (umask 077 && printf 'URL: https://%s:%s\nUsername: admin\nPassword: %s\n' \
-    "$(hostname -I | awk '{print $1}')" "$PANEL_PORT" "$ADMIN_PASS" >/root/xpanel-admin.txt)
-fi
+# The password is only shown on screen, never stored in a file (older
+# versions kept /root/xpanel-admin.txt).
+rm -f /root/xpanel-admin.txt
 
 systemctl enable xpanel-agent xpanel-api
 systemctl restart xpanel-agent xpanel-api
@@ -256,17 +255,38 @@ done
 curl -sf -o /dev/null http://127.0.0.1:8889/api/health \
   || die "xpanel-api không khởi động được, xem: journalctl -u xpanel-api"
 
-IP="$(hostname -I | awk '{print $1}')"
-echo
-log "X-Panel đã cài xong: https://$IP:$PANEL_PORT"
-if [ -n "$ADMIN_PASS" ]; then
-  echo "    Tài khoản: admin"
-  echo "    Mật khẩu : $ADMIN_PASS   (đã lưu ở /root/xpanel-admin.txt)"
-else
-  echo "    Đã nâng cấp; tài khoản và cấu hình được giữ nguyên."
+# The one-line installer turns on disk quotas here, so the login details
+# below are the last thing on screen.
+if [ "${XPANEL_ENABLE_QUOTA:-0}" = 1 ]; then
+  "$SRC/enable-quota.sh" || warn "Chưa bật được quota tự động (/home cần ext4 hoặc xfs)."
 fi
-warn "Chứng chỉ panel là self-signed, trình duyệt sẽ cảnh báo lần đầu."
-if ! findmnt -n -o OPTIONS --target /home | grep -qE '(^|,)(usrquota|quota|uquota|usrjquota=[^,]*)(,|$)'; then
+QUOTA_ON=1
+findmnt -n -o OPTIONS --target /home | grep -qE '(^|,)(usrquota|quota|uquota|usrjquota=[^,]*)(,|$)' || QUOTA_ON=0
+
+LOCAL_IP="$(hostname -I | awk '{print $1}')"
+PUBLIC_IP="$(curl -4 -fsS -m 4 https://api.ipify.org 2>/dev/null | grep -E '^[0-9.]+$' || true)"
+echo
+printf '\033[1;32m%s\033[0m\n' "=================================================================="
+printf '\033[1;32m  X-Panel đã cài xong\033[0m\n'
+printf '\033[1;32m%s\033[0m\n' "=================================================================="
+if [ -n "$PUBLIC_IP" ] && [ "$PUBLIC_IP" != "$LOCAL_IP" ]; then
+  echo "  Địa chỉ   : https://$PUBLIC_IP:$PANEL_PORT"
+  echo "              https://$LOCAL_IP:$PANEL_PORT   (mạng nội bộ)"
+else
+  echo "  Địa chỉ   : https://$LOCAL_IP:$PANEL_PORT"
+fi
+echo "  Tài khoản : admin"
+if [ -n "$ADMIN_PASS" ]; then
+  printf '  Mật khẩu  : \033[1m%s\033[0m\n' "$ADMIN_PASS"
+  echo
+  warn "Hãy lưu mật khẩu này ngay: nó chỉ hiển thị một lần và không được lưu trên máy chủ."
+  echo "   Quên mật khẩu: chạy lại lệnh cài kèm ADMIN_PASSWORD='mật-khẩu-mới'."
+else
+  echo "  Mật khẩu  : giữ nguyên như trước (đã nâng cấp, dữ liệu và cấu hình được giữ nguyên)"
+fi
+printf '\033[1;32m%s\033[0m\n' "=================================================================="
+warn "Chứng chỉ panel là self-signed, trình duyệt sẽ cảnh báo lần đầu (chọn Advanced → Proceed)."
+if [ "$QUOTA_ON" = 0 ]; then
   warn "Quota ổ đĩa chưa bật trên /home: giới hạn dung lượng của gói chưa có hiệu lực."
-  warn "Bật bằng: sudo $PREFIX/bin/enable-quota.sh"
+  warn "Bật bằng: $PREFIX/bin/enable-quota.sh"
 fi
