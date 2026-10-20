@@ -57,8 +57,12 @@ func Create(ctx context.Context, username string) (uid int, home string, err err
 		return 0, "", fmt.Errorf("linux user %q already exists", username)
 	}
 	home = HomeBase + "/" + username
-	if err := run.Cmd(ctx, "useradd", "--create-home", "--home-dir", home, "--shell", "/usr/sbin/nologin",
-		"--user-group", "--comment", Marker, username); err != nil {
+	groupArgs, err := groupFor(username)
+	if err != nil {
+		return 0, "", err
+	}
+	args := append([]string{"--create-home", "--home-dir", home, "--shell", "/usr/sbin/nologin"}, groupArgs...)
+	if err := run.Cmd(ctx, "useradd", append(args, "--comment", Marker, username)...); err != nil {
 		return 0, "", err
 	}
 	u, err := user.Lookup(username)
@@ -186,6 +190,40 @@ func Locked(username string) bool {
 		f := strings.Split(line, ":")
 		if len(f) >= 8 && f[0] == username {
 			return f[7] == "1"
+		}
+	}
+	return false
+}
+
+// groupFor picks useradd's group option. A group left behind with the same
+// name (an older uninstall removed the user but not its group, which nginx
+// is a member of) is reused when no account has it as primary group, so the
+// name can be created again and kept files keep their group.
+func groupFor(username string) ([]string, error) {
+	g, err := user.LookupGroup(username)
+	if err != nil {
+		return []string{"--user-group"}, nil
+	}
+	gid, _ := strconv.Atoi(g.Gid)
+	if gid < minUID {
+		return nil, fmt.Errorf("group %q is a system group", username)
+	}
+	if primaryUser(g.Gid) {
+		return nil, fmt.Errorf("group %q belongs to another user", username)
+	}
+	return []string{"--gid", username}, nil
+}
+
+// primaryUser reports whether some user has gid as its primary group.
+func primaryUser(gid string) bool {
+	b, err := os.ReadFile("/etc/passwd")
+	if err != nil {
+		return true // be safe: do not reuse
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		f := strings.Split(line, ":")
+		if len(f) > 3 && f[3] == gid {
+			return true
 		}
 	}
 	return false

@@ -30,6 +30,7 @@ for p in /opt/xpanel /etc/xpanel /var/lib/xpanel /etc/nginx/conf.d/xpanel /etc/n
   [ -e "$p" ] && bad "$p still exists" || ok "$p removed"
 done
 id ucust >/dev/null 2>&1 && bad "hosting user still exists" || ok "hosting user removed"
+getent group ucust >/dev/null && bad "hosting group left behind" || ok "hosting group removed"
 id xpanel >/dev/null 2>&1 && bad "xpanel user still exists" || ok "service user removed"
 mariadb -e "USE ucust_shop" 2>/dev/null && bad "customer database still exists" || ok "customer database dropped"
 (cd /tmp && runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='xpanel'") | grep -q 1 && bad "panel database still exists" || ok "panel database dropped"
@@ -47,5 +48,9 @@ cd /root/rel && ADMIN_PASSWORD='Admin@123!' ./install.sh >/tmp/reinstall.log 2>&
 rm -f /tmp/admin
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
 [ "$(c admin GET /users)" = 200 ] && [ "$(jq '.users|length' /tmp/out)" = 1 ] && ok "fresh panel works (only admin)" || bad "panel after reinstall"
+# A name used before the uninstall can be created again (orphan groups once broke this).
+groupadd ghost 2>/dev/null; gpasswd -a www-data ghost >/dev/null 2>&1
+[ "$(c admin POST /users '{"username":"ucust","password":"Client12345","role":"user"}')" = 201 ] && ok "same account name works after reinstall" || bad "cannot recreate ucust: $(cat /tmp/out)"
+[ "$(c admin POST /users '{"username":"ghost","password":"Client12345","role":"user"}')" = 201 ] && [ "$(id -gn ghost)" = ghost ] && ok "orphan group reused" || bad "orphan group blocks account: $(cat /tmp/out)"
 
 [ "$FAIL" = 0 ] && echo "PASS uninstall" || { echo "FAIL uninstall"; exit 1; }

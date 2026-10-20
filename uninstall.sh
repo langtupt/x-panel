@@ -98,6 +98,8 @@ if [ "$KEEP" != 1 ]; then
     q pkill -KILL -u "$u"
 
     q userdel -r "$u"
+    # nginx is a member of each account's group, so userdel leaves it behind.
+    q groupdel "$u"
     rm -rf "/home/${u:?}"
   done
 
