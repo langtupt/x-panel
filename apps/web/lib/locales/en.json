@@ -885,5 +885,7 @@
   "Panel: số lần sai mỗi tài khoản": "Panel: failures per account",
   "Trong 15 phút, từ mọi IP; 0 = không khóa": "Within 15 minutes, from any IP; 0 = never lock",
   "… thì khóa đăng nhập (phút)": "… then lock login (minutes)",
-  "Tài khoản tạm khóa đăng nhập": "Account login temporarily locked"
+  "Tài khoản tạm khóa đăng nhập": "Account login temporarily locked",
+  "Lệnh triển khai (chạy sau mỗi lần Build, dưới quyền tài khoản)": "Deploy commands (run after every Build, as the account)",
+  "Ví dụ chạy migration, build tài nguyên. Lệnh php / composer dùng đúng phiên bản PHP của website; lệnh lỗi sẽ dừng Build.": "E.g. migrations or asset builds. php / composer use the site PHP version; a failing command stops the Build."
 }

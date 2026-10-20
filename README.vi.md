@@ -397,7 +397,13 @@ API cũ /api/php và /api/phpmyadmin vẫn tương thích.
   Next.js mẫu dùng package phiên bản latest ở lần tạo đầu, sau đó npm tạo lockfile.
 - **Build & restart** chạy npm ci/install + build, go build, hoặc Composer + Laravel
   config/view cache bằng user Linux của khách trong slice của tài khoản (tối đa 30 phút).
-  Không tự chạy database migrations. Node cần script start trong package.json.
+  Node cần script start trong package.json.
+- **Lệnh triển khai** (trong form sửa website): các lệnh chạy sau mỗi lần Build, cùng user và
+  môi trường cách ly, ví dụ `php artisan migrate --force`, `php artisan storage:link`,
+  `npx prisma migrate deploy`. `php`/`composer` dùng đúng phiên bản PHP của website;
+  một lệnh lỗi làm Build dừng lại và ứng dụng không được khởi động lại.
+- PHP mặc định cho hosting: upload/post tối đa 128 MB (bằng giới hạn của nginx), memory 256 MB,
+  thời gian chạy 300 giây (`/etc/php/<v>/fpm/conf.d/97-xpanel-hosting.ini`); admin đổi ở trang PHP.
 - Biến môi trường riêng từng site nhập theo KEY=value; PORT, HOST, PATH, HOME do
   panel quản lý. PHP giữ môi trường trong pool riêng. Cấu hình được lưu ở DB panel
   và EnvironmentFile root-owned (0600); không đưa mật khẩu vào mã nguồn. Các biến hiển thị cho chủ site

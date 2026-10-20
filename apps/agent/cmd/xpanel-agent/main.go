@@ -97,6 +97,10 @@ func main() {
 	if err := firewall.Restore(context.Background()); err != nil {
 		log.Error("restore firewall", "err", err)
 	}
+	// PHP installed by older releases kept PHP's 2 MB upload limit.
+	if err := php.MigrateHostingDefaults(context.Background(), d); err != nil {
+		log.Error("php hosting defaults", "err", err)
+	}
 
 	srv := server.New(log)
 	srv.Register(agentproto.ActionSystemReboot, func(ctx context.Context, _ json.RawMessage) (any, error) { return nil, sysinfo.Reboot(ctx) })

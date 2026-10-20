@@ -386,6 +386,19 @@ func Build(ctx context.Context, d distro.Distro, p agentproto.SiteAppParams) (an
 	case "laravel":
 		script += "/usr/bin/php" + p.Site.PHPVersion + " /usr/local/bin/composer install --no-dev --no-interaction --optimize-autoloader\n/usr/bin/php" + p.Site.PHPVersion + " artisan config:cache\n/usr/bin/php" + p.Site.PHPVersion + " artisan view:cache\n"
 	}
+	// The customer's own deploy commands (migrations, asset builds…), with
+	// "php" and "composer" bound to the site's PHP version. They run as the
+	// account in the same confined unit as the build.
+	if s := strings.TrimSpace(p.DeployScript); s != "" {
+		if len(s) > 8000 || strings.ContainsRune(s, 0) {
+			return nil, fmt.Errorf("deploy script too long")
+		}
+		if agentproto.ValidPHPVersion(p.Site.PHPVersion) {
+			php := "/usr/bin/php" + p.Site.PHPVersion
+			script += "php() { " + php + " \"$@\"; }\ncomposer() { " + php + " /usr/local/bin/composer \"$@\"; }\n"
+		}
+		script += "echo '--- Lệnh triển khai ---'\nset -x\n" + s + "\nset +x\n"
+	}
 	// A transient service bounds the whole process tree and kills it on timeout.
 	args := []string{"--quiet", "--wait", "--pipe", "--collect", "--uid=" + p.Username, "--gid=" + p.Username, "--slice=xpanel-" + p.Username + ".slice", "--working-directory=" + r, "--property=RuntimeMaxSec=1800", "--property=NoNewPrivileges=yes", "--property=ProtectSystem=strict", "--property=ProtectHome=read-only", "--property=ReadWritePaths=" + u.HomeDir, "--property=PrivateTmp=yes", "--property=ProtectProc=invisible"}
 	env := map[string]string{"HOME": u.HomeDir, "PATH": path, "PORT": strconv.Itoa(p.Site.Port), "HOST": "127.0.0.1", "NODE_ENV": "production", "XDG_CACHE_HOME": filepath.Join(u.HomeDir, "tmp/.cache"), "npm_config_cache": filepath.Join(u.HomeDir, "tmp/.npm"), "GOPATH": filepath.Join(u.HomeDir, "tmp/go"), "GOCACHE": filepath.Join(u.HomeDir, "tmp/go-build"), "COMPOSER_HOME": filepath.Join(u.HomeDir, "tmp/composer"), "COMPOSER_CACHE_DIR": filepath.Join(u.HomeDir, "tmp/composer-cache")}

@@ -65,6 +65,9 @@ func Install(ctx context.Context, d distro.Distro, version string) (string, erro
 		err = WritePerformanceDefaults(version)
 	}
 	if err == nil {
+		_, err = WriteHostingDefaults(version)
+	}
+	if err == nil {
 		err = step(run.Opts{Timeout: time.Minute}, "systemctl", "enable", "--now", d.PHPFPMService(version))
 	}
 	if err == nil {

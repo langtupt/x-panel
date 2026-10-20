@@ -68,6 +68,23 @@ for kind in html php nodejs go nextjs laravel; do
  req GET "/sites/$SITE/logs"
  echo "PASS site $kind"
 done
+# PHP sites get hosting limits, not PHP's 2 MB default.
+echo '<?php echo ini_get("upload_max_filesize"),"|",ini_get("post_max_size");' | runuser -u appcust -- sh -c 'cat > /home/appcust/www/php.apps.example.com/xp-ini.php'
+[ "$(curl -s -H 'Host: php.apps.example.com' http://127.0.0.1/xp-ini.php)" = "128M|128M" ]; echo "PASS PHP upload limit 128M"
+head -c 20000000 /dev/urandom > /tmp/20m.bin
+echo '<?php echo $_FILES["f"]["error"] ?? "none", ":", $_FILES["f"]["size"] ?? 0;' | runuser -u appcust -- sh -c 'cat > /home/appcust/www/php.apps.example.com/xp-up.php'
+[ "$(curl -s -m 60 -H 'Host: php.apps.example.com' -F f=@/tmp/20m.bin http://127.0.0.1/xp-up.php)" = "0:20000000" ]; echo "PASS 20 MB upload to PHP"
+# Deploy commands run after the build, as the account, with the site's PHP.
+LV=$(curl -sk -b /tmp/apps-cookie "${H[@]}" "$B/api/sites" | jq '.[] | select(.domain=="laravel.apps.example.com") | .id')
+req PUT "/sites/$LV" '{"aliases":[],"app_type":"laravel","php_version":"8.3","doc_root":"","env":{},"deploy_script":"php artisan --version > storage/xp-deploy.txt\nid -un >> storage/xp-deploy.txt"}' 200
+req POST "/sites/$LV/build" '' 202; wait_task "$(jq -r .id /tmp/apps-response)"
+grep -q "Laravel Framework" /home/appcust/www/laravel.apps.example.com/storage/xp-deploy.txt && grep -qx appcust /home/appcust/www/laravel.apps.example.com/storage/xp-deploy.txt
+echo "PASS deploy script runs as the account with the site's PHP"
+req PUT "/sites/$LV" '{"aliases":[],"app_type":"laravel","php_version":"8.3","doc_root":"","env":{},"deploy_script":"false"}' 200
+req POST "/sites/$LV/build" '' 202; TASK=$(jq -r .id /tmp/apps-response)
+for _ in $(seq 1 120); do req GET "/tasks/$TASK"; st=$(jq -r .status /tmp/apps-response); [ "$st" = done ] || [ "$st" = failed ] && break; sleep 2; done
+[ "$st" = failed ]; echo "PASS failing deploy command fails the build"
+web laravel.apps.example.com 'Laravel'
 # Every running PHP/process service belongs to the account's limited slice.
 for unit in $(systemctl list-units --type=service --no-legend 'xpanel-app-appcust-*' | awk '{print $1}'); do
  systemctl show "$unit" -p Slice --value | grep -qx xpanel-appcust.slice

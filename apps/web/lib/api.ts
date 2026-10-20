@@ -213,6 +213,7 @@ export interface Site {
   runtime: string;
   port: number;
   env: Record<string, string>;
+  deploy_script?: string;
   id: number;
   user_id: number;
   username: string;

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/jackc/pgx/v5"
 	"regexp"
+	"strings"
 	"time"
 	"xpanel/apps/api/internal/apperr"
 	"xpanel/apps/api/internal/sites"
@@ -19,6 +20,13 @@ var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 var runtimeVersion = regexp.MustCompile(`^[0-9]+(\.[0-9]+){0,2}$`)
 
 func normalizeAppInput(in *SiteInput) error {
+	if in.DeployScript != nil {
+		v := strings.TrimSpace(strings.ReplaceAll(*in.DeployScript, "\r\n", "\n"))
+		if len(v) > 8000 || strings.ContainsRune(v, 0) {
+			return apperr.Invalid("lệnh triển khai tối đa 8000 ký tự")
+		}
+		in.DeployScript = &v
+	}
 	if in.AppType == "" {
 		if in.PHPVersion == "" {
 			in.AppType = "html"
@@ -174,7 +182,7 @@ func (s *Service) runSiteBuild(ctx context.Context, t *tasks.Task, logf func(str
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
 	var out agentproto.TaskLog
-	err = s.agent.Call(ctx, agentproto.ActionSiteBuild, agentproto.SiteAppParams{Username: owner.Username, Site: appSite(site), Sample: in.Sample}, &out)
+	err = s.agent.Call(ctx, agentproto.ActionSiteBuild, agentproto.SiteAppParams{Username: owner.Username, Site: appSite(site), Sample: in.Sample, DeployScript: site.DeployScript}, &out)
 	if out.Log != "" {
 		logf("%s", out.Log)
 	}
