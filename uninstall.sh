@@ -58,7 +58,7 @@ printf '\033[1;31m%s\033[0m\n' "================================================
 if [ "${XPANEL_CONFIRM:-}" != "XOA-SACH" ]; then
   [ -r /dev/tty ] || die "Cần xác nhận: chạy lại với XPANEL_CONFIRM=XOA-SACH trước \"bash\"."
   printf 'Gõ  XOA SACH  để tiếp tục (Enter để hủy): '
-  read -r answer </dev/tty || answer=""
+  { read -r answer </dev/tty; } 2>/dev/null || answer=""
   [ "$answer" = "XOA SACH" ] || die "Đã hủy, không thay đổi gì."
 fi
 
