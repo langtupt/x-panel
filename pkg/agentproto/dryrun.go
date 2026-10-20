@@ -63,6 +63,8 @@ func (d *DryRun) Call(_ context.Context, action string, params, out any) error {
 		res = PanelSSLInfo{Subject: "dry-run", Issuer: "dry-run", NotAfter: time.Now().Add(365 * 24 * time.Hour), SelfSigned: true}
 	case ActionStatsCollect:
 		res = StatsResult{At: time.Now(), Accounts: map[string]AccountStatSample{}}
+	case ActionPHPManageList:
+		res = PHPManagement{Modules: []PHPModule{}, Settings: []PHPSetting{}}
 	case ActionSystemInfo:
 		res = SystemInfo{Hostname: "dry-run", OSName: "Dry-run (no agent)", CPUCount: 1}
 	default:

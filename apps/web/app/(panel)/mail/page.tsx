@@ -685,7 +685,7 @@ function DomainView({
                   {translate("Chưa có hộp thư nào")}
                 </p>
                 <p className="mb-4 text-sm text-muted-foreground">
-                  {translate("Tạo hộp thư đầu tiên, ví dụ info@")} {d.domain}
+                  {translate("Tạo hộp thư đầu tiên, ví dụ info@")}{d.domain}
                 </p>
                 <button
                   className="btn-primary"

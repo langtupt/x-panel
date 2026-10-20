@@ -155,7 +155,13 @@ rm -rf /var/log/xpanel
 # SFTP chroot block in sshd_config.
 if grep -q "BEGIN X-Panel" /etc/ssh/sshd_config 2>/dev/null; then
   sed -i '/^# BEGIN X-Panel/,/^# END X-Panel/d' /etc/ssh/sshd_config
-  sshd -t && systemctl reload ssh
+  # Ubuntu 24.04 starts sshd by socket activation: ssh.service may be
+  # inactive and a reload then fails, which must not abort the uninstall.
+  if sshd -t; then
+    systemctl try-reload-or-restart ssh 2>/dev/null || true
+  else
+    warn "sshd_config không hợp lệ sau khi gỡ khối X-Panel; kiểm tra bằng: sshd -t"
+  fi
 fi
 q userdel xpanel-pma
 q userdel xpanel-webmail

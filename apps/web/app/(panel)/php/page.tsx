@@ -219,11 +219,11 @@ export default function PHPPage() {
           [t("Phiên bản đã cài"), versions.length],
           [
             t("Mô-đun đã cài"),
-            data?.modules.filter((m) => m.installed).length ?? 0,
+            (data?.modules ?? []).filter((m) => m.installed).length,
           ],
           [
             t("Thiết lập tùy chỉnh"),
-            data?.settings.filter((s) => s.custom).length ?? 0,
+            (data?.settings ?? []).filter((s) => s.custom).length,
           ],
         ].map(([label, value]) => (
           <div className="card p-5" key={label}>
