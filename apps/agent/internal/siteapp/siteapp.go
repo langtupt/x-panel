@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -80,6 +81,9 @@ func ready(ctx context.Context, user string, site agentproto.WebSite) error {
 }
 func Dynamic(t string) bool { return t == "nodejs" || t == "nextjs" || t == "go" }
 func Validate(s agentproto.WebSite) error {
+	if err := s.PHPConfig.Validate(); err != nil {
+		return err
+	}
 	if err := validate.Domain(s.Domain); err != nil {
 		return err
 	}
@@ -235,12 +239,38 @@ func Sync(ctx context.Context, distroForPHP distro.Distro, p agentproto.WebSyncP
 			// every customer group, other customers are not, so no account can
 			// talk FastCGI to another account's PHP.
 			fpm := fmt.Sprintf("[global]\ndaemonize=no\nerror_log=syslog\n[www]\nlisten=%s\nlisten.group=%s\nlisten.mode=0660\npm=ondemand\npm.max_children=%d\npm.process_idle_timeout=30s\nclear_env=no\ncatch_workers_output=yes\nphp_admin_value[open_basedir]=%s/:/tmp/\n", Socket(p.Username, site.Domain), p.Username, maxWorkers(p.MemMB), u.HomeDir)
+			workers := maxWorkers(p.MemMB)
+			if site.PHPConfig.Workers > 0 {
+				workers = min(workers, site.PHPConfig.Workers)
+			}
+			fpm = strings.Replace(fpm, fmt.Sprintf("pm.max_children=%d", maxWorkers(p.MemMB)), fmt.Sprintf("pm.max_children=%d", workers), 1)
+			fpm += fmt.Sprintf("request_terminate_timeout=%ds\n", site.PHPConfig.RequestTimeout)
+			// Root-owned directory prevents customer symlink replacement of trace files.
+			slowPath, err := prepareSlowLog(unit, u.Uid, u.Gid)
+			if err != nil {
+				return err
+			}
+			fpm += "slowlog=" + slowPath + "\n"
+			fpm += fmt.Sprintf("request_slowlog_timeout=%ds\n", site.PHPConfig.SlowTimeout)
+			keys := []string{}
+			for k := range site.PHPConfig.Settings {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				fpm += fmt.Sprintf("php_admin_value[%s]=\"%s\"\n", k, site.PHPConfig.Settings[k])
+			}
 			// The FPM config contains no secrets; the unit environment stays root-only.
 			credential := filepath.Join(dir, unit+".fpm")
-			if oldFPM, _ := os.ReadFile(credential); string(oldFPM) != fpm {
+			oldFPM, _ := os.ReadFile(credential)
+			if string(oldFPM) != fpm {
 				fpmChanged = true
 			}
 			if err := os.WriteFile(credential, []byte(fpm), 0644); err != nil {
+				return err
+			}
+			if _, err := run.Output(ctx, "runuser", "-u", p.Username, "--", distroForPHP.PHPFPMBinary(site.PHPVersion), "-t", "--fpm-config", credential); err != nil {
+				_ = os.WriteFile(credential, oldFPM, 0644)
 				return err
 			}
 			if err := os.Chmod(credential, 0644); err != nil {
@@ -248,7 +278,7 @@ func Sync(ctx context.Context, distroForPHP distro.Distro, p agentproto.WebSyncP
 			}
 			// No SupplementaryGroups: customer code must never run in the shared
 			// www-data group (it would reach every other account's sockets).
-			content = fmt.Sprintf("[Unit]\nDescription=X-Panel PHP %s\nAfter=network.target\n[Service]\nType=simple\nUser=%s\nGroup=%s\nSlice=xpanel-%s.slice\nRuntimeDirectory=%s\nRuntimeDirectoryMode=0755\n%sExecStart=%s --nodaemonize --force-stderr --fpm-config %s\nOOMPolicy=continue\nRestart=on-failure\nRestartSec=3\nNoNewPrivileges=true\nPrivateTmp=true\nProtectProc=invisible\nProtectSystem=strict\nProtectHome=read-only\nReadWritePaths=%s\n[Install]\nWantedBy=multi-user.target\n", site.Domain, p.Username, p.Username, p.Username, strings.TrimSuffix(unit, ".service"), envDirective, distroForPHP.PHPFPMBinary(site.PHPVersion), credential, unitValue(u.HomeDir))
+			content = fmt.Sprintf("[Unit]\nDescription=X-Panel PHP %s\nAfter=network.target\n[Service]\nType=simple\nUser=%s\nGroup=%s\nSlice=xpanel-%s.slice\nRuntimeDirectory=%s\nRuntimeDirectoryMode=0755\n%sExecStart=%s --nodaemonize --force-stderr --fpm-config %s\nOOMPolicy=continue\nRestart=on-failure\nRestartSec=3\nNoNewPrivileges=true\nPrivateTmp=true\nProtectProc=invisible\nProtectSystem=strict\nProtectHome=read-only\nReadWritePaths=%s\n[Install]\nWantedBy=multi-user.target\n", site.Domain, p.Username, p.Username, p.Username, strings.TrimSuffix(unit, ".service"), envDirective, distroForPHP.PHPFPMBinary(site.PHPVersion), credential, unitValue(u.HomeDir)+" "+slowPath)
 		}
 		conf := filepath.Join("/etc/systemd/system", unit)
 		old, _ := os.ReadFile(conf)
@@ -309,6 +339,7 @@ func Sync(ctx context.Context, distroForPHP distro.Distro, p agentproto.WebSyncP
 		_ = os.Remove(filepath.Join(dir, e.Name()+".built"))
 		_ = os.Remove(filepath.Join(dir, e.Name()+".fpm"))
 		_ = os.Remove(filepath.Join(dir, e.Name()+".env"))
+		_ = os.Remove(filepath.Join("/var/log/xpanel/php", e.Name()+".slow.log"))
 		if err := os.Remove(filepath.Join(dir, e.Name())); err != nil {
 			return err
 		}
@@ -400,7 +431,49 @@ func Logs(ctx context.Context, p agentproto.SiteAppParams) (any, error) {
 		return nil, err
 	}
 	out, err := run.Output(ctx, "journalctl", "--no-pager", "-n", "200", "-u", Unit(p.Username, p.Site.Domain))
+	if p.Site.AppType == "php" || p.Site.AppType == "laravel" {
+		path := filepath.Join("/var/log/xpanel/php", Unit(p.Username, p.Site.Domain)+".slow.log")
+		if f, e := os.Open(path); e == nil {
+			defer f.Close()
+			if st, e := f.Stat(); e == nil {
+				if st.Size() > 65536 {
+					_, _ = f.Seek(-65536, 2)
+				}
+				data, _ := io.ReadAll(io.LimitReader(f, 65536))
+				out += "\n--- PHP slow log ---\n" + string(data)
+			}
+		}
+	}
 	return agentproto.TaskLog{Log: out}, err
+}
+func prepareSlowLog(unit, uidText, gidText string) (string, error) {
+	const dir = "/var/log/xpanel/php"
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	path := filepath.Join(dir, unit+".slow.log")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	uid, err := strconv.Atoi(uidText)
+	if err != nil {
+		return "", err
+	}
+	gid, err := strconv.Atoi(gidText)
+	if err != nil {
+		return "", err
+	}
+	if err = f.Chown(uid, gid); err != nil {
+		return "", err
+	}
+	// copytruncate avoids restarting customer masters during rotation.
+	rotation := "/var/log/xpanel/php/*.slow.log {\n daily\n maxsize 10M\n rotate 7\n missingok\n notifempty\n compress\n copytruncate\n su root root\n}\n"
+	if err = os.WriteFile("/etc/logrotate.d/xpanel-php", []byte(rotation), 0644); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 func sampleScript(kind string) string {
 	files := map[string]string{}

@@ -1,4 +1,5 @@
 "use client";
+import { t as translate } from "@/lib/i18n";
 
 import { useState } from "react";
 import { taskLabel, type Task, type TaskStatus } from "@/lib/api";
@@ -19,7 +20,7 @@ export function TaskStatusBadge({ status }: { status: TaskStatus }) {
       {(status === "running" || status === "pending") && (
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
       )}
-      {s.label}
+      {translate(s.label)}
     </span>
   );
 }
@@ -42,18 +43,20 @@ export function TaskCard({
       >
         <span className="min-w-0 truncate">
           <span className="font-medium">
-            {taskLabel[task.type] ?? task.type}
+            {translate(taskLabel[task.type] ?? task.type)}
           </span>
-          <span className="text-slate-500"> · {task.target}</span>
+          <span className="text-slate-500"> · {translate(task.target)}</span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
           <TaskStatusBadge status={task.status} />
-          <span className="text-xs text-slate-400">{open ? "▲" : "▼"}</span>
+          <span className="text-xs text-slate-400">
+            {translate(open ? "▲" : "▼")}
+          </span>
         </span>
       </button>
       {open && (
         <pre className="max-h-72 overflow-auto border-t border-slate-100 bg-slate-950 px-3 py-2 text-xs leading-relaxed text-slate-200">
-          {task.log || "Chưa có log…"}
+          {task.log || translate("Chưa có log…")}
         </pre>
       )}
       <div className="flex justify-end border-t px-3 py-1.5">
@@ -65,7 +68,7 @@ export function TaskCard({
             )
           }
         >
-          Mở trong popup →
+          {translate("Mở trong popup →")}
         </button>
       </div>
     </div>

@@ -15,6 +15,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,6 +33,7 @@ import (
 	"time"
 
 	"xpanel/apps/agent/internal/apps"
+	"xpanel/apps/agent/internal/run"
 	"xpanel/pkg/agentproto"
 	"xpanel/pkg/gdrive"
 	"xpanel/pkg/validate"
@@ -378,6 +381,7 @@ func Restore(ctx context.Context, p agentproto.BackupRestoreParams) (agentproto.
 		}
 	}()
 	restoredDBs := map[string]bool{}
+	manifestSeen := false
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
@@ -386,8 +390,15 @@ func Restore(ctx context.Context, p agentproto.BackupRestoreParams) (agentproto.
 		if err != nil {
 			return res(err)
 		}
+		if !manifestSeen && h.Name != "manifest.json" {
+			return res(errors.New("backup thiếu manifest đầu tiên"))
+		}
 		switch {
 		case h.Name == "manifest.json":
+			if manifestSeen || h.Typeflag != tar.TypeReg || h.Size > 16<<20 {
+				return res(ErrBadBackup)
+			}
+			manifestSeen = true
 			var m struct {
 				Username string `json:"username"`
 			}
@@ -415,7 +426,7 @@ func Restore(ctx context.Context, p agentproto.BackupRestoreParams) (agentproto.
 				continue
 			}
 			log.printf("Khôi phục database %s", name)
-			if err := importDB(ctx, d, tr); err != nil {
+			if err := importDB(ctx, u, d, tr); err != nil {
 				return res(fmt.Errorf("database %s: %w", name, err))
 			}
 			restoredDBs[name] = true
@@ -429,6 +440,19 @@ func Restore(ctx context.Context, p agentproto.BackupRestoreParams) (agentproto.
 				return res(err)
 			}
 		}
+	}
+	if !manifestSeen {
+		return res(ErrBadBackup)
+	}
+	// tar may stop before gzip's checksum and the encrypted final frame.
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		return res(err)
+	}
+	if err := gz.Close(); err != nil {
+		return res(err)
+	}
+	if _, err := io.Copy(io.Discard, dec); err != nil {
+		return res(err)
 	}
 	if home != nil {
 		err := home.finish()
@@ -500,14 +524,13 @@ func (hw *homeWriter) add(h *tar.Header, r io.Reader) error {
 }
 
 func (hw *homeWriter) finish() error {
-	hw.tw.Close()
-	hw.stdin.Close()
+	writeErr := hw.tw.Close()
+	closeErr := hw.stdin.Close()
 	err := hw.cmd.Wait()
-	var exit *exec.ExitError
-	if err != nil && !(errors.As(err, &exit) && exit.ExitCode() <= 2) {
+	if err != nil {
 		return fmt.Errorf("tar: %v: %s", err, strings.TrimSpace(hw.stderr.String()))
 	}
-	return nil
+	return errors.Join(writeErr, closeErr)
 }
 
 func (hw *homeWriter) abort() {
@@ -520,19 +543,33 @@ func (hw *homeWriter) abort() {
 // objects belong to the importing session instead of naming another account.
 var definerRe = regexp.MustCompile("DEFINER=`[^`]*`@`[^`]*`")
 
-func importDB(ctx context.Context, d agentproto.BackupDB, r io.Reader) error {
+func importDB(ctx context.Context, u *user.User, d agentproto.BackupDB, r io.Reader) (result error) {
+	login, password, err := restoreCredentials()
+	if err != nil {
+		return err
+	}
+	cleanup := func() {
+		cleanCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		result = errors.Join(result, restoreGrant(cleanCtx, d, login, password, true))
+	}
+	defer cleanup()
+	if err := restoreGrant(ctx, d, login, password, false); err != nil {
+		return err
+	}
 	var cmd *exec.Cmd
 	var stdin io.Reader = r
 	if d.Engine == "postgresql" {
 		if d.User == "" {
 			return errors.New("missing database owner")
 		}
-		cmd = exec.CommandContext(ctx, "runuser", "-u", "postgres", "--", "psql", "-p", strconv.Itoa(apps.PGPort),
-			"-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", d.Name)
-		// Objects are created as the database's owner, never as postgres.
+		cmd = exec.CommandContext(ctx, "runuser", "-u", u.Username, "--", "psql", "-h", "127.0.0.1", "-p", strconv.Itoa(apps.PGPort),
+			"-U", login, "-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", d.Name)
 		stdin = io.MultiReader(strings.NewReader(`SET ROLE "`+d.User+`";`+"\n"), r)
+		cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=" + u.HomeDir, "PGPASSWORD=" + password, "LANG=C.UTF-8"}
 	} else {
-		cmd = exec.CommandContext(ctx, "mariadb", "--batch", d.Name)
+		cmd = exec.CommandContext(ctx, "runuser", "-u", u.Username, "--", "mariadb", "--no-defaults", "--protocol=TCP", "--host=127.0.0.1", "--user="+login, "--batch", "--binary-mode", "--local-infile=0", "--database="+d.Name)
+		cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=" + u.HomeDir, "MYSQL_PWD=" + password, "LANG=C.UTF-8"}
 		pr, pw := io.Pipe()
 		go func() {
 			sc := bufio.NewReaderSize(r, 1<<20)
@@ -554,6 +591,7 @@ func importDB(ctx context.Context, d agentproto.BackupDB, r io.Reader) error {
 			}
 		}()
 		stdin = pr
+		defer pr.Close() // unblock the filtering goroutine if the client exits early
 	}
 	var stderr bytes.Buffer
 	cmd.Stdin, cmd.Stderr = stdin, &stderr
@@ -563,28 +601,74 @@ func importDB(ctx context.Context, d agentproto.BackupDB, r io.Reader) error {
 	return nil
 }
 
-func writeMail(domain, rel string, h *tar.Header, r io.Reader) error {
-	root := filepath.Join(mailRoot, domain)
-	target := filepath.Join(root, filepath.FromSlash(rel))
-	if target != root && !strings.HasPrefix(target, root+string(os.PathSeparator)) {
-		return nil
+// restoreCredentials is intentionally unrelated to any persistent database password.
+func restoreCredentials() (string, string, error) {
+	var data [40]byte
+	if _, err := rand.Read(data[:]); err != nil {
+		return "", "", err
 	}
+	return "xp_restore_" + hex.EncodeToString(data[:8]), hex.EncodeToString(data[8:]), nil
+}
+
+func restoreGrant(ctx context.Context, d agentproto.BackupDB, login, password string, remove bool) error {
+	if d.User == "" {
+		return errors.New("missing database owner")
+	}
+	var sql string
+	if d.Engine == "postgresql" {
+		if remove {
+			sql = `ALTER ROLE "` + login + `" NOLOGIN PASSWORD NULL; SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename='` + login + `' AND pid<>pg_backend_pid(); REASSIGN OWNED BY "` + login + `" TO "` + d.User + `"; DROP OWNED BY "` + login + `"; DROP ROLE "` + login + `";`
+		} else {
+			sql = `CREATE ROLE "` + login + `" LOGIN PASSWORD '` + password + `' VALID UNTIL '` + time.Now().UTC().Add(2*time.Hour).Format(time.RFC3339) + `' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION; GRANT "` + d.User + `" TO "` + login + `";`
+		}
+		_, err := run.With(ctx, run.Opts{Stdin: sql}, "runuser", "-u", "postgres", "--", "psql", "-p", strconv.Itoa(apps.PGPort), "-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", d.Name)
+		return err
+	}
+	for _, host := range []string{"localhost", "127.0.0.1"} {
+		account := "'" + login + "'@'" + host + "'"
+		if remove {
+			sql += "DROP USER IF EXISTS " + account + ";"
+		} else {
+			sql += "CREATE USER " + account + " IDENTIFIED BY '" + password + "'; GRANT ALL PRIVILEGES ON `" + strings.ReplaceAll(d.Name, "_", `\_`) + "`.* TO " + account + ";"
+		}
+	}
+	_, err := run.With(ctx, run.Opts{Stdin: sql}, "mariadb", "--batch")
+	return err
+}
+
+func writeMail(domain, rel string, h *tar.Header, r io.Reader) error {
+	base := filepath.Join(mailRoot, domain)
+	info, err := os.Lstat(base)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("invalid mail domain directory")
+	}
+	return writeMailAt(base, rel, h, r)
+}
+
+// os.Root confines writes even if a mailbox path is replaced with a symlink.
+func writeMailAt(base, rel string, h *tar.Header, r io.Reader) error {
+	root, err := os.OpenRoot(base)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	rel = filepath.FromSlash(rel)
 	switch h.Typeflag {
 	case tar.TypeDir:
-		return os.MkdirAll(target, 0o700)
+		return root.MkdirAll(rel, 0o700)
 	case tar.TypeReg:
-		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+		if err := root.MkdirAll(filepath.Dir(rel), 0o700); err != nil {
 			return err
 		}
-		f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+		f, err := root.OpenFile(rel, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(f, r)
-		if cerr := f.Close(); err == nil {
-			err = cerr
-		}
-		return err
+		_, copyErr := io.Copy(f, r)
+		return errors.Join(copyErr, f.Close())
 	}
 	return nil
 }

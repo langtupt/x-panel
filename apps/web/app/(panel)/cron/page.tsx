@@ -1,4 +1,5 @@
 "use client";
+import { t as translate } from "@/lib/i18n";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, errMsg, type CronJob } from "@/lib/api";
@@ -69,12 +70,14 @@ function CronForm({
   return (
     <form onSubmit={submit} className="card space-y-4 p-5">
       <h2 className="font-semibold">
-        {editing ? "Sửa cron job" : "Thêm cron job"}
+        {translate(
+          editing ? translate("Sửa cron job") : translate("Thêm cron job"),
+        )}
       </h2>
       <div className="modal-grid">
         {manager && !editing && (
           <div className="md:col-span-2">
-            <label className="label">Tài khoản</label>
+            <label className="label">{translate("Tài khoản")}</label>
             <OwnerSelect
               owners={owners}
               value={ownerId}
@@ -83,13 +86,13 @@ function CronForm({
           </div>
         )}
         <div>
-          <label className="label">Lịch chạy</label>
+          <label className="label">{translate("Lịch chạy")}</label>
           <input
             className="input font-mono"
             required
             value={schedule}
             onChange={(e) => setSchedule(e.target.value)}
-            placeholder="phút giờ ngày tháng thứ"
+            placeholder={translate("phút giờ ngày tháng thứ")}
           />
           <div className="mt-2 flex flex-wrap gap-1.5">
             {PRESETS.map((p) => (
@@ -99,23 +102,26 @@ function CronForm({
                 onClick={() => setSchedule(p.value)}
                 className={`rounded-md border px-2 py-0.5 text-xs ${schedule === p.value ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-300"}`}
               >
-                {p.label}
+                {translate(p.label)}
               </button>
             ))}
           </div>
         </div>
         <div>
-          <label className="label">Lệnh</label>
+          <label className="label">{translate("Lệnh")}</label>
           <input
             className="input font-mono"
             required
             maxLength={1000}
             value={command}
             onChange={(e) => setCommand(e.target.value)}
-            placeholder={`/usr/bin/php8.3 ${home}/www/example.com/artisan schedule:run`}
+            placeholder={translate(
+              `/usr/bin/php8.3 ${home}/www/example.com/artisan schedule:run`,
+            )}
           />
           <p className="mt-1 text-xs text-slate-400">
-            Chạy bằng user của tài khoản, thư mục home {home}.
+            {translate("Chạy bằng user của tài khoản, thư mục home")}{" "}
+            {translate(home)}.
           </p>
         </div>
       </div>
@@ -124,16 +130,17 @@ function CronForm({
           type="checkbox"
           checked={enabled}
           onChange={(e) => setEnabled(e.target.checked)}
-        />{" "}
-        Đang bật
+        />
+        {translate(" ")}
+        {translate("Đang bật")}
       </label>
       <ErrorBox msg={error} />
       <div className="modal-actions">
         <button className="btn-primary" disabled={saving}>
-          {saving ? "Đang lưu…" : "Lưu"}
+          {translate(saving ? translate("Đang lưu…") : translate("Lưu"))}
         </button>
         <button type="button" className="btn-ghost" onClick={onCancel}>
-          Hủy
+          {translate("Hủy")}
         </button>
       </div>
     </form>
@@ -184,7 +191,7 @@ export default function CronPage() {
         <div>
           <h1 className="text-xl font-semibold">Cron</h1>
           <p className="text-sm text-slate-500">
-            Lệnh chạy định kỳ; tự dừng khi tài khoản bị khóa.
+            {translate("Lệnh chạy định kỳ; tự dừng khi tài khoản bị khóa.")}
           </p>
         </div>
         {!form && (
@@ -192,12 +199,16 @@ export default function CronPage() {
             className="btn-primary"
             onClick={() => setForm({ editing: null })}
           >
-            + Thêm cron
+            {translate("+ Thêm cron")}
           </button>
         )}
       </div>
       {form && (
-        <Modal size="wide" title="Lịch chạy Cron" onClose={() => setForm(null)}>
+        <Modal
+          size="wide"
+          title={translate("Lịch chạy Cron")}
+          onClose={() => setForm(null)}
+        >
           <CronForm
             key={form.editing?.id ?? "new"}
             editing={form.editing}
@@ -216,10 +227,12 @@ export default function CronPage() {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3">Lịch</th>
-              <th className="px-4 py-3">Lệnh</th>
-              {manager && <th className="px-4 py-3">Tài khoản</th>}
-              <th className="px-4 py-3">Trạng thái</th>
+              <th className="px-4 py-3">{translate("Lịch")}</th>
+              <th className="px-4 py-3">{translate("Lệnh")}</th>
+              {manager && (
+                <th className="px-4 py-3">{translate("Tài khoản")}</th>
+              )}
+              <th className="px-4 py-3">{translate("Trạng thái")}</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -227,14 +240,18 @@ export default function CronPage() {
             {list.map((j) => (
               <tr key={j.id} className={j.enabled ? "" : "text-slate-400"}>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="font-mono text-xs">{j.schedule}</div>
+                  <div className="font-mono text-xs">
+                    {translate(j.schedule)}
+                  </div>
                   <div className="text-xs text-slate-500">
-                    {describe(j.schedule) !== j.schedule &&
-                      describe(j.schedule)}
+                    {translate(
+                      describe(j.schedule) !== j.schedule &&
+                        describe(j.schedule),
+                    )}
                   </div>
                 </td>
                 <td className="max-w-md px-4 py-3 font-mono text-xs break-all">
-                  {j.command}
+                  {translate(j.command)}
                 </td>
                 {manager && <td className="px-4 py-3">{j.username}</td>}
                 <td className="px-4 py-3">
@@ -242,7 +259,9 @@ export default function CronPage() {
                     onClick={() => toggle(j)}
                     className={`text-xs ${j.enabled ? "text-emerald-600" : "text-slate-500"}`}
                   >
-                    {j.enabled ? "● Bật" : "○ Tắt"}
+                    {translate(
+                      j.enabled ? translate("● Bật") : translate("○ Tắt"),
+                    )}
                   </button>
                 </td>
                 <td className="px-4 py-3">
@@ -251,13 +270,13 @@ export default function CronPage() {
                       className="btn-ghost px-2.5 py-1 text-xs"
                       onClick={() => setForm({ editing: j })}
                     >
-                      Sửa
+                      {translate("Sửa")}
                     </button>
                     <button
                       className="btn-ghost px-2.5 py-1 text-xs text-red-600"
                       onClick={() => setDeleting(j)}
                     >
-                      Xóa
+                      {translate("Xóa")}
                     </button>
                   </div>
                 </td>
@@ -269,7 +288,7 @@ export default function CronPage() {
                   colSpan={5}
                   className="px-4 py-8 text-center text-slate-500"
                 >
-                  Chưa có cron job nào.
+                  {translate("Chưa có cron job nào.")}
                 </td>
               </tr>
             )}
@@ -278,19 +297,22 @@ export default function CronPage() {
       </div>
 
       {deleting && (
-        <Modal title="Xóa cron job" onClose={() => setDeleting(null)}>
+        <Modal
+          title={translate("Xóa cron job")}
+          onClose={() => setDeleting(null)}
+        >
           <p className="break-all font-mono text-sm text-slate-600">
-            {deleting.schedule} {deleting.command}
+            {translate(deleting.schedule)} {translate(deleting.command)}
           </p>
           <div className="mt-5 flex justify-end gap-2">
             <button className="btn-ghost" onClick={() => setDeleting(null)}>
-              Hủy
+              {translate("Hủy")}
             </button>
             <button
               className="btn bg-red-600 text-white hover:bg-red-700"
               onClick={confirmDelete}
             >
-              Xóa
+              {translate("Xóa")}
             </button>
           </div>
         </Modal>

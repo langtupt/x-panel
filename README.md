@@ -280,7 +280,7 @@ Admin xem mọi tài khoản, đại lý xem khách của mình, khách chỉ xe
 
 ## Applications và ứng dụng website
 
-Trang **Applications** (admin) thay trang PHP, liệt kê PHP, Composer, Node.js, Go,
+Trang **Applications** (admin) liệt kê PHP, Composer, Node.js, Go,
 MariaDB, PostgreSQL, phpMyAdmin và Adminer. Chọn phiên bản rồi cài; tác vụ chạy nền,
 có trạng thái và nhật ký ở trang Tasks. Mỗi lần chỉ chạy một tác vụ cài đặt.
 API cũ /api/php và /api/phpmyadmin vẫn tương thích.
@@ -356,3 +356,26 @@ Kiểm thử scheduler dùng command giả; triển khai không tự reboot VPS.
 
 Preview UI độc lập với VPS: chạy `python tests/ui/preview.py`, mở localhost:3010.
 Toàn bộ dữ liệu và cài đặt trong preview đều mô phỏng; không dùng credential thật.
+
+### Interface language
+
+X-Panel supports Vietnamese (default) and English. Use the language selector on the sign-in page or in the panel header. The selection is saved in this browser and shared between tabs; routes, usernames, application identifiers and stored data are unchanged. Switching language closes open forms, so save edits first. Server-generated logs retain their original text.
+
+English UI messages are maintained in `apps/web/lib/locales/en.json`. Use `translate(message, [parameters])` for display text and `localeTag()` for dates and numbers. Keep API values and internal identifiers independent of translated labels.
+
+
+### Mô-đun và thiết lập PHP
+
+Admin mở **PHP** (`/php/`) để chọn phiên bản đã cài. Tab **Mô-đun PHP** lấy danh sách gói từ chỉ mục APT đang cấu hình trên server, hiển thị trạng thái/phiên bản và cho phép cài hoặc gỡ bằng tác vụ nền có popup nhật ký. Các gói nền tảng CLI/FPM/common/dev được bảo vệ; gỡ bị chặn nếu APT dự định gỡ thêm gói phụ thuộc khác.
+
+Tab **Thiết lập PHP** cung cấp 40 directive thông dụng (memory/upload limits, timeout, timezone, session và OPcache), tìm kiếm, sửa nhiều dòng và khôi phục mặc định từng dòng. Ghi đè nằm ở `/etc/php/<version>/fpm/conf.d/99-xpanel.ini`; không sửa php.ini gốc hay cấu hình CLI. File được ghi nguyên tử, kiểm tra FPM trước khi áp dụng và khôi phục file cũ nếu lỗi. Các master PHP-FPM đang chạy của phiên bản đó, bao gồm service riêng của website/tài khoản, nhận USR2 để nạp lại cấu hình. Thiết lập trong pool/site có thể ghi đè giá trị toàn phiên bản. Chỉ admin được gọi API quản lý PHP; mọi thay đổi được ghi audit.
+
+
+### PHP nâng cao
+
+- **PHP → Mô-đun** phân biệt gói đã cài, bật cho FPM và extension thực sự được nạp bởi FPM SAPI. Các extension tích hợp/bảo vệ không cho gỡ. Module của gói nhiều extension được bật/tắt cùng nhau; CLI giữ nguyên. Nút cập nhật kho chạy `apt-get update` bằng task nền; ứng dụng so sánh phiên bản bằng `dpkg --compare-versions` và cung cấp cập nhật gói đã cài.
+- **Website → PHP**: ghi đè các directive phù hợp ở cấp pool, kế thừa cấu hình chung khi bỏ ghi đè. Có workers, request timeout, slow-log threshold; workers bị chặn bởi mức tính từ RAM gói hosting. Chỉ admin thay đổi worker count; khách/đại lý được chỉnh directive và timeout của website họ quản lý. Các directive khởi tạo OPcache/cache hệ thống chỉ sửa ở trang PHP chung.
+- Nhật ký phiên bản đọc tối đa 200 dòng journal của các service PHP tương ứng. Nhật ký website thêm tối đa 64 KiB cuối slow log; file riêng trong `/var/log/xpanel/php` có quyền 0600, xoay vòng với logrotate (7 bản, ngưỡng 10M khi logrotate chạy). Slow timeout mặc định 0 (tắt).
+- Trang PHP khôi phục task đang chạy từ API sau khi tải lại. Thay đổi chưa lưu được cảnh báo khi đóng popup website, chuyển trang, đổi ngôn ngữ hoặc tải lại tab. Popup nội bộ dùng giao diện X-Panel; tải lại/đóng tab dùng cảnh báo chuẩn trình duyệt.
+
+Kiểm thử VPS Ubuntu: install/disable/enable/remove `php8.5-bz2`, cập nhật APT, tạo website tạm `.invalid`, xác minh `ini_get` qua HTTP, thu slow trace thực tế, reset cấu hình, chặn directive không được phép và dọn website thử. Không chạy nâng cấp hàng loạt các gói production để thử chức năng cập nhật.

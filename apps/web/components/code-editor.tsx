@@ -26,11 +26,15 @@ export default function CodeEditor({
     // .env, .htaccess and friends: plain "properties" style highlighting.
     const desc =
       LanguageDescription.matchFilename(languages, name) ??
-      (/^\.(env|htaccess|user\.ini)/.test(name) ? LanguageDescription.matchLanguageName(languages, "properties") : null);
+      (/^\.(env|htaccess|user\.ini)/.test(name)
+        ? LanguageDescription.matchLanguageName(languages, "properties")
+        : null);
     let alive = true;
     if (desc) desc.load().then((s) => alive && setLang([s]));
     else setLang([]);
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [path]);
 
   useEffect(() => {
@@ -46,7 +50,12 @@ export default function CodeEditor({
       theme={dark ? "dark" : "light"}
       extensions={lang}
       onChange={onChange}
-      basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: true, searchKeymap: true }}
+      basicSetup={{
+        lineNumbers: true,
+        foldGutter: true,
+        highlightActiveLine: true,
+        searchKeymap: true,
+      }}
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
           e.preventDefault();

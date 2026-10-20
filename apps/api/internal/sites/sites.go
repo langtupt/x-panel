@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"xpanel/apps/api/internal/db"
+	"xpanel/pkg/phpconfig"
 )
 
 type SSLStatus string
@@ -21,6 +22,7 @@ const (
 )
 
 type Site struct {
+	PHPConfig    phpconfig.Site    `json:"php_config"`
 	AppType      string            `json:"app_type"`
 	Runtime      string            `json:"runtime"`
 	Port         int               `json:"port"`
@@ -49,12 +51,12 @@ func NewRepo(q db.Querier) *Repo       { return &Repo{q: q} }
 func (r *Repo) WithTx(tx pgx.Tx) *Repo { return &Repo{q: tx} }
 
 const selectCols = `SELECT s.id, s.user_id, u.username, s.domain, s.aliases, s.php_version, s.doc_root,
-	s.ssl_status, s.ssl_expires_at, s.created_at, s.app_type, s.runtime, COALESCE(s.app_port,0), s.env, s.ssl_type, s.ssl_issuer FROM sites s JOIN users u ON u.id = s.user_id`
+	s.ssl_status, s.ssl_expires_at, s.created_at, s.app_type, s.runtime, COALESCE(s.app_port,0), s.env, s.ssl_type, s.ssl_issuer, s.php_config FROM sites s JOIN users u ON u.id = s.user_id`
 
 func scan(row pgx.Row) (*Site, error) {
 	var s Site
 	err := row.Scan(&s.ID, &s.UserID, &s.Username, &s.Domain, &s.Aliases, &s.PHPVersion, &s.DocRoot,
-		&s.SSLStatus, &s.SSLExpiresAt, &s.CreatedAt, &s.AppType, &s.Runtime, &s.Port, &s.Env, &s.SSLType, &s.SSLIssuer)
+		&s.SSLStatus, &s.SSLExpiresAt, &s.CreatedAt, &s.AppType, &s.Runtime, &s.Port, &s.Env, &s.SSLType, &s.SSLIssuer, &s.PHPConfig)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -148,5 +150,10 @@ func (r *Repo) ExpiringSSL(ctx context.Context, before time.Time) ([]Site, error
 func (r *Repo) SetCertificate(ctx context.Context, id int64, typ, issuer string, expires time.Time) error {
 	_, err := r.q.Exec(ctx, `UPDATE sites SET ssl_status='active', ssl_type=$2, ssl_issuer=$3, ssl_expires_at=$4,
 		updated_at=now() WHERE id=$1`, id, typ, issuer, expires)
+	return err
+}
+
+func (r *Repo) SetPHPConfig(ctx context.Context, id int64, c phpconfig.Site) error {
+	_, err := r.q.Exec(ctx, `UPDATE sites SET php_config=$2, updated_at=now() WHERE id=$1`, id, c)
 	return err
 }

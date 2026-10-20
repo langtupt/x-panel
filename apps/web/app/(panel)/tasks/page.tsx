@@ -1,4 +1,6 @@
 "use client";
+import { localeTag } from "@/lib/i18n";
+import { t as translate } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import { api, errMsg, isOpen, type Task } from "@/lib/api";
@@ -26,9 +28,11 @@ export default function TasksPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Tác vụ</h1>
+        <h1 className="text-xl font-semibold">{translate("Tác vụ")}</h1>
         <p className="text-sm text-slate-500">
-          Các công việc chạy nền gần đây (cài PHP, cấp và gia hạn SSL).
+          {translate(
+            "Các công việc chạy nền gần đây (cài PHP, cấp và gia hạn SSL).",
+          )}
         </p>
       </div>
       <ErrorBox msg={error} />
@@ -36,13 +40,16 @@ export default function TasksPage() {
         {list?.map((t) => (
           <div key={t.id}>
             <div className="mb-1 text-xs text-slate-400">
-              #{t.id} · {new Date(t.created_at).toLocaleString("vi-VN")}
+              #{translate(t.id)} ·{" "}
+              {translate(new Date(t.created_at).toLocaleString(localeTag()))}
             </div>
             <TaskCard task={t} />
           </div>
         ))}
         {list?.length === 0 && (
-          <p className="text-sm text-slate-500">Chưa có tác vụ nào.</p>
+          <p className="text-sm text-slate-500">
+            {translate("Chưa có tác vụ nào.")}
+          </p>
         )}
       </div>
     </div>

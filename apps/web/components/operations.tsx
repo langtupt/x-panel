@@ -1,4 +1,5 @@
 "use client";
+import { t as translate } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import { api, isOpen, taskLabel, type Task } from "@/lib/api";
@@ -34,22 +35,24 @@ type Operation = {
 function title(op: Operation) {
   if (op.task)
     return `${taskLabel[op.task.type] ?? op.task.type} · ${op.task.target}`;
-  if (op.path.includes("/files/upload")) return "Tải tệp lên máy chủ";
-  if (op.path.includes("/install")) return "Cài đặt ứng dụng";
-  if (op.path.includes("/build")) return "Build & khởi động lại website";
-  if (op.path.includes("/ssl")) return "Cập nhật chứng chỉ SSL";
+  if (op.path.includes("/files/upload"))
+    return translate("Tải tệp lên máy chủ");
+  if (op.path.includes("/install")) return translate("Cài đặt ứng dụng");
+  if (op.path.includes("/build"))
+    return translate("Build & khởi động lại website");
+  if (op.path.includes("/ssl")) return translate("Cập nhật chứng chỉ SSL");
   const resource = op.path.split("/")[1];
   const labels: Record<string, string> = {
     sites: "website",
-    users: "tài khoản",
+    users: translate("tài khoản"),
     databases: "database",
-    packages: "gói dịch vụ",
+    packages: translate("gói dịch vụ"),
     ftp: "FTP",
     cron: "cron",
-    files: "tệp",
-    me: "tài khoản",
+    files: translate("tệp"),
+    me: translate("tài khoản"),
   };
-  return `${op.method === "DELETE" ? "Xóa" : op.method === "POST" ? "Thực hiện thao tác" : "Cập nhật"} ${labels[resource] ?? "dữ liệu"}`;
+  return `${op.method === "DELETE" ? translate("Xóa") : op.method === "POST" ? translate("Thực hiện thao tác") : translate("Cập nhật")} ${labels[resource] ?? translate("dữ liệu")}`;
 }
 
 export function Operations() {
@@ -103,7 +106,9 @@ export function Operations() {
           );
           setWarning("");
         } catch {
-          setWarning("Tạm mất kết nối. Đang thử lấy lại trạng thái tác vụ…");
+          setWarning(
+            translate("Tạm mất kết nối. Đang thử lấy lại trạng thái tác vụ…"),
+          );
           setOperations((items) => [...items]);
         }
       }
@@ -126,9 +131,11 @@ export function Operations() {
           size="lg"
         >
           <Activity className={active.length ? "animate-pulse" : ""} />
-          {active.length
-            ? `${active.length} tác vụ đang chạy`
-            : "Xem tác vụ gần nhất"}
+          {translate(
+            active.length
+              ? translate("{0} tác vụ đang chạy", [active.length])
+              : translate("Xem tác vụ gần nhất"),
+          )}
         </Button>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
@@ -147,19 +154,25 @@ export function Operations() {
               <Button
                 size="icon"
                 variant="ghost"
-                aria-label="Thu nhỏ tác vụ"
+                aria-label={translate("Thu nhỏ tác vụ")}
                 onClick={() => setOpen(false)}
               >
                 <Minimize2 />
               </Button>
             </div>
-            <DialogTitle>{title(current)}</DialogTitle>
+            <DialogTitle>{translate(title(current))}</DialogTitle>
             <DialogDescription>
-              {running
-                ? "Đang xử lý. Bạn có thể thu nhỏ và tiếp tục làm việc; tác vụ vẫn chạy trên máy chủ."
-                : failed
-                  ? "Thao tác chưa hoàn tất. Xem thông tin lỗi bên dưới."
-                  : "Thao tác đã hoàn tất."}
+              {translate(
+                running
+                  ? translate(
+                      "Đang xử lý. Bạn có thể thu nhỏ và tiếp tục làm việc; tác vụ vẫn chạy trên máy chủ.",
+                    )
+                  : failed
+                    ? translate(
+                        "Thao tác chưa hoàn tất. Xem thông tin lỗi bên dưới.",
+                      )
+                    : translate("Thao tác đã hoàn tất."),
+              )}
             </DialogDescription>
           </DialogHeader>
           {operations.length > 1 && (
@@ -175,21 +188,27 @@ export function Operations() {
                     ])
                   }
                 >
-                  {op.task ? `#${op.task.id}` : `Thao tác ${op.id}`}
+                  {translate(
+                    op.task
+                      ? `#${op.task.id}`
+                      : translate("Thao tác {0}", [op.id]),
+                  )}
                 </button>
               ))}
             </div>
           )}
           {current.task && (
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Tác vụ #{current.task.id}</span>
+              <span>
+                {translate("Tác vụ #")} {translate(current.task.id)}
+              </span>
               <TaskStatusBadge status={current.task.status} />
             </div>
           )}
           {running && (
             <div
               role="progressbar"
-              aria-label="Đang xử lý"
+              aria-label={translate("Đang xử lý")}
               aria-valuenow={current.progress}
               className="h-1.5 overflow-hidden rounded-full bg-muted"
             >
@@ -206,7 +225,7 @@ export function Operations() {
           <div className="overflow-hidden rounded-lg border bg-neutral-950 text-neutral-200">
             <div className="flex items-center gap-2 border-b border-white/10 px-4 py-2.5 text-xs text-neutral-400">
               <Terminal className="size-3.5" />
-              Nhật ký thực hiện
+              {translate("Nhật ký thực hiện")}
             </div>
             <pre
               aria-live="polite"
@@ -215,13 +234,13 @@ export function Operations() {
               {current.error ||
                 current.task?.log ||
                 (running
-                  ? "Đã gửi yêu cầu đến máy chủ. Đang chờ nhật ký…"
-                  : "Hoàn tất thành công.")}
+                  ? translate("Đã gửi yêu cầu đến máy chủ. Đang chờ nhật ký…")
+                  : translate("Hoàn tất thành công."))}
             </pre>
           </div>
           {warning && (
             <p role="alert" className="text-xs text-amber-700">
-              {warning}
+              {translate(warning)}
             </p>
           )}
           <div className="flex justify-end">
@@ -229,7 +248,7 @@ export function Operations() {
               variant={running ? "outline" : "default"}
               onClick={() => setOpen(false)}
             >
-              {running ? "Chạy nền" : "Đóng"}
+              {translate(running ? translate("Chạy nền") : translate("Đóng"))}
             </Button>
           </div>
         </DialogContent>

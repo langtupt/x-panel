@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+	"xpanel/pkg/phpconfig"
 
 	"xpanel/pkg/gdrive"
 )
@@ -159,6 +160,7 @@ type WebSyncParams struct {
 }
 
 type WebSite struct {
+	PHPConfig  phpconfig.Site    `json:"php_config"`
 	AppType    string            `json:"app_type"`
 	Runtime    string            `json:"runtime"`
 	Port       int               `json:"port"`

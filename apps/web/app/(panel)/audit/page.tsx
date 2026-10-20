@@ -1,4 +1,6 @@
 "use client";
+import { localeTag } from "@/lib/i18n";
+import { t as translate } from "@/lib/i18n";
 
 import { useCallback, useEffect, useState } from "react";
 import { api, errMsg, type AuditRow } from "@/lib/api";
@@ -65,9 +67,11 @@ export default function AuditPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Nhật ký hoạt động</h1>
+        <h1 className="text-xl font-semibold">
+          {translate("Nhật ký hoạt động")}
+        </h1>
         <p className="text-sm text-slate-500">
-          Mọi thao tác thay đổi dữ liệu trên panel.
+          {translate("Mọi thao tác thay đổi dữ liệu trên panel.")}
         </p>
       </div>
       <ErrorBox msg={error} />
@@ -75,10 +79,10 @@ export default function AuditPage() {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3">Thời gian</th>
-              <th className="px-4 py-3">Người thực hiện</th>
-              <th className="px-4 py-3">Hành động</th>
-              <th className="px-4 py-3">Chi tiết</th>
+              <th className="px-4 py-3">{translate("Thời gian")}</th>
+              <th className="px-4 py-3">{translate("Người thực hiện")}</th>
+              <th className="px-4 py-3">{translate("Hành động")}</th>
+              <th className="px-4 py-3">{translate("Chi tiết")}</th>
               <th className="px-4 py-3">IP</th>
             </tr>
           </thead>
@@ -89,17 +93,19 @@ export default function AuditPage() {
                 className={a.action.endsWith("_failed") ? "bg-red-50/50" : ""}
               >
                 <td className="px-4 py-2 text-xs whitespace-nowrap text-slate-500">
-                  {new Date(a.created_at).toLocaleString("vi-VN")}
+                  {translate(
+                    new Date(a.created_at).toLocaleString(localeTag()),
+                  )}
                 </td>
-                <td className="px-4 py-2">{a.actor ?? "—"}</td>
+                <td className="px-4 py-2">{translate(a.actor ?? "—")}</td>
                 <td className="px-4 py-2 whitespace-nowrap">
-                  {actionLabel[a.action] ?? a.action}
+                  {translate(actionLabel[a.action] ?? a.action)}
                 </td>
                 <td className="max-w-lg px-4 py-2 font-mono text-xs break-all text-slate-600">
-                  {details(a.meta)}
+                  {translate(details(a.meta))}
                 </td>
                 <td className="px-4 py-2 font-mono text-xs text-slate-500">
-                  {a.ip}
+                  {translate(a.ip)}
                 </td>
               </tr>
             ))}
@@ -109,7 +115,7 @@ export default function AuditPage() {
                   colSpan={5}
                   className="px-4 py-8 text-center text-slate-500"
                 >
-                  Chưa có hoạt động nào.
+                  {translate("Chưa có hoạt động nào.")}
                 </td>
               </tr>
             )}
@@ -121,7 +127,7 @@ export default function AuditPage() {
           className="btn-ghost"
           onClick={() => load(rows[rows.length - 1].id)}
         >
-          Xem thêm
+          {translate("Xem thêm")}
         </button>
       )}
     </div>

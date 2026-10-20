@@ -1,4 +1,5 @@
 "use client";
+import { t as translate } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import { api, fmtMB, limit, type Overview } from "@/lib/api";
@@ -20,8 +21,8 @@ function Meter({
   return (
     <div className="card p-5">
       <div className="flex items-baseline justify-between">
-        <span className="text-sm text-slate-500">{label}</span>
-        <span className="text-2xl font-semibold">{pct}%</span>
+        <span className="text-sm text-slate-500">{translate(label)}</span>
+        <span className="text-2xl font-semibold">{translate(pct)}%</span>
       </div>
       <div className="mt-3 h-2 rounded-full bg-slate-100">
         <div
@@ -30,7 +31,7 @@ function Meter({
         />
       </div>
       <p className="mt-2 text-xs text-slate-500">
-        {fmtMB(used)} / {fmtMB(total)}
+        {translate(fmtMB(used))} / {translate(fmtMB(total))}
       </p>
     </div>
   );
@@ -47,9 +48,9 @@ function Stat({
 }) {
   return (
     <div className="card p-5">
-      <span className="text-sm text-slate-500">{label}</span>
+      <span className="text-sm text-slate-500">{translate(label)}</span>
       <div className="mt-1 text-2xl font-semibold">{value}</div>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-slate-500">{translate(hint)}</p>}
     </div>
   );
 }
@@ -68,7 +69,7 @@ function MyPlan() {
   if (error)
     return (
       <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-        {error}
+        {translate(error)}
       </p>
     );
   if (!ov) return null;
@@ -77,35 +78,38 @@ function MyPlan() {
   return (
     <section className="space-y-4">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Gói dịch vụ: {p ? p.name : "Không giới hạn"}
+        {translate("Gói dịch vụ:")}{" "}
+        {translate(p ? p.name : translate("Không giới hạn"))}
       </h2>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {me.role === "user" &&
           (ov.quota_enabled && ov.disk_used_mb !== null ? (
             <Meter
-              label="Dung lượng ổ cứng"
+              label={translate("Dung lượng ổ cứng")}
               used={ov.disk_used_mb}
               total={p?.disk_mb ?? 0}
             />
           ) : (
             <Stat
-              label="Dung lượng ổ cứng"
+              label={translate("Dung lượng ổ cứng")}
               value={p ? limit(p.disk_mb, fmtMB) : "∞"}
-              hint="Chưa đo được mức sử dụng"
+              hint={translate("Chưa đo được mức sử dụng")}
             />
           ))}
         {me.role === "reseller" && (
           <>
             <Meter
-              label="Dung lượng đã cấp"
+              label={translate("Dung lượng đã cấp")}
               used={ov.allocated_disk_mb ?? 0}
               total={p?.disk_mb ?? 0}
             />
             <Stat
-              label="Tài khoản khách"
+              label={translate("Tài khoản khách")}
               value={`${ov.allocated_users ?? 0} / ${p ? limit(p.max_users) : "∞"}`}
               hint={
-                p?.oversell ? "Gói cho phép oversell dung lượng" : undefined
+                p?.oversell
+                  ? translate("Gói cho phép oversell dung lượng")
+                  : undefined
               }
             />
           </>
@@ -120,7 +124,9 @@ function MyPlan() {
             <Stat
               label="PHP"
               value={
-                p.php_versions.length ? p.php_versions.join(", ") : "Tất cả"
+                p.php_versions.length
+                  ? p.php_versions.join(", ")
+                  : translate("Tất cả")
               }
               hint={`CPU ${limit(p.cpu_pct, (n) => n + "%")} · RAM ${limit(p.mem_mb, fmtMB)}`}
             />
@@ -137,9 +143,11 @@ export default function DashboardPage() {
   return (
     <div className="space-y-7">
       <div>
-        <h1>Xin chào, {me.username}</h1>
+        <h1>
+          {translate("Xin chào,")} {me.username}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Tổng quan workspace và gói dịch vụ của bạn.
+          {translate("Tổng quan workspace và gói dịch vụ của bạn.")}
         </p>
       </div>
       <MyPlan />

@@ -1,4 +1,5 @@
 "use client";
+import { t as translate } from "@/lib/i18n";
 
 import { FormEvent, useEffect, useState } from "react";
 import QRCode from "qrcode";
@@ -16,7 +17,8 @@ function PasswordCard() {
     e.preventDefault();
     setMsg("");
     setError("");
-    if (f.next !== f.confirm) return setError("Mật khẩu nhập lại không khớp");
+    if (f.next !== f.confirm)
+      return setError(translate("Mật khẩu nhập lại không khớp"));
     try {
       await api("/me/password", {
         method: "POST",
@@ -25,8 +27,10 @@ function PasswordCard() {
       setF({ current: "", next: "", confirm: "" });
       setMsg(
         me.role === "user"
-          ? "Đã đổi mật khẩu. Các phiên khác đã bị đăng xuất; SFTP dùng mật khẩu mới."
-          : "Đã đổi mật khẩu. Các phiên khác đã bị đăng xuất.",
+          ? translate(
+              "Đã đổi mật khẩu. Các phiên khác đã bị đăng xuất; SFTP dùng mật khẩu mới.",
+            )
+          : translate("Đã đổi mật khẩu. Các phiên khác đã bị đăng xuất."),
       );
     } catch (err) {
       setError(errMsg(err));
@@ -35,10 +39,10 @@ function PasswordCard() {
 
   return (
     <form onSubmit={submit} className="card space-y-4 p-5">
-      <h2 className="font-semibold">Đổi mật khẩu</h2>
+      <h2 className="font-semibold">{translate("Đổi mật khẩu")}</h2>
       <div className="grid gap-4 md:grid-cols-3">
         <div>
-          <label className="label">Mật khẩu hiện tại</label>
+          <label className="label">{translate("Mật khẩu hiện tại")}</label>
           <input
             className="input"
             type="password"
@@ -49,7 +53,7 @@ function PasswordCard() {
           />
         </div>
         <div>
-          <label className="label">Mật khẩu mới</label>
+          <label className="label">{translate("Mật khẩu mới")}</label>
           <input
             className="input"
             type="password"
@@ -61,7 +65,7 @@ function PasswordCard() {
           />
         </div>
         <div>
-          <label className="label">Nhập lại</label>
+          <label className="label">{translate("Nhập lại")}</label>
           <input
             className="input"
             type="password"
@@ -75,11 +79,11 @@ function PasswordCard() {
       </div>
       {msg && (
         <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          {msg}
+          {translate(msg)}
         </p>
       )}
       <ErrorBox msg={error} />
-      <button className="btn-primary">Đổi mật khẩu</button>
+      <button className="btn-primary">{translate("Đổi mật khẩu")}</button>
     </form>
   );
 }
@@ -123,7 +127,11 @@ function TwoFactorCard() {
       setEnabled(true);
       setSetup(null);
       setCode("");
-      setMsg("Đã bật xác thực 2 lớp. Lần đăng nhập sau sẽ cần mã từ ứng dụng.");
+      setMsg(
+        translate(
+          "Đã bật xác thực 2 lớp. Lần đăng nhập sau sẽ cần mã từ ứng dụng.",
+        ),
+      );
     } catch (err) {
       setError(errMsg(err));
     }
@@ -140,7 +148,7 @@ function TwoFactorCard() {
       setEnabled(false);
       setPassword("");
       setCode("");
-      setMsg("Đã tắt xác thực 2 lớp.");
+      setMsg(translate("Đã tắt xác thực 2 lớp."));
     } catch (err) {
       setError(errMsg(err));
     }
@@ -149,27 +157,28 @@ function TwoFactorCard() {
   return (
     <div className="card space-y-4 p-5">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Xác thực 2 lớp (TOTP)</h2>
+        <h2 className="font-semibold">{translate("Xác thực 2 lớp (TOTP)")}</h2>
         <span
           className={`rounded-full px-2 py-0.5 text-xs font-medium ${enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}
         >
-          {enabled ? "Đang bật" : "Đang tắt"}
+          {translate(enabled ? translate("Đang bật") : translate("Đang tắt"))}
         </span>
       </div>
       {msg && (
         <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          {msg}
+          {translate(msg)}
         </p>
       )}
 
       {!enabled && !setup && (
         <>
           <p className="text-sm text-slate-600">
-            Dùng Google Authenticator, Authy, 1Password… để tạo mã 6 số khi đăng
-            nhập.
+            {translate(
+              "Dùng Google Authenticator, Authy, 1Password… để tạo mã 6 số khi đăng nhập.",
+            )}
           </p>
           <button className="btn-primary" onClick={start}>
-            Bật xác thực 2 lớp
+            {translate("Bật xác thực 2 lớp")}
           </button>
         </>
       )}
@@ -179,19 +188,21 @@ function TwoFactorCard() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={setup.qr}
-            alt="Mã QR xác thực 2 lớp"
+            alt={translate("Mã QR xác thực 2 lớp")}
             width={200}
             height={200}
             className="rounded-lg border border-slate-200"
           />
           <div className="space-y-3 text-sm">
             <p>
-              1. Quét mã QR bằng ứng dụng xác thực, hoặc nhập khóa thủ công:
+              {translate(
+                "1. Quét mã QR bằng ứng dụng xác thực, hoặc nhập khóa thủ công:",
+              )}
             </p>
             <code className="block break-all rounded bg-slate-100 px-2 py-1 font-mono">
               {setup.secret}
             </code>
-            <p>2. Nhập mã 6 số ứng dụng hiển thị để xác nhận:</p>
+            <p>{translate("2. Nhập mã 6 số ứng dụng hiển thị để xác nhận:")}</p>
             <input
               className="input w-40 text-center font-mono tracking-[0.3em]"
               required
@@ -202,13 +213,15 @@ function TwoFactorCard() {
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             />
             <div className="flex gap-2">
-              <button className="btn-primary">Xác nhận và bật</button>
+              <button className="btn-primary">
+                {translate("Xác nhận và bật")}
+              </button>
               <button
                 type="button"
                 className="btn-ghost"
                 onClick={() => setSetup(null)}
               >
-                Hủy
+                {translate("Hủy")}
               </button>
             </div>
           </div>
@@ -221,7 +234,7 @@ function TwoFactorCard() {
           className="grid gap-3 md:grid-cols-3 md:items-end"
         >
           <div>
-            <label className="label">Mật khẩu</label>
+            <label className="label">{translate("Mật khẩu")}</label>
             <input
               className="input"
               type="password"
@@ -231,7 +244,7 @@ function TwoFactorCard() {
             />
           </div>
           <div>
-            <label className="label">Mã 6 số hiện tại</label>
+            <label className="label">{translate("Mã 6 số hiện tại")}</label>
             <input
               className="input font-mono"
               required
@@ -242,7 +255,9 @@ function TwoFactorCard() {
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             />
           </div>
-          <button className="btn-ghost text-red-600">Tắt xác thực 2 lớp</button>
+          <button className="btn-ghost text-red-600">
+            {translate("Tắt xác thực 2 lớp")}
+          </button>
         </form>
       )}
       <ErrorBox msg={error} />
@@ -258,16 +273,19 @@ export default function AccountPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Tài khoản của tôi</h1>
+        <h1 className="text-xl font-semibold">
+          {translate("Tài khoản của tôi")}
+        </h1>
         <p className="text-sm text-slate-500">
-          {me.username} · {roleLabel[me.role]}
-          {me.email && ` · ${me.email}`}
+          {me.username} · {translate(roleLabel[me.role])}
+          {translate(me.email && ` · ${me.email}`)}
         </p>
       </div>
       {me.impersonator ? (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Đang đăng nhập thay: không thể đổi mật khẩu hay xác thực 2 lớp của tài
-          khoản này.
+          {translate(
+            "Đang đăng nhập thay: không thể đổi mật khẩu hay xác thực 2 lớp của tài khoản này.",
+          )}
         </p>
       ) : (
         <>
@@ -278,8 +296,9 @@ export default function AccountPage() {
       {me.role === "user" && (
         <div className="card p-5 text-sm text-slate-600">
           <h2 className="mb-2 font-semibold text-slate-800">SFTP</h2>
-          Host <code>{host}</code>, cổng <code>22</code>, user{" "}
-          <code>{me.username}</code>, mật khẩu = mật khẩu panel.
+          Host <code>{host}</code> {translate(", cổng")} <code>22</code>, user
+          {translate(" ")}
+          <code>{me.username}</code> {translate(", mật khẩu = mật khẩu panel.")}
         </div>
       )}
     </div>

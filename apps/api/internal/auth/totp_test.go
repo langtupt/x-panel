@@ -1,9 +1,12 @@
 package auth
 
 import (
+	"context"
 	"encoding/base32"
+	"errors"
 	"testing"
 	"time"
+	"xpanel/apps/api/internal/users"
 )
 
 // RFC 6238 Appendix B test vectors (SHA-1, 8 digits) truncated to 6 digits.
@@ -51,5 +54,28 @@ func TestSecretBox(t *testing.T) {
 	}
 	if _, err := newSecretBox([]byte("another-secret-xxxxxxxxxxxxxxxxxxxx")).open(sealed); err == nil {
 		t.Error("opened with wrong key")
+	}
+}
+
+func TestTOTPReplayNormalized(t *testing.T) {
+	s := NewService(nil, nil, []byte("test-secret"))
+	secret, _ := NewTOTPSecret()
+	sealed, _ := s.box.seal(secret)
+	u := &users.User{ID: 42, TOTPSecret: &sealed}
+	key, _ := b32.DecodeString(secret)
+	code := totpCode(key, uint64(time.Now().Unix()/30))
+	if err := s.checkTOTP(u, code); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.checkTOTP(u, code[:3]+" "+code[3:]); !errors.Is(err, ErrTOTPInvalid) {
+		t.Fatalf("replayed code accepted: %v", err)
+	}
+	if err := s.EnableTOTP(context.Background(), u, secret, code); !errors.Is(err, ErrTOTPEnabled) {
+		t.Fatalf("existing factor replaced: %v", err)
+	}
+}
+func TestTOTPRejectWeakSecret(t *testing.T) {
+	if VerifyTOTP("", totpCode(nil, uint64(time.Now().Unix()/30)), time.Now()) {
+		t.Fatal("empty key accepted")
 	}
 }

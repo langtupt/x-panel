@@ -165,3 +165,9 @@ func (r *Repo) SetTOTP(ctx context.Context, id int64, sealed *string) error {
 	_, err := r.q.Exec(ctx, `UPDATE users SET totp_secret=$2, updated_at=now() WHERE id=$1`, id, sealed)
 	return err
 }
+
+// EnableTOTP atomically refuses replacement of an existing second factor.
+func (r *Repo) EnableTOTP(ctx context.Context, id int64, sealed string) (bool, error) {
+	tag, err := r.q.Exec(ctx, `UPDATE users SET totp_secret=$2, updated_at=now() WHERE id=$1 AND totp_secret IS NULL`, id, sealed)
+	return tag.RowsAffected() == 1, err
+}

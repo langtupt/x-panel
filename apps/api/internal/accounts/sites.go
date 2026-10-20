@@ -55,6 +55,7 @@ func (s *Service) RegisterTasks(q *tasks.Queue) {
 	q.Handle(TaskBackupCreate, s.runBackupCreate)
 	q.Handle(TaskBackupRestore, s.runBackupRestore)
 	q.Handle(TaskPHPInstall, s.runPHPInstall)
+	q.Handle("php.manage", s.runPHPManage)
 	q.Handle(TaskPMAInstall, s.runPMAInstall)
 }
 
@@ -75,7 +76,7 @@ func (s *Service) syncWeb(ctx context.Context, tx pgx.Tx, owner *users.User) ([]
 		p.CPUPct, p.MemMB = pkg.CPUPct, pkg.MemMB
 	}
 	for _, st := range list {
-		p.Sites = append(p.Sites, agentproto.WebSite{Domain: st.Domain, Aliases: st.Aliases,
+		p.Sites = append(p.Sites, agentproto.WebSite{PHPConfig: st.PHPConfig, Domain: st.Domain, Aliases: st.Aliases,
 			AppType: st.AppType, Runtime: st.Runtime, Port: st.Port, Env: st.Env, PHPVersion: st.PHPVersion, DocRoot: st.DocRoot, SSL: st.SSLStatus == sites.SSLActive})
 	}
 	var res agentproto.WebSyncResult

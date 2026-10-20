@@ -1,4 +1,5 @@
 "use client";
+import { t as translate } from "@/lib/i18n";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
@@ -40,7 +41,11 @@ function PackageSelect({
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
     >
-      <option value="">{required ? "— Chọn gói —" : "Không giới hạn"}</option>
+      <option value="">
+        {translate(
+          required ? translate("— Chọn gói —") : translate("Không giới hạn"),
+        )}
+      </option>
       {options.map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
@@ -90,18 +95,18 @@ function CreateUserForm({
   return (
     <form onSubmit={submit} className="modal-grid">
       <div>
-        <label className="label">Tên đăng nhập</label>
+        <label className="label">{translate("Tên đăng nhập")}</label>
         <input
           className="input"
           required
           pattern="[a-z][a-z0-9_]{2,31}"
-          title="3-32 ký tự: a-z, 0-9, _ (bắt đầu bằng chữ)"
+          title={translate("3-32 ký tự: a-z, 0-9, _ (bắt đầu bằng chữ)")}
           value={form.username}
           onChange={(e) => setForm({ ...form, username: e.target.value })}
         />
       </div>
       <div>
-        <label className="label">Mật khẩu</label>
+        <label className="label">{translate("Mật khẩu")}</label>
         <input
           className="input"
           type="password"
@@ -122,7 +127,7 @@ function CreateUserForm({
         />
       </div>
       <div>
-        <label className="label">Loại</label>
+        <label className="label">{translate("Loại")}</label>
         <select
           className="input"
           value={form.role}
@@ -132,13 +137,13 @@ function CreateUserForm({
         >
           {creatable.map((r) => (
             <option key={r} value={r}>
-              {roleLabel[r]}
+              {translate(roleLabel[r])}
             </option>
           ))}
         </select>
       </div>
       <div>
-        <label className="label">Gói dịch vụ</label>
+        <label className="label">{translate("Gói dịch vụ")}</label>
         <PackageSelect
           packages={packages}
           role={form.role}
@@ -148,7 +153,9 @@ function CreateUserForm({
         />
       </div>
       <button className="btn-primary" disabled={saving}>
-        {saving ? "Đang tạo…" : "Tạo tài khoản"}
+        {translate(
+          saving ? translate("Đang tạo…") : translate("Tạo tài khoản"),
+        )}
       </button>
       <div className="sm:col-span-2">
         <ErrorBox msg={error} />
@@ -206,12 +213,15 @@ function UserDialog({
   }
 
   const titles = {
-    package: "Đổi gói dịch vụ",
-    password: "Đặt lại mật khẩu",
-    delete: "Xóa tài khoản",
+    package: translate("Đổi gói dịch vụ"),
+    password: translate("Đặt lại mật khẩu"),
+    delete: translate("Xóa tài khoản"),
   };
   return (
-    <Modal title={`${titles[dialog.kind]}: ${u.username}`} onClose={onClose}>
+    <Modal
+      title={`${translate(titles[dialog.kind])}: ${u.username}`}
+      onClose={onClose}
+    >
       <form onSubmit={run} className="space-y-4">
         {dialog.kind === "package" && (
           <PackageSelect
@@ -231,27 +241,32 @@ function UserDialog({
               minLength={10}
               autoFocus
               autoComplete="new-password"
-              placeholder="Mật khẩu mới (tối thiểu 10 ký tự)"
+              placeholder={translate("Mật khẩu mới (tối thiểu 10 ký tự)")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
             <p className="text-xs text-slate-500">
-              Mọi phiên đăng nhập hiện tại của tài khoản sẽ bị đăng xuất.
+              {translate(
+                "Mọi phiên đăng nhập hiện tại của tài khoản sẽ bị đăng xuất.",
+              )}
             </p>
           </>
         )}
         {dialog.kind === "delete" && (
           <p className="text-sm text-slate-600">
-            Xóa vĩnh viễn <b>{u.username}</b>
-            {u.linux_uid !== null &&
-              " cùng user Linux và toàn bộ dữ liệu trong /home/" + u.username}
-            . Không thể hoàn tác.
+            {translate("Xóa vĩnh viễn")} <b>{u.username}</b>
+            {translate(
+              u.linux_uid !== null &&
+                translate(" cùng user Linux và toàn bộ dữ liệu trong /home/") +
+                  u.username,
+            )}
+            {translate(". Không thể hoàn tác.")}
           </p>
         )}
         <ErrorBox msg={error} />
         <div className="modal-actions">
           <button type="button" className="btn-ghost" onClick={onClose}>
-            Hủy
+            {translate("Hủy")}
           </button>
           <button
             className={
@@ -261,7 +276,13 @@ function UserDialog({
             }
             disabled={busy}
           >
-            {busy ? "Đang xử lý…" : dialog.kind === "delete" ? "Xóa" : "Lưu"}
+            {translate(
+              busy
+                ? translate("Đang xử lý…")
+                : dialog.kind === "delete"
+                  ? translate("Xóa")
+                  : translate("Lưu"),
+            )}
           </button>
         </div>
       </form>
@@ -321,21 +342,27 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Tài khoản</h1>
+        <h1 className="text-xl font-semibold">{translate("Tài khoản")}</h1>
         <p className="text-sm text-slate-500">
-          {isAdmin
-            ? "Quản lý đại lý và người dùng trên máy chủ."
-            : "Quản lý khách hàng của bạn."}
+          {translate(
+            isAdmin
+              ? translate("Quản lý đại lý và người dùng trên máy chủ.")
+              : translate("Quản lý khách hàng của bạn."),
+          )}
         </p>
       </div>
 
       <div className="flex justify-end">
         <button className="btn-primary" onClick={() => setCreating(true)}>
-          + Tạo tài khoản
+          {translate("+ Tạo tài khoản")}
         </button>
       </div>
       {creating && (
-        <Modal size="wide" title="Tạo tài khoản" onClose={() => setCreating(false)}>
+        <Modal
+          size="wide"
+          title={translate("Tạo tài khoản")}
+          onClose={() => setCreating(false)}
+        >
           <CreateUserForm
             creatable={creatable}
             packages={packages}
@@ -350,8 +377,9 @@ export default function UsersPage() {
       <ErrorBox msg={error} />
       {!quotaOn && list.some((u) => u.linux_uid !== null) && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Quota ổ đĩa chưa được bật trên phân vùng chứa /home nên giới hạn dung
-          lượng chưa có hiệu lực và chưa đo được mức sử dụng.
+          {translate(
+            "Quota ổ đĩa chưa được bật trên phân vùng chứa /home nên giới hạn dung lượng chưa có hiệu lực và chưa đo được mức sử dụng.",
+          )}
         </p>
       )}
 
@@ -359,12 +387,12 @@ export default function UsersPage() {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3">Tài khoản</th>
-              <th className="px-4 py-3">Loại</th>
-              {isAdmin && <th className="px-4 py-3">Thuộc</th>}
-              <th className="px-4 py-3">Gói</th>
-              <th className="px-4 py-3">Dung lượng</th>
-              <th className="px-4 py-3">Trạng thái</th>
+              <th className="px-4 py-3">{translate("Tài khoản")}</th>
+              <th className="px-4 py-3">{translate("Loại")}</th>
+              {isAdmin && <th className="px-4 py-3">{translate("Thuộc")}</th>}
+              <th className="px-4 py-3">{translate("Gói")}</th>
+              <th className="px-4 py-3">{translate("Dung lượng")}</th>
+              <th className="px-4 py-3">{translate("Trạng thái")}</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -377,26 +405,28 @@ export default function UsersPage() {
                   <td className="px-4 py-3">
                     <div className="font-medium">{u.username}</div>
                     <div className="text-xs text-slate-500">
-                      {u.email || "—"}
+                      {translate(u.email || "—")}
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${roleBadge[u.role]}`}
                     >
-                      {roleLabel[u.role]}
+                      {translate(roleLabel[u.role])}
                     </span>
                   </td>
                   {isAdmin && (
                     <td className="px-4 py-3 text-slate-500">
-                      {u.parent_name ?? "—"}
+                      {translate(u.parent_name ?? "—")}
                     </td>
                   )}
                   <td className="px-4 py-3">
                     {u.role === "admin"
                       ? "—"
                       : (u.package_name ?? (
-                          <span className="text-slate-400">Không giới hạn</span>
+                          <span className="text-slate-400">
+                            {translate("Không giới hạn")}
+                          </span>
                         ))}
                   </td>
                   <td className="px-4 py-3">
@@ -412,9 +442,13 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {u.status === "active" ? (
-                      <span className="text-emerald-600">● Hoạt động</span>
+                      <span className="text-emerald-600">
+                        {translate("● Hoạt động")}
+                      </span>
                     ) : (
-                      <span className="text-red-600">● Đã khóa</span>
+                      <span className="text-red-600">
+                        {translate("● Đã khóa")}
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -427,16 +461,18 @@ export default function UsersPage() {
                             }
                             className="btn-ghost px-2.5 py-1 text-xs"
                           >
-                            Đổi gói
+                            {translate("Đổi gói")}
                           </button>
                         )}
                         {u.status === "active" && !me.impersonator && (
                           <button
                             onClick={() => impersonate(u)}
                             className="btn-ghost px-2.5 py-1 text-xs"
-                            title="Mở panel với quyền của tài khoản này"
+                            title={translate(
+                              "Mở panel với quyền của tài khoản này",
+                            )}
                           >
-                            Đăng nhập thay
+                            {translate("Đăng nhập thay")}
                           </button>
                         )}
                         <button
@@ -445,19 +481,23 @@ export default function UsersPage() {
                           }
                           className="btn-ghost px-2.5 py-1 text-xs"
                         >
-                          Mật khẩu
+                          {translate("Mật khẩu")}
                         </button>
                         <button
                           onClick={() => toggle(u)}
                           className="btn-ghost px-2.5 py-1 text-xs"
                         >
-                          {u.status === "active" ? "Khóa" : "Mở khóa"}
+                          {translate(
+                            u.status === "active"
+                              ? translate("Khóa")
+                              : translate("Mở khóa"),
+                          )}
                         </button>
                         <button
                           onClick={() => setDialog({ kind: "delete", user: u })}
                           className="btn-ghost px-2.5 py-1 text-xs text-red-600"
                         >
-                          Xóa
+                          {translate("Xóa")}
                         </button>
                       </div>
                     )}
@@ -471,7 +511,7 @@ export default function UsersPage() {
                   colSpan={7}
                   className="px-4 py-8 text-center text-slate-500"
                 >
-                  Chưa có tài khoản nào.
+                  {translate("Chưa có tài khoản nào.")}
                 </td>
               </tr>
             )}

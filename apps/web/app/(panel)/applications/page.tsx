@@ -1,4 +1,7 @@
 "use client";
+import { localeTag } from "@/lib/i18n";
+import { t as translate } from "@/lib/i18n";
+
 import { useCallback, useEffect, useState } from "react";
 import { api, errMsg, isOpen, type AppInfo, type Task } from "@/lib/api";
 import { ErrorBox } from "@/components/ui";
@@ -75,33 +78,59 @@ function AppCard({
             <Icon className="size-5" strokeWidth={1.5} />
           </div>
           <Badge variant={installed.length ? "secondary" : "outline"}>
-            {app.builtin
-              ? "Tích hợp"
-              : installed.length
-                ? "Đã cài"
-                : "Chưa cài"}
+            {translate(
+              app.builtin
+                ? translate("Tích hợp")
+                : installed.length
+                  ? translate("Đã cài")
+                  : translate("Chưa cài"),
+            )}
           </Badge>
         </div>
         <h2 className="text-base font-semibold tracking-tight">{app.name}</h2>
         <p className="mt-2 min-h-14 text-xs leading-5 text-muted-foreground">
-          {app.id === "php" ? "PHP-FPM, hỗ trợ chạy song song nhiều phiên bản." : app.description}
+          {translate(
+            app.id === "php"
+              ? translate("PHP-FPM, hỗ trợ chạy song song nhiều phiên bản.")
+              : app.description,
+          )}
         </p>
         <div className="mt-4 rounded-lg bg-muted/60 px-3 py-2.5">
           <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-            Phiên bản đã cài
+            {translate("Phiên bản đã cài")}
           </span>
           <div className="mt-2 flex flex-wrap gap-2">
-            {installed.length ? installed.map((v) => (
-              <div key={v} className="flex items-center gap-1 rounded-md border bg-background pl-2 text-xs">
-                <span className="font-mono">{displayVersion(app.installed_labels?.[v] ?? v)}</span>
-                <Button size="icon" variant="ghost" className="size-7 text-destructive"
-                  disabled={busy || app.builtin || app.id === "postgresql"}
-                  title={app.builtin || app.id === "postgresql" ? "Database được bảo vệ" : `Gỡ ${app.name} ${v}`}
-                  aria-label={`Gỡ ${app.name} ${v}`} onClick={() => select(app, v, true)}>
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
-            )) : <span className="text-xs text-muted-foreground">Chưa cài đặt</span>}
+            {installed.length ? (
+              installed.map((v) => (
+                <div
+                  key={v}
+                  className="flex items-center gap-1 rounded-md border bg-background pl-2 text-xs"
+                >
+                  <span className="font-mono">
+                    {translate(displayVersion(app.installed_labels?.[v] ?? v))}
+                  </span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 text-destructive"
+                    disabled={busy || app.builtin || app.id === "postgresql"}
+                    title={translate(
+                      app.builtin || app.id === "postgresql"
+                        ? translate("Database được bảo vệ")
+                        : translate("Gỡ {0} {1}", [app.name, v]),
+                    )}
+                    aria-label={translate("Gỡ {0} {1}", [app.name, v])}
+                    onClick={() => select(app, v, true)}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                {translate("Chưa cài đặt")}
+              </span>
+            )}
           </div>
         </div>
         <ErrorBox msg={app.error ?? ""} />
@@ -110,7 +139,7 @@ function AppCard({
         {!app.builtin ? (
           <>
             <label className="sr-only" htmlFor={`version-${app.id}`}>
-              Phiên bản {app.name}
+              {translate("Phiên bản")} {app.name}
             </label>
             <select
               id={`version-${app.id}`}
@@ -119,10 +148,12 @@ function AppCard({
               onChange={(e) => setVersion(e.target.value)}
               disabled={busy || !selected}
             >
-              {!available.length && <option value="">Chưa có phiên bản</option>}
+              {!available.length && (
+                <option value="">{translate("Chưa có phiên bản")}</option>
+              )}
               {available.map((v) => (
                 <option key={v} value={v}>
-                  {displayVersion(app.version_labels?.[v] ?? v)}
+                  {translate(displayVersion(app.version_labels?.[v] ?? v))}
                 </option>
               ))}
             </select>
@@ -137,26 +168,30 @@ function AppCard({
               onClick={() => select(app, selected)}
             >
               {update ? <RefreshCw /> : <Download />}
-              {update
-                ? "Cập nhật bản vá"
-                : installed.includes(selected)
-                  ? "Đã cài phiên bản này"
-                  : "Cài đặt ứng dụng"}
+              {translate(
+                update
+                  ? translate("Cập nhật bản vá")
+                  : installed.includes(selected)
+                    ? translate("Đã cài phiên bản này")
+                    : translate("Cài đặt ứng dụng"),
+              )}
             </Button>
           </>
         ) : (
           <div className="flex h-[84px] items-center justify-center gap-2 text-xs text-muted-foreground">
             <ShieldCheck className="size-4" />
-            Được quản lý cùng hệ thống
+            {translate("Được quản lý cùng hệ thống")}
           </div>
         )}
         <details className="text-[10px] leading-5 text-muted-foreground">
           <summary className="cursor-pointer">
-            Nguồn & thời gian kiểm tra
+            {translate("Nguồn & thời gian kiểm tra")}
           </summary>
-          <p className="mt-1 break-words">{app.source ?? "—"}</p>
+          <p className="mt-1 break-words">{translate(app.source ?? "—")}</p>
           {app.checked_at && (
-            <p>{new Date(app.checked_at).toLocaleString("vi-VN")}</p>
+            <p>
+              {translate(new Date(app.checked_at).toLocaleString(localeTag()))}
+            </p>
           )}
         </details>
       </div>
@@ -204,16 +239,24 @@ export default function ApplicationsPage() {
         setTasks(
           list.filter(
             (t) =>
-              ["app.install", "app.remove", "php.install", "pma.install"].includes(t.type) &&
-              isOpen(t),
+              [
+                "app.install",
+                "app.remove",
+                "php.install",
+                "pma.install",
+              ].includes(t.type) && isOpen(t),
           ),
         );
         if (
           tasks.length &&
           !list.some(
             (t) =>
-              ["app.install", "app.remove", "php.install", "pma.install"].includes(t.type) &&
-              isOpen(t),
+              [
+                "app.install",
+                "app.remove",
+                "php.install",
+                "pma.install",
+              ].includes(t.type) && isOpen(t),
           )
         )
           void load();
@@ -234,10 +277,13 @@ export default function ApplicationsPage() {
     setSelection(null);
     setSending(true);
     try {
-      const task = await api<Task>(`/apps/${app.id}/${remove ? "remove" : "install"}`, {
-        method: "POST",
-        body: { version },
-      });
+      const task = await api<Task>(
+        `/apps/${app.id}/${remove ? "remove" : "install"}`,
+        {
+          method: "POST",
+          body: { version },
+        },
+      );
       setTasks((cur) => [task, ...cur]);
     } catch (e) {
       setError(errMsg(e));
@@ -258,9 +304,9 @@ export default function ApplicationsPage() {
             <Blocks className="size-3.5" />
             Application catalog
           </div>
-          <h1>Ứng dụng</h1>
+          <h1>{translate("Ứng dụng")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Cài runtime và dịch vụ cần thiết cho website của bạn.
+            {translate("Cài runtime và dịch vụ cần thiết cho website của bạn.")}
           </p>
         </div>
         <Button
@@ -272,18 +318,22 @@ export default function ApplicationsPage() {
           }}
         >
           <RefreshCw className={refreshing ? "animate-spin" : ""} />
-          {refreshing ? "Đang kiểm tra…" : "Làm mới phiên bản"}
+          {translate(
+            refreshing
+              ? translate("Đang kiểm tra…")
+              : translate("Làm mới phiên bản"),
+          )}
         </Button>
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           ["Trong catalog", apps.length, Blocks],
           [
-            "Ứng dụng đã cài",
+            translate("Ứng dụng đã cài"),
             apps.filter((a) => a.installed.length).length,
             HardDrive,
           ],
-          ["Tác vụ đang chạy", tasks.length, Terminal],
+          [translate("Tác vụ đang chạy"), tasks.length, Terminal],
         ].map(([label, value, Icon]) => {
           const I = Icon as typeof Blocks;
           return (
@@ -292,9 +342,11 @@ export default function ApplicationsPage() {
               key={String(label)}
             >
               <div>
-                <p className="text-xs text-muted-foreground">{String(label)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {translate(String(label))}
+                </p>
                 <p className="mt-1 text-2xl font-semibold tabular-nums">
-                  {loading ? "—" : String(value)}
+                  {translate(loading ? "—" : String(value))}
                 </p>
               </div>
               <I className="size-5 text-muted-foreground" strokeWidth={1.5} />
@@ -310,9 +362,16 @@ export default function ApplicationsPage() {
           className="flex w-full items-center gap-3 rounded-xl border bg-background px-4 py-3 text-left text-sm"
         >
           <Loader2 className="size-4 animate-spin" />
-          <span className="flex-1">{t.type === "app.remove" ? "Đang gỡ" : "Đang cài đặt"} {t.target}</span>
+          <span className="flex-1">
+            {translate(
+              t.type === "app.remove"
+                ? translate("Đang gỡ")
+                : translate("Đang cài đặt"),
+            )}{" "}
+            {translate(t.target)}
+          </span>
           <span className="text-xs text-muted-foreground">
-            Xem tiến trình →
+            {translate("Xem tiến trình →")}
           </span>
         </button>
       ))}
@@ -324,7 +383,7 @@ export default function ApplicationsPage() {
               onClick={() => setCategory(c.id)}
               className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition ${category === c.id ? "bg-background shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
             >
-              {c.label}
+              {translate(c.label)}
             </button>
           ))}
         </div>
@@ -332,8 +391,8 @@ export default function ApplicationsPage() {
           <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
           <input
             className="input pl-9"
-            placeholder="Tìm ứng dụng…"
-            aria-label="Tìm ứng dụng"
+            placeholder={translate("Tìm ứng dụng…")}
+            aria-label={translate("Tìm ứng dụng")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -352,19 +411,22 @@ export default function ApplicationsPage() {
               key={app.id}
               app={app}
               busy={sending || tasks.some(isOpen)}
-              select={(app, version, remove) => setSelection({ app, version, remove })}
+              select={(app, version, remove) =>
+                setSelection({ app, version, remove })
+              }
             />
           ))}
         </div>
       )}
       {!loading && !visible.length && (
         <div className="card py-16 text-center text-sm text-muted-foreground">
-          Không tìm thấy ứng dụng phù hợp.
+          {translate("Không tìm thấy ứng dụng phù hợp.")}
         </div>
       )}
       <p className="text-[11px] text-muted-foreground">
-        Danh sách lưu đệm 5 phút. Chọn “Làm mới phiên bản” để kiểm tra nguồn
-        phát hành ngay.
+        {translate(
+          "Danh sách lưu đệm 5 phút. Chọn “Làm mới phiên bản” để kiểm tra nguồn phát hành ngay.",
+        )}
       </p>
       <Dialog
         open={!!selection}
@@ -377,28 +439,56 @@ export default function ApplicationsPage() {
             <div className="mb-2 flex size-11 items-center justify-center rounded-xl border bg-muted">
               <Download className="size-5" />
             </div>
-            <DialogTitle>{selection?.remove ? "Gỡ cài đặt" : "Cài đặt"} {selection?.app.name}?</DialogTitle>
+            <DialogTitle>
+              {translate(
+                selection?.remove
+                  ? translate("Gỡ cài đặt")
+                  : translate("Cài đặt"),
+              )}{" "}
+              {translate(selection?.app.name)}?
+            </DialogTitle>
             <DialogDescription>
-              {selection?.remove
-                ? "Phiên bản đã chọn sẽ được gỡ khỏi máy chủ. Website đang sử dụng phiên bản này phải được chuyển sang phiên bản khác trước."
-                : "Ứng dụng sẽ được cài trên máy chủ. Bạn có thể theo dõi trạng thái và nhật ký trong popup tác vụ."}
+              {translate(
+                selection?.remove
+                  ? translate(
+                      "Phiên bản đã chọn sẽ được gỡ khỏi máy chủ. Website đang sử dụng phiên bản này phải được chuyển sang phiên bản khác trước.",
+                    )
+                  : translate(
+                      "Ứng dụng sẽ được cài trên máy chủ. Bạn có thể theo dõi trạng thái và nhật ký trong popup tác vụ.",
+                    ),
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border bg-muted/40 p-3 text-sm">
             <span className="text-xs text-muted-foreground">
-              Phiên bản đã chọn
+              {translate("Phiên bản đã chọn")}
             </span>
             <p className="mt-1 break-all font-medium">
-              {displayVersion((selection?.remove ? selection.app.installed_labels?.[selection.version] : selection?.app.version_labels?.[selection.version]) ?? selection?.version ?? "")}
+              {translate(
+                displayVersion(
+                  (selection?.remove
+                    ? selection.app.installed_labels?.[selection.version]
+                    : selection?.app.version_labels?.[selection.version]) ??
+                    selection?.version ??
+                    "",
+                ),
+              )}
             </p>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setSelection(null)}>
-              Hủy
+              {translate("Hủy")}
             </Button>
-            <Button variant={selection?.remove ? "destructive" : "default"} onClick={install}>
+            <Button
+              variant={selection?.remove ? "destructive" : "default"}
+              onClick={install}
+            >
               <Download />
-              {selection?.remove ? "Xác nhận gỡ cài đặt" : "Xác nhận cài đặt"}
+              {translate(
+                selection?.remove
+                  ? translate("Xác nhận gỡ cài đặt")
+                  : translate("Xác nhận cài đặt"),
+              )}
             </Button>
           </div>
         </DialogContent>

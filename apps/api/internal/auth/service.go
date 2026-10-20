@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ var (
 	ErrTooManyAttempts    = errors.New("đăng nhập sai quá nhiều lần, thử lại sau 15 phút")
 	ErrInvalidSession     = errors.New("phiên đăng nhập không hợp lệ")
 	ErrTOTPRequired       = errors.New("cần mã xác thực 2 lớp")
+	ErrTOTPEnabled        = errors.New("two-factor authentication already enabled")
 	ErrTOTPInvalid        = errors.New("mã xác thực 2 lớp không đúng")
 )
 
@@ -56,6 +58,7 @@ func (s *Service) checkTOTP(u *users.User, code string) error {
 	if u.TOTPSecret == nil {
 		return nil
 	}
+	code = strings.ReplaceAll(strings.TrimSpace(code), " ", "")
 	if code == "" {
 		return ErrTOTPRequired
 	}
@@ -86,6 +89,9 @@ func (s *Service) checkTOTP(u *users.User, code string) error {
 
 // EnableTOTP stores secret after the user proved their app produces valid codes.
 func (s *Service) EnableTOTP(ctx context.Context, u *users.User, secret, code string) error {
+	if u.TOTPSecret != nil {
+		return ErrTOTPEnabled
+	}
 	if !VerifyTOTP(secret, code, time.Now()) {
 		return ErrTOTPInvalid
 	}
@@ -93,7 +99,14 @@ func (s *Service) EnableTOTP(ctx context.Context, u *users.User, secret, code st
 	if err != nil {
 		return err
 	}
-	return s.users.SetTOTP(ctx, u.ID, &sealed)
+	ok, err := s.users.EnableTOTP(ctx, u.ID, sealed)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrTOTPEnabled
+	}
+	return nil
 }
 
 // DisableTOTP requires the password and a current code.

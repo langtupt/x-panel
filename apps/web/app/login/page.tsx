@@ -1,4 +1,6 @@
 "use client";
+import { LanguageSwitcher } from "@/components/language-provider";
+import { t as translate } from "@/lib/i18n";
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -37,7 +39,9 @@ export default function LoginPage() {
         setNeedCode(true);
       } else {
         setError(
-          err instanceof ApiError ? err.message : "Không kết nối được máy chủ",
+          err instanceof ApiError
+            ? err.message
+            : translate("Không kết nối được máy chủ"),
         );
       }
       setLoading(false);
@@ -46,6 +50,9 @@ export default function LoginPage() {
 
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
+      <div className="absolute right-4 top-4 z-10">
+        <LanguageSwitcher />
+      </div>
       <section className="relative hidden flex-col justify-between overflow-hidden border-r bg-neutral-950 p-12 text-neutral-100 lg:flex">
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-xl bg-white font-bold text-neutral-950">
@@ -64,23 +71,25 @@ export default function LoginPage() {
             Built for your infrastructure
           </p>
           <h2 className="text-4xl font-medium leading-tight tracking-tight xl:text-5xl">
-            Một workspace.
-            <br />
-            <span className="text-neutral-500">Toàn bộ hạ tầng.</span>
+            {translate("Một workspace.")} <br />
+            <span className="text-neutral-500">
+              {translate("Toàn bộ hạ tầng.")}
+            </span>
           </h2>
           <p className="mt-6 max-w-sm text-sm leading-7 text-neutral-400">
-            Quản lý website, ứng dụng và tài nguyên máy chủ trong một giao diện
-            thống nhất.
+            {translate(
+              "Quản lý website, ứng dụng và tài nguyên máy chủ trong một giao diện thống nhất.",
+            )}
           </p>
           <div className="mt-10 grid gap-4 text-xs text-neutral-300">
             {[
-              "Website & runtime đa nền tảng",
-              "Database & tài khoản tập trung",
-              "Theo dõi và vận hành máy chủ",
+              translate("Website & runtime đa nền tảng"),
+              translate("Database & tài khoản tập trung"),
+              translate("Theo dõi và vận hành máy chủ"),
             ].map((label) => (
               <div key={label} className="flex items-center gap-3">
                 <Check className="size-3.5 text-neutral-500" />
-                {label}
+                {translate(label)}
               </div>
             ))}
           </div>
@@ -110,19 +119,25 @@ export default function LoginPage() {
               <LockKeyhole className="size-4" />
             </div>
             <h1 className="text-2xl font-semibold tracking-tight">
-              {needCode ? "Xác thực tài khoản" : "Chào mừng trở lại"}
+              {translate(
+                needCode
+                  ? translate("Xác thực tài khoản")
+                  : translate("Chào mừng trở lại"),
+              )}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              {needCode
-                ? "Nhập mã từ ứng dụng xác thực để tiếp tục."
-                : "Đăng nhập để truy cập workspace của bạn."}
+              {translate(
+                needCode
+                  ? translate("Nhập mã từ ứng dụng xác thực để tiếp tục.")
+                  : translate("Đăng nhập để truy cập workspace của bạn."),
+              )}
             </p>
           </div>
           <form onSubmit={onSubmit} className="space-y-5">
             <div className={needCode ? "hidden" : "space-y-5"}>
               <div>
                 <label className="label" htmlFor="username">
-                  Tên đăng nhập
+                  {translate("Tên đăng nhập")}
                 </label>
                 <input
                   id="username"
@@ -130,14 +145,14 @@ export default function LoginPage() {
                   autoComplete="username"
                   autoFocus
                   required
-                  placeholder="Nhập tên tài khoản"
+                  placeholder={translate("Nhập tên tài khoản")}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                 />
               </div>
               <div>
                 <label className="label" htmlFor="password">
-                  Mật khẩu
+                  {translate("Mật khẩu")}
                 </label>
                 <input
                   id="password"
@@ -145,7 +160,7 @@ export default function LoginPage() {
                   className="input h-10"
                   autoComplete="current-password"
                   required
-                  placeholder="Nhập mật khẩu"
+                  placeholder={translate("Nhập mật khẩu")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -154,7 +169,7 @@ export default function LoginPage() {
             {needCode && (
               <div>
                 <label className="label" htmlFor="code">
-                  Mã xác thực 2 lớp
+                  {translate("Mã xác thực 2 lớp")}
                 </label>
                 <input
                   id="code"
@@ -175,15 +190,17 @@ export default function LoginPage() {
                 role="alert"
                 className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive"
               >
-                {error}
+                {translate(error)}
               </p>
             )}
             <Button type="submit" className="h-10 w-full" disabled={loading}>
-              {loading
-                ? "Đang đăng nhập…"
-                : needCode
-                  ? "Xác nhận"
-                  : "Đăng nhập"}
+              {translate(
+                loading
+                  ? translate("Đang đăng nhập…")
+                  : needCode
+                    ? translate("Xác nhận")
+                    : translate("Đăng nhập"),
+              )}
               <ArrowRight />
             </Button>
             {needCode && (
@@ -196,13 +213,13 @@ export default function LoginPage() {
                   setError("");
                 }}
               >
-                Quay lại
+                {translate("Quay lại")}
               </button>
             )}
           </form>
           <div className="mt-8 flex items-center justify-center gap-2 border-t pt-6 text-[10px] text-muted-foreground">
             <ShieldCheck className="size-3.5" />
-            Không chia sẻ thông tin đăng nhập của bạn.
+            {translate("Không chia sẻ thông tin đăng nhập của bạn.")}
           </div>
         </div>
       </section>

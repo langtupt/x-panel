@@ -1,4 +1,6 @@
 "use client";
+import { LanguageSwitcher } from "@/components/language-provider";
+import { t as translate } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -104,6 +106,9 @@ const NAV: NavItem[] = [
     group: "Workspace",
   },
   {
+    href: "/php/", label: "PHP", roles: ["admin"], icon: Blocks, group: "Quản trị",
+  },
+  {
     href: "/applications/",
     label: "Applications",
     roles: ["admin"],
@@ -191,7 +196,7 @@ export default function PanelLayout({
     return (
       <div className="flex min-h-screen items-center justify-center gap-3 bg-muted/30 text-sm text-muted-foreground">
         <Activity className="size-5 animate-pulse" />
-        Đang tải workspace…
+        {translate("Đang tải workspace…")}
       </div>
     );
   const nav = NAV.filter((n) => n.roles.includes(user.role));
@@ -211,7 +216,7 @@ export default function PanelLayout({
       </Link>
       <nav
         className="flex-1 space-y-6 overflow-y-auto px-3 py-3"
-        aria-label="Điều hướng chính"
+        aria-label={translate("Điều hướng chính")}
       >
         {["Workspace", "Quản trị", "Hệ thống"].map((group) => {
           const items = nav.filter((n) => n.group === group);
@@ -219,7 +224,7 @@ export default function PanelLayout({
             items.length > 0 && (
               <div key={group}>
                 <div className="mb-2 px-3 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-                  {group}
+                  {translate(group)}
                 </div>
                 <div className="space-y-1">
                   {items.map((n) => {
@@ -232,7 +237,7 @@ export default function PanelLayout({
                         className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-colors ${selected ? "bg-primary font-medium text-primary-foreground shadow-xs" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                       >
                         <n.icon className="size-4" strokeWidth={1.6} />
-                        {n.label}
+                        {translate(n.label)}
                         {selected && (
                           <ChevronRight className="ml-auto size-3.5 opacity-60" />
                         )}
@@ -250,12 +255,12 @@ export default function PanelLayout({
         className="flex items-center gap-3 border-t px-5 py-4"
       >
         <div className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase">
-          {user.username.slice(0, 2)}
+          {translate(user.username.slice(0, 2))}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-semibold">{user.username}</p>
           <p className="text-[11px] text-muted-foreground">
-            {roleLabel[user.role]}
+            {translate(roleLabel[user.role])}
           </p>
         </div>
         <Settings2 className="size-4 text-muted-foreground" />
@@ -267,36 +272,37 @@ export default function PanelLayout({
       <TooltipProvider>
         <div className="flex min-h-screen bg-muted/30">
           <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r bg-sidebar lg:flex">
-            {navigation}
+            {translate(navigation)}
           </aside>
           <Sheet open={mobile} onOpenChange={setMobile}>
             <SheetContent side="left" className="flex w-64 flex-col gap-0 p-0">
               <SheetTitle className="sr-only">Menu X-Panel</SheetTitle>
-              {navigation}
+              {translate(navigation)}
             </SheetContent>
           </Sheet>
           <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
             {user.impersonator && (
               <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-100 px-6 py-2 text-xs text-amber-950">
                 <span>
-                  Đang đăng nhập thay <b>{user.username}</b> bởi{" "}
-                  {user.impersonator.username}
+                  {translate("Đang đăng nhập thay")} <b>{user.username}</b>{" "}
+                  {translate("bởi")} {translate(" ")}
+                  {translate(user.impersonator.username)}
                 </span>
                 <button
                   onClick={stopImpersonating}
                   className="font-semibold underline"
                 >
-                  Quay lại tài khoản quản trị
+                  {translate("Quay lại tài khoản quản trị")}
                 </button>
               </div>
             )}
             <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b bg-background/95 px-5 backdrop-blur-md md:px-8">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <Button
                   size="icon"
                   variant="ghost"
                   className="lg:hidden"
-                  aria-label="Mở menu"
+                  aria-label={translate("Mở menu")}
                   onClick={() => setMobile(true)}
                 >
                   <Menu />
@@ -305,14 +311,15 @@ export default function PanelLayout({
                   Workspace
                 </span>
                 <ChevronRight className="hidden size-3 text-muted-foreground sm:block" />
-                <span className="text-xs font-medium">
-                  {current?.label ?? "X-Panel"}
+                <span className="min-w-0 truncate text-xs font-medium">
+                  {translate(current?.label ?? "X-Panel")}
                 </span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <LanguageSwitcher />
                 <span className="hidden items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-medium text-muted-foreground sm:flex">
                   <span className="size-1.5 rounded-full bg-emerald-500" />
-                  {roleLabel[user.role]}
+                  {translate(roleLabel[user.role])}
                 </span>
                 <Tooltip>
                   <TooltipTrigger
@@ -324,20 +331,27 @@ export default function PanelLayout({
                     }
                   >
                     <Activity className="size-4" />
-                    <span className="sr-only">Tác vụ</span>
+                    <span className="sr-only">{translate("Tác vụ")}</span>
                   </TooltipTrigger>
-                  <TooltipContent>Trung tâm tác vụ</TooltipContent>
+                  <TooltipContent>
+                    {translate("Trung tâm tác vụ")}
+                  </TooltipContent>
                 </Tooltip>
                 <div className="h-5 w-px bg-border" />
                 <Button variant="ghost" size="sm" onClick={logout}>
                   <LogOut className="size-3.5" />
-                  <span className="hidden sm:inline">Đăng xuất</span>
+                  <span className="hidden sm:inline">
+                    {translate("Đăng xuất")}
+                  </span>
                 </Button>
               </div>
             </header>
             <main className="panel-main flex-1">{children}</main>
-            <footer className="flex items-center justify-between border-t px-5 py-4 text-[10px] text-muted-foreground md:px-8">
-              <span>X-Panel · Hosting control panel</span>
+            <footer className="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-4 text-[10px] text-muted-foreground md:px-8">
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>X-Panel · Hosting control panel</span>
+                <span>· {translate("Một sản phẩm của")} <a href="https://socsmart.com" target="_blank" rel="noopener noreferrer" className="font-medium hover:text-foreground hover:underline">socsmart.com</a></span>
+              </span>
               <span className="flex items-center gap-1.5">
                 <Server className="size-3" />
                 Workspace / {user.username}

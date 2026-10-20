@@ -1,4 +1,5 @@
 "use client";
+import { t as translate } from "@/lib/i18n";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, errMsg, fmtMB, limit, type Package } from "@/lib/api";
@@ -98,7 +99,7 @@ function NumField({
 }) {
   return (
     <div>
-      <label className="label">{label}</label>
+      <label className="label">{translate(label)}</label>
       <input
         className="input"
         type="number"
@@ -107,7 +108,7 @@ function NumField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
-      {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-slate-400">{translate(hint)}</p>}
     </div>
   );
 }
@@ -163,111 +164,129 @@ function PackageForm({
     <form onSubmit={submit} className="card package-form space-y-5 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">
-          {editing ? `Sửa gói “${editing.name}”` : "Tạo gói mới"}
+          {translate(
+            editing
+              ? translate("Sửa gói “{0}”", [editing.name])
+              : translate("Tạo gói mới"),
+          )}
         </h2>
-        <span className="text-xs text-slate-400">0 = không giới hạn</span>
+        <span className="text-xs text-slate-400">
+          {translate("0 = không giới hạn")}
+        </span>
       </div>
-      <fieldset className="modal-section"><legend>Thông tin gói</legend>
-      <div className="modal-grid">
-        <div className="modal-span-2">
-          <label className="label">Tên gói</label>
-          <input
-            className="input"
-            required
-            maxLength={64}
-            value={f.name}
-            onChange={(e) => set("name")(e.target.value)}
+      <fieldset className="modal-section">
+        <legend>{translate("Thông tin gói")}</legend>
+        <div className="modal-grid">
+          <div className="modal-span-2">
+            <label className="label">{translate("Tên gói")}</label>
+            <input
+              className="input"
+              required
+              maxLength={64}
+              value={f.name}
+              onChange={(e) => set("name")(e.target.value)}
+            />
+          </div>
+          {isAdmin && (
+            <div>
+              <label className="label">{translate("Dành cho")}</label>
+              <select
+                className="input"
+                disabled={!!editing}
+                value={f.kind}
+                onChange={(e) =>
+                  setF({ ...blank(e.target.value as Kind), name: f.name })
+                }
+              >
+                <option value="user">{translate("Người dùng")}</option>
+                <option value="reseller">{translate("Đại lý")}</option>
+              </select>
+            </div>
+          )}
+        </div>
+      </fieldset>
+      <fieldset className="modal-section">
+        <legend>{translate("Dung lượng & lưu lượng")}</legend>
+        <div className="modal-grid">
+          <NumField
+            label={translate("Dung lượng (GB)")}
+            step="0.5"
+            value={f.disk_gb}
+            onChange={set("disk_gb")}
+            hint={
+              f.kind === "reseller"
+                ? translate("Tổng dung lượng được cấp cho khách")
+                : undefined
+            }
+          />
+          <NumField
+            label={translate("Số inode (file)")}
+            value={f.inodes}
+            onChange={set("inodes")}
+          />
+          <NumField
+            label={translate("Băng thông (GB/tháng)")}
+            value={f.bandwidth_gb}
+            onChange={set("bandwidth_gb")}
           />
         </div>
-        {isAdmin && (
-          <div>
-            <label className="label">Dành cho</label>
-            <select
-              className="input"
-              disabled={!!editing}
-              value={f.kind}
-              onChange={(e) =>
-                setF({ ...blank(e.target.value as Kind), name: f.name })
-              }
-            >
-              <option value="user">Người dùng</option>
-              <option value="reseller">Đại lý</option>
-            </select>
-          </div>
-        )}
-      </div></fieldset>
-      <fieldset className="modal-section"><legend>Dung lượng & lưu lượng</legend>
-      <div className="modal-grid">
-        <NumField
-          label="Dung lượng (GB)"
-          step="0.5"
-          value={f.disk_gb}
-          onChange={set("disk_gb")}
-          hint={
-            f.kind === "reseller"
-              ? "Tổng dung lượng được cấp cho khách"
-              : undefined
-          }
-        />
-        <NumField
-          label="Số inode (file)"
-          value={f.inodes}
-          onChange={set("inodes")}
-        />
-        <NumField
-          label="Băng thông (GB/tháng)"
-          value={f.bandwidth_gb}
-          onChange={set("bandwidth_gb")}
-        />
-      </div></fieldset>
-      <fieldset className="modal-section"><legend>Giới hạn dịch vụ</legend>
-      <div className="modal-grid">
-        <NumField
-          label="Số website"
-          value={f.max_sites}
-          onChange={set("max_sites")}
-        />
-        <NumField
-          label="Số database"
-          value={f.max_dbs}
-          onChange={set("max_dbs")}
-        />
-        <NumField
-          label="Số tài khoản FTP"
-          value={f.max_ftp}
-          onChange={set("max_ftp")}
-        />
-        <NumField
-          label="Số cron job"
-          value={f.max_cron}
-          onChange={set("max_cron")}
-        />
-        <NumField
-          label="Số hộp thư email"
-          value={f.max_mailboxes}
-          onChange={set("max_mailboxes")}
-        />
-      </div></fieldset>
-      <fieldset className="modal-section"><legend>Tài nguyên xử lý</legend>
-      <div className="modal-grid">
-        <NumField
-          label="CPU (%)"
-          value={f.cpu_pct}
-          onChange={set("cpu_pct")}
-          hint="100% = 1 nhân"
-        />
-        <NumField label="RAM (MB)" value={f.mem_mb} onChange={set("mem_mb")} />
-        {f.kind === "reseller" && (
+      </fieldset>
+      <fieldset className="modal-section">
+        <legend>{translate("Giới hạn dịch vụ")}</legend>
+        <div className="modal-grid">
           <NumField
-            label="Số tài khoản tối đa"
-            value={f.max_users}
-            onChange={set("max_users")}
+            label={translate("Số website")}
+            value={f.max_sites}
+            onChange={set("max_sites")}
           />
-        )}
-      </div></fieldset>
+          <NumField
+            label={translate("Số database")}
+            value={f.max_dbs}
+            onChange={set("max_dbs")}
+          />
+          <NumField
+            label={translate("Số tài khoản FTP")}
+            value={f.max_ftp}
+            onChange={set("max_ftp")}
+          />
+          <NumField
+            label={translate("Số cron job")}
+            value={f.max_cron}
+            onChange={set("max_cron")}
+          />
+          <NumField
+            label={translate("Số hộp thư email")}
+            value={f.max_mailboxes}
+            onChange={set("max_mailboxes")}
+          />
+        </div>
+      </fieldset>
+      <fieldset className="modal-section">
+        <legend>{translate("Tài nguyên xử lý")}</legend>
+        <div className="modal-grid">
+          <NumField
+            label="CPU (%)"
+            value={f.cpu_pct}
+            onChange={set("cpu_pct")}
+            hint={translate("100% = 1 nhân")}
+          />
+          <NumField
+            label="RAM (MB)"
+            value={f.mem_mb}
+            onChange={set("mem_mb")}
+          />
+          {f.kind === "reseller" && (
+            <NumField
+              label={translate("Số tài khoản tối đa")}
+              value={f.max_users}
+              onChange={set("max_users")}
+            />
+          )}
+        </div>
+      </fieldset>
 
       <fieldset className="modal-section">
-        <legend>Phiên bản PHP được phép</legend>
+        <legend>{translate("Phiên bản PHP được phép")}</legend>
         <div className="flex flex-wrap gap-2">
           {phpVersions.map((v) => (
             <label
@@ -284,12 +303,12 @@ function PackageForm({
                 checked={f.php_versions.includes(v)}
                 onChange={() => togglePHP(v)}
               />
-              PHP {v}
+              PHP {translate(v)}
             </label>
           ))}
         </div>
         <p className="mt-1 text-xs text-slate-400">
-          Không chọn = tất cả phiên bản.
+          {translate("Không chọn = tất cả phiên bản.")}
         </p>
       </fieldset>
 
@@ -300,17 +319,23 @@ function PackageForm({
             checked={f.oversell}
             onChange={(e) => setF({ ...f, oversell: e.target.checked })}
           />
-          Cho phép bán vượt dung lượng (oversell)
+          {translate("Cho phép bán vượt dung lượng (oversell)")}
         </label>
       )}
 
       <ErrorBox msg={error} />
       <div className="modal-actions">
         <button className="btn-primary" disabled={saving}>
-          {saving ? "Đang lưu…" : editing ? "Lưu thay đổi" : "Tạo gói"}
+          {translate(
+            saving
+              ? translate("Đang lưu…")
+              : editing
+                ? translate("Lưu thay đổi")
+                : translate("Tạo gói"),
+          )}
         </button>
         <button type="button" className="btn-ghost" onClick={onCancel}>
-          Hủy
+          {translate("Hủy")}
         </button>
       </div>
     </form>
@@ -353,18 +378,18 @@ export default function PackagesPage() {
 
   const groups: { kind: Kind; title: string }[] = isAdmin
     ? [
-        { kind: "reseller", title: "Gói đại lý" },
-        { kind: "user", title: "Gói người dùng" },
+        { kind: "reseller", title: translate("Gói đại lý") },
+        { kind: "user", title: translate("Gói người dùng") },
       ]
-    : [{ kind: "user", title: "Gói cho khách hàng" }];
+    : [{ kind: "user", title: translate("Gói cho khách hàng") }];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Gói dịch vụ</h1>
+          <h1 className="text-xl font-semibold">{translate("Gói dịch vụ")}</h1>
           <p className="text-sm text-slate-500">
-            Giới hạn tài nguyên áp dụng cho từng tài khoản.
+            {translate("Giới hạn tài nguyên áp dụng cho từng tài khoản.")}
           </p>
         </div>
         {!form && (
@@ -372,13 +397,17 @@ export default function PackagesPage() {
             className="btn-primary"
             onClick={() => setForm({ initial: blank("user"), editing: null })}
           >
-            + Tạo gói
+            {translate("+ Tạo gói")}
           </button>
         )}
       </div>
 
       {form && (
-        <Modal size="large" title="Gói dịch vụ" onClose={() => setForm(null)}>
+        <Modal
+          size="large"
+          title={translate("Gói dịch vụ")}
+          onClose={() => setForm(null)}
+        >
           <PackageForm
             key={form.editing?.id ?? "new"}
             {...form}
@@ -399,10 +428,12 @@ export default function PackagesPage() {
         return (
           <section key={g.kind} className="space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              {g.title}
+              {translate(g.title)}
             </h2>
             {items.length === 0 && (
-              <p className="text-sm text-slate-400">Chưa có gói nào.</p>
+              <p className="text-sm text-slate-400">
+                {translate("Chưa có gói nào.")}
+              </p>
             )}
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {items.map((p) => (
@@ -411,7 +442,8 @@ export default function PackagesPage() {
                     <div>
                       <h3 className="font-semibold">{p.name}</h3>
                       <p className="text-xs text-slate-500">
-                        {p.users_count} tài khoản đang dùng
+                        {translate(p.users_count)}{" "}
+                        {translate("tài khoản đang dùng")}
                       </p>
                     </div>
                     {p.oversell && (
@@ -421,32 +453,43 @@ export default function PackagesPage() {
                     )}
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                    <dt className="text-slate-500">Dung lượng</dt>
-                    <dd>{limit(p.disk_mb, fmtMB)}</dd>
+                    <dt className="text-slate-500">
+                      {translate("Dung lượng")}
+                    </dt>
+                    <dd>{translate(limit(p.disk_mb, fmtMB))}</dd>
                     {p.kind === "reseller" && (
                       <>
-                        <dt className="text-slate-500">Tài khoản</dt>
+                        <dt className="text-slate-500">
+                          {translate("Tài khoản")}
+                        </dt>
                         <dd>{limit(p.max_users)}</dd>
                       </>
                     )}
                     <dt className="text-slate-500">Website</dt>
-                    <dd>{limit(p.max_sites)}</dd>
+                    <dd>{translate(limit(p.max_sites))}</dd>
                     <dt className="text-slate-500">Database</dt>
-                    <dd>{limit(p.max_dbs)}</dd>
+                    <dd>{translate(limit(p.max_dbs))}</dd>
                     <dt className="text-slate-500">FTP</dt>
-                    <dd>{limit(p.max_ftp)}</dd>
-                    <dt className="text-slate-500">Băng thông</dt>
-                    <dd>{limit(p.bandwidth_gb, (n) => `${n} GB`)}</dd>
+                    <dd>{translate(limit(p.max_ftp))}</dd>
+                    <dt className="text-slate-500">
+                      {translate("Băng thông")}
+                    </dt>
+                    <dd>
+                      {translate(limit(p.bandwidth_gb, (n) => `${n} GB`))}
+                    </dd>
                     <dt className="text-slate-500">CPU / RAM</dt>
                     <dd>
-                      {limit(p.cpu_pct, (n) => `${n}%`)} /{" "}
-                      {limit(p.mem_mb, fmtMB)}
+                      {translate(limit(p.cpu_pct, (n) => `${n}%`))} /
+                      {translate(" ")}
+                      {translate(limit(p.mem_mb, fmtMB))}
                     </dd>
                     <dt className="text-slate-500">PHP</dt>
                     <dd>
-                      {p.php_versions.length
-                        ? p.php_versions.join(", ")
-                        : "Tất cả"}
+                      {translate(
+                        p.php_versions.length
+                          ? p.php_versions.join(", ")
+                          : translate("Tất cả"),
+                      )}
                     </dd>
                   </dl>
                   <div className="mt-auto flex gap-2 pt-4">
@@ -456,17 +499,19 @@ export default function PackagesPage() {
                         setForm({ initial: fromPackage(p), editing: p })
                       }
                     >
-                      Sửa
+                      {translate("Sửa")}
                     </button>
                     <button
                       className="btn-ghost px-3 py-1 text-xs text-red-600"
                       disabled={p.users_count > 0}
-                      title={
-                        p.users_count > 0 ? "Gói đang được sử dụng" : undefined
-                      }
+                      title={translate(
+                        p.users_count > 0
+                          ? translate("Gói đang được sử dụng")
+                          : undefined,
+                      )}
                       onClick={() => setDeleting(p)}
                     >
-                      Xóa
+                      {translate("Xóa")}
                     </button>
                   </div>
                 </div>
@@ -477,19 +522,23 @@ export default function PackagesPage() {
       })}
 
       {deleting && (
-        <Modal title="Xóa gói dịch vụ" onClose={() => setDeleting(null)}>
+        <Modal
+          title={translate("Xóa gói dịch vụ")}
+          onClose={() => setDeleting(null)}
+        >
           <p className="text-sm text-slate-600">
-            Xóa gói <b>{deleting.name}</b>? Thao tác không thể hoàn tác.
+            {translate("Xóa gói")} <b>{deleting.name}</b>{" "}
+            {translate("? Thao tác không thể hoàn tác.")}
           </p>
           <div className="mt-5 flex justify-end gap-2">
             <button className="btn-ghost" onClick={() => setDeleting(null)}>
-              Hủy
+              {translate("Hủy")}
             </button>
             <button
               className="btn bg-red-600 text-white hover:bg-red-700"
               onClick={confirmDelete}
             >
-              Xóa
+              {translate("Xóa")}
             </button>
           </div>
         </Modal>

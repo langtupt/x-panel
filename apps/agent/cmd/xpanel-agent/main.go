@@ -132,6 +132,15 @@ func main() {
 	srv.Register(agentproto.ActionWebSync, server.Typed(func(ctx context.Context, p agentproto.WebSyncParams) (any, error) {
 		return syncer.Sync(ctx, p)
 	}))
+	srv.Register(agentproto.ActionPHPManageLogs, server.Typed(func(ctx context.Context, p agentproto.PHPManageParams) (any, error) { return php.Logs(ctx, p) }))
+	srv.Register(agentproto.ActionPHPManageList, server.Typed(func(ctx context.Context, p agentproto.PHPManageParams) (any, error) { return php.Management(ctx, p) }))
+	srv.Register(agentproto.ActionPHPManageApply, server.Typed(func(ctx context.Context, p agentproto.PHPManageParams) (any, error) {
+		out, err := php.ApplyManagement(ctx, p)
+		if err != nil {
+			return nil, fmt.Errorf("%w\n%s", err, out)
+		}
+		return agentproto.TaskLog{Log: out}, nil
+	}))
 	srv.Register(agentproto.ActionPHPList, func(context.Context, json.RawMessage) (any, error) {
 		return agentproto.PHPList{Supported: agentproto.PHPVersions, Installed: php.Installed(d)}, nil
 	})

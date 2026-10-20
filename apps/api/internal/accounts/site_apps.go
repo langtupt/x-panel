@@ -81,7 +81,7 @@ func allocateAppPort(ctx context.Context, tx pgx.Tx, site *sites.Site) error {
 	return tx.QueryRow(ctx, `SELECT p FROM generate_series(10000,29999) p WHERE NOT EXISTS(SELECT 1 FROM sites WHERE app_port=p) ORDER BY p LIMIT 1`).Scan(&site.Port)
 }
 func appSite(site *sites.Site) agentproto.WebSite {
-	return agentproto.WebSite{Domain: site.Domain, PHPVersion: site.PHPVersion, DocRoot: site.DocRoot, AppType: site.AppType, Runtime: site.Runtime, Port: site.Port, Env: site.Env}
+	return agentproto.WebSite{PHPConfig: site.PHPConfig, Domain: site.Domain, PHPVersion: site.PHPVersion, DocRoot: site.DocRoot, AppType: site.AppType, Runtime: site.Runtime, Port: site.Port, Env: site.Env}
 }
 
 type siteBuildPayload struct {

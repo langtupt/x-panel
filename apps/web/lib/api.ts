@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 export type Role = "admin" | "reseller" | "user";
 export type Status = "active" | "suspended";
 
@@ -185,7 +186,9 @@ export async function api<T>(
 }
 
 export function errMsg(e: unknown) {
-  return e instanceof ApiError ? e.message : "Lỗi không xác định";
+  return e instanceof ApiError
+    ? translate(e.message)
+    : translate("Lỗi không xác định");
 }
 
 export const roleLabel: Record<Role, string> = {
@@ -264,6 +267,7 @@ export const taskLabel: Record<string, string> = {
   "app.install": "Cài ứng dụng",
   "ssl.issue": "Cấp SSL",
   "php.install": "Cài PHP",
+  "php.manage": "Quản lý PHP",
   "pma.install": "Cài phpMyAdmin",
 };
 

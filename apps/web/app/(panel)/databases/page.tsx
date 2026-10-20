@@ -1,4 +1,5 @@
 "use client";
+import { t as translate } from "@/lib/i18n";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
@@ -32,7 +33,7 @@ function Copy({ value }: { value: string }) {
         })
       }
     >
-      {done ? "Đã chép" : "Chép"}
+      {translate(done ? translate("Đã chép") : translate("Chép"))}
     </button>
   );
 }
@@ -76,7 +77,7 @@ function CreateForm({
 
   return (
     <form onSubmit={submit} className="card space-y-4 p-5">
-      <h2 className="font-semibold">Tạo database</h2>
+      <h2 className="font-semibold">{translate("Tạo database")}</h2>
       <label className="label">Engine</label>
       <select
         className="input"
@@ -84,12 +85,14 @@ function CreateForm({
         onChange={(e) => setEngine(e.target.value)}
       >
         <option value="mariadb">MariaDB</option>
-        <option value="postgresql">PostgreSQL (cần cài từ Applications)</option>
+        <option value="postgresql">
+          {translate("PostgreSQL (cần cài từ Applications)")}
+        </option>
       </select>
       <div className="modal-grid">
         {owners && (
           <div>
-            <label className="label">Tài khoản sở hữu</label>
+            <label className="label">{translate("Tài khoản sở hữu")}</label>
             <select
               className="input"
               required
@@ -97,7 +100,9 @@ function CreateForm({
               onChange={(e) => setUserId(Number(e.target.value) || null)}
             >
               {owners.length === 0 && (
-                <option value="">Chưa có tài khoản người dùng nào</option>
+                <option value="">
+                  {translate("Chưa có tài khoản người dùng nào")}
+                </option>
               )}
               {owners.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -108,24 +113,24 @@ function CreateForm({
           </div>
         )}
         <div>
-          <label className="label">Tên database</label>
+          <label className="label">{translate("Tên database")}</label>
           <div className="flex items-center rounded-lg border border-slate-300 bg-slate-50 text-sm">
-            <span className="px-3 text-slate-500">{prefix}_</span>
+            <span className="px-3 text-slate-500">{translate(prefix)}_</span>
             <input
               className="input rounded-l-none border-0 border-l"
               required
               pattern="[a-z0-9_]{1,40}"
-              title="Chỉ a-z, 0-9, _"
+              title={translate("Chỉ a-z, 0-9, _")}
               value={name}
               onChange={(e) => setName(e.target.value.toLowerCase())}
             />
           </div>
           <p className="mt-1 text-xs text-slate-400">
-            User database trùng tên với database.
+            {translate("User database trùng tên với database.")}
           </p>
         </div>
         <div>
-          <label className="label">Mật khẩu</label>
+          <label className="label">{translate("Mật khẩu")}</label>
           <div className="flex items-center gap-2 [&>input]:flex-1 [&>button]:shrink-0">
             <input
               className="input font-mono"
@@ -137,7 +142,7 @@ function CreateForm({
             <button
               type="button"
               className="btn-ghost px-3"
-              title="Tạo mật khẩu mới"
+              title={translate("Tạo mật khẩu mới")}
               onClick={() => setPassword(genPassword())}
             >
               ↻
@@ -148,10 +153,12 @@ function CreateForm({
       <ErrorBox msg={error} />
       <div className="modal-actions">
         <button className="btn-primary" disabled={saving}>
-          {saving ? "Đang tạo…" : "Tạo database"}
+          {translate(
+            saving ? translate("Đang tạo…") : translate("Tạo database"),
+          )}
         </button>
         <button type="button" className="btn-ghost" onClick={onCancel}>
-          Hủy
+          {translate("Hủy")}
         </button>
       </div>
     </form>
@@ -184,7 +191,10 @@ function PasswordDialog({
   }
 
   return (
-    <Modal title={`Đổi mật khẩu ${db.db_user}`} onClose={onClose}>
+    <Modal
+      title={translate("Đổi mật khẩu {0}", [db.db_user])}
+      onClose={onClose}
+    >
       <form onSubmit={submit} className="space-y-4">
         <div className="flex items-center gap-2 [&>input]:flex-1 [&>button]:shrink-0">
           <input
@@ -207,16 +217,19 @@ function PasswordDialog({
         </div>
         {saved && (
           <p className="text-sm text-emerald-700">
-            Đã đổi mật khẩu. Nhớ cập nhật cấu hình website.{" "}
+            {translate("Đã đổi mật khẩu. Nhớ cập nhật cấu hình website.")}{" "}
+            {translate(" ")}
             <Copy value={password} />
           </p>
         )}
         <ErrorBox msg={error} />
         <div className="modal-actions">
           <button type="button" className="btn-ghost" onClick={onClose}>
-            {saved ? "Đóng" : "Hủy"}
+            {translate(saved ? translate("Đóng") : translate("Hủy"))}
           </button>
-          {!saved && <button className="btn-primary">Lưu</button>}
+          {!saved && (
+            <button className="btn-primary">{translate("Lưu")}</button>
+          )}
         </div>
       </form>
     </Modal>
@@ -248,14 +261,17 @@ function PhpMyAdmin({ admin }: { admin: boolean }) {
   return (
     <div className="card flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
       <div>
-        <b>phpMyAdmin</b>{" "}
+        <b>phpMyAdmin</b>
+        {translate(" ")}
         {st.installed ? (
           <span className="text-slate-500">
-            đăng nhập bằng user + mật khẩu database (PHP {st.php_version})
+            {translate("đăng nhập bằng user + mật khẩu database (PHP")}{" "}
+            {translate(st.php_version)})
           </span>
         ) : (
           <span className="text-slate-500">
-            chưa được cài{admin ? "" : " (liên hệ quản trị viên)"}
+            {translate("chưa được cài")}{" "}
+            {translate(admin ? "" : translate(" (liên hệ quản trị viên)"))}
           </span>
         )}
       </div>
@@ -266,13 +282,13 @@ function PhpMyAdmin({ admin }: { admin: boolean }) {
           target="_blank"
           rel="noreferrer"
         >
-          Mở phpMyAdmin
+          {translate("Mở phpMyAdmin")}
         </a>
       ) : (
         admin &&
         !t && (
           <button className="btn-primary px-3 py-1.5 text-xs" onClick={install}>
-            Cài phpMyAdmin
+            {translate("Cài phpMyAdmin")}
           </button>
         )
       )}
@@ -337,7 +353,9 @@ export default function DatabasesPage() {
         <div>
           <h1 className="text-xl font-semibold">Database</h1>
           <p className="text-sm text-slate-500">
-            Kết nối nội bộ: MariaDB localhost:3306; PostgreSQL 127.0.0.1:5433.
+            {translate(
+              "Kết nối nội bộ: MariaDB localhost:3306; PostgreSQL 127.0.0.1:5433.",
+            )}
           </p>
         </div>
         {!creating && (
@@ -348,7 +366,7 @@ export default function DatabasesPage() {
               setCreated(null);
             }}
           >
-            + Tạo database
+            {translate("+ Tạo database")}
           </button>
         )}
       </div>
@@ -356,7 +374,11 @@ export default function DatabasesPage() {
       <PhpMyAdmin admin={me.role === "admin"} />
 
       {creating && (
-        <Modal size="wide" title="Tạo database" onClose={() => setCreating(false)}>
+        <Modal
+          size="wide"
+          title={translate("Tạo database")}
+          onClose={() => setCreating(false)}
+        >
           <CreateForm
             owners={manager ? owners : null}
             me={me}
@@ -373,31 +395,37 @@ export default function DatabasesPage() {
       {created && (
         <div className="card border-emerald-200 bg-emerald-50 p-5 text-sm">
           <div className="mb-3 font-semibold text-emerald-800">
-            Đã tạo database. Hãy lưu mật khẩu, nó sẽ không hiển thị lại.
+            {translate(
+              "Đã tạo database. Hãy lưu mật khẩu, nó sẽ không hiển thị lại.",
+            )}
           </div>
           <dl className="grid max-w-xl grid-cols-[8rem_1fr_auto] gap-x-3 gap-y-1.5 font-mono">
             <dt className="font-sans text-slate-500">Host</dt>
             <dd>
-              {created.db.engine === "postgresql"
-                ? "127.0.0.1:5433"
-                : "localhost:3306"}
+              {translate(
+                created.db.engine === "postgresql"
+                  ? "127.0.0.1:5433"
+                  : "localhost:3306",
+              )}
             </dd>
             <span />
             <dt className="font-sans text-slate-500">Database</dt>
-            <dd>{created.db.name}</dd>
+            <dd>{translate(created.db.name)}</dd>
             <Copy value={created.db.name} />
             <dt className="font-sans text-slate-500">User</dt>
-            <dd>{created.db.db_user}</dd>
+            <dd>{translate(created.db.db_user)}</dd>
             <Copy value={created.db.db_user} />
-            <dt className="font-sans text-slate-500">Mật khẩu</dt>
-            <dd className="break-all">{created.password}</dd>
+            <dt className="font-sans text-slate-500">
+              {translate("Mật khẩu")}
+            </dt>
+            <dd className="break-all">{translate(created.password)}</dd>
             <Copy value={created.password} />
           </dl>
           <button
             className="btn-ghost mt-4 px-3 py-1 text-xs"
             onClick={() => setCreated(null)}
           >
-            Đã lưu, đóng
+            {translate("Đã lưu, đóng")}
           </button>
         </div>
       )}
@@ -409,8 +437,10 @@ export default function DatabasesPage() {
             <tr>
               <th className="px-4 py-3">Database</th>
               <th className="px-4 py-3">User</th>
-              {manager && <th className="px-4 py-3">Tài khoản</th>}
-              <th className="px-4 py-3">Dung lượng</th>
+              {manager && (
+                <th className="px-4 py-3">{translate("Tài khoản")}</th>
+              )}
+              <th className="px-4 py-3">{translate("Dung lượng")}</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -420,19 +450,23 @@ export default function DatabasesPage() {
                 <td className="px-4 py-3 font-mono font-medium">
                   {d.name}
                   <div className="text-xs font-sans text-slate-500">
-                    {d.engine === "postgresql"
-                      ? "PostgreSQL · 127.0.0.1:5433"
-                      : "MariaDB · localhost:3306"}
+                    {translate(
+                      d.engine === "postgresql"
+                        ? "PostgreSQL · 127.0.0.1:5433"
+                        : "MariaDB · localhost:3306",
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-3 font-mono text-slate-600">
-                  {d.db_user}
+                  {translate(d.db_user)}
                 </td>
                 {manager && (
                   <td className="px-4 py-3 text-slate-600">{d.username}</td>
                 )}
                 <td className="px-4 py-3 text-slate-600">
-                  {d.size_bytes === null ? "—" : fmtBytes(d.size_bytes)}
+                  {translate(
+                    d.size_bytes === null ? "—" : fmtBytes(d.size_bytes),
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-1.5">
@@ -440,23 +474,25 @@ export default function DatabasesPage() {
                       className="btn-ghost px-2.5 py-1 text-xs"
                       target="_blank"
                       rel="noreferrer"
-                      href={
-                        dbToolURL(d.engine === "postgresql" ? "adminer" : "phpmyadmin")
-                      }
+                      href={dbToolURL(
+                        d.engine === "postgresql" ? "adminer" : "phpmyadmin",
+                      )}
                     >
-                      {d.engine === "postgresql" ? "Adminer" : "phpMyAdmin"}
+                      {translate(
+                        d.engine === "postgresql" ? "Adminer" : "phpMyAdmin",
+                      )}
                     </a>
                     <button
                       className="btn-ghost px-2.5 py-1 text-xs"
                       onClick={() => setPwFor(d)}
                     >
-                      Mật khẩu
+                      {translate("Mật khẩu")}
                     </button>
                     <button
                       className="btn-ghost px-2.5 py-1 text-xs text-red-600"
                       onClick={() => setDeleting(d)}
                     >
-                      Xóa
+                      {translate("Xóa")}
                     </button>
                   </div>
                 </td>
@@ -468,7 +504,7 @@ export default function DatabasesPage() {
                   colSpan={5}
                   className="px-4 py-8 text-center text-slate-500"
                 >
-                  Chưa có database nào.
+                  {translate("Chưa có database nào.")}
                 </td>
               </tr>
             )}
@@ -479,22 +515,23 @@ export default function DatabasesPage() {
       {pwFor && <PasswordDialog db={pwFor} onClose={() => setPwFor(null)} />}
       {deleting && (
         <Modal
-          title={`Xóa database ${deleting.name}`}
+          title={translate("Xóa database {0}", [deleting.name])}
           onClose={() => setDeleting(null)}
         >
           <p className="text-sm text-slate-600">
-            Toàn bộ dữ liệu trong database và user <b>{deleting.db_user}</b> sẽ
-            bị xóa vĩnh viễn.
+            {translate("Toàn bộ dữ liệu trong database và user")}{" "}
+            <b>{translate(deleting.db_user)}</b>{" "}
+            {translate("sẽ bị xóa vĩnh viễn.")}
           </p>
           <div className="mt-5 flex justify-end gap-2">
             <button className="btn-ghost" onClick={() => setDeleting(null)}>
-              Hủy
+              {translate("Hủy")}
             </button>
             <button
               className="btn bg-red-600 text-white hover:bg-red-700"
               onClick={confirmDelete}
             >
-              Xóa
+              {translate("Xóa")}
             </button>
           </div>
         </Modal>

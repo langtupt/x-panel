@@ -232,6 +232,10 @@ func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 	if !notImpersonating(w, r) {
 		return
 	}
+	if currentUser(r).TOTPSecret != nil {
+		writeErr(w, http.StatusConflict, auth.ErrTOTPEnabled.Error())
+		return
+	}
 	secret, err := auth.NewTOTPSecret()
 	if err != nil {
 		s.internalError(w, err)
@@ -253,7 +257,10 @@ func (s *Server) handleTOTPEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := currentUser(r)
-	if err := s.auth.EnableTOTP(r.Context(), me, in.Secret, in.Code); errors.Is(err, auth.ErrTOTPInvalid) {
+	if err := s.auth.EnableTOTP(r.Context(), me, in.Secret, in.Code); errors.Is(err, auth.ErrTOTPEnabled) {
+		writeErr(w, http.StatusConflict, err.Error())
+		return
+	} else if errors.Is(err, auth.ErrTOTPInvalid) {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	} else if err != nil {

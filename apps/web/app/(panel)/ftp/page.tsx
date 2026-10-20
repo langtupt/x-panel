@@ -1,4 +1,5 @@
 "use client";
+import { t as translate } from "@/lib/i18n";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, errMsg, genPassword, type FtpAccount } from "@/lib/api";
@@ -54,11 +55,11 @@ function CreateForm({
 
   return (
     <form onSubmit={submit} className="card space-y-4 p-5">
-      <h2 className="font-semibold">Tạo tài khoản FTP</h2>
+      <h2 className="font-semibold">{translate("Tạo tài khoản FTP")}</h2>
       <div className="modal-grid">
         {manager && (
           <div>
-            <label className="label">Tài khoản sở hữu</label>
+            <label className="label">{translate("Tài khoản sở hữu")}</label>
             <OwnerSelect
               owners={owners}
               value={ownerId}
@@ -67,9 +68,9 @@ function CreateForm({
           </div>
         )}
         <div>
-          <label className="label">Tên đăng nhập</label>
+          <label className="label">{translate("Tên đăng nhập")}</label>
           <div className="flex items-center rounded-lg border border-slate-300 bg-slate-50 text-sm">
-            <span className="px-3 text-slate-500">{prefix}_</span>
+            <span className="px-3 text-slate-500">{translate(prefix)}_</span>
             <input
               className="input rounded-l-none border-0 border-l"
               required
@@ -80,7 +81,7 @@ function CreateForm({
           </div>
         </div>
         <div>
-          <label className="label">Thư mục được phép</label>
+          <label className="label">{translate("Thư mục được phép")}</label>
           <div className="flex items-center rounded-lg border border-slate-300 bg-slate-50 text-sm">
             <span className="px-3 text-slate-500">~/</span>
             <input
@@ -91,11 +92,11 @@ function CreateForm({
             />
           </div>
           <p className="mt-1 text-xs text-slate-400">
-            Tài khoản FTP chỉ thấy thư mục này.
+            {translate("Tài khoản FTP chỉ thấy thư mục này.")}
           </p>
         </div>
         <div>
-          <label className="label">Mật khẩu</label>
+          <label className="label">{translate("Mật khẩu")}</label>
           <div className="flex items-center gap-2 [&>input]:flex-1 [&>button]:shrink-0">
             <input
               className="input font-mono"
@@ -117,10 +118,10 @@ function CreateForm({
       <ErrorBox msg={error} />
       <div className="modal-actions">
         <button className="btn-primary" disabled={saving}>
-          {saving ? "Đang tạo…" : "Tạo"}
+          {translate(saving ? translate("Đang tạo…") : translate("Tạo"))}
         </button>
         <button type="button" className="btn-ghost" onClick={onCancel}>
-          Hủy
+          {translate("Hủy")}
         </button>
       </div>
     </form>
@@ -182,8 +183,9 @@ export default function FTPPage() {
         <div>
           <h1 className="text-xl font-semibold">FTP / SFTP</h1>
           <p className="text-sm text-slate-500">
-            FTP (cổng 21, hỗ trợ TLS) cho từng thư mục; SFTP (cổng 22) cho cả
-            thư mục home.
+            {translate(
+              "FTP (cổng 21, hỗ trợ TLS) cho từng thư mục; SFTP (cổng 22) cho cả thư mục home.",
+            )}
           </p>
         </div>
         {!creating && (
@@ -194,21 +196,26 @@ export default function FTPPage() {
               setCreated(null);
             }}
           >
-            + Tạo FTP
+            {translate("+ Tạo FTP")}
           </button>
         )}
       </div>
 
       {me.role === "user" && (
         <div className="card p-4 text-sm text-slate-600">
-          <b>SFTP</b> toàn bộ thư mục home: host <code>{host}</code>, cổng{" "}
-          <code>22</code>, user <code>{me.username}</code>, mật khẩu = mật khẩu
-          đăng nhập panel.
+          <b>SFTP</b> {translate("toàn bộ thư mục home: host")}{" "}
+          <code>{host}</code> {translate(", cổng")} {translate(" ")}
+          <code>22</code>, user <code>{me.username}</code>{" "}
+          {translate(", mật khẩu = mật khẩu đăng nhập panel.")}
         </div>
       )}
 
       {creating && (
-        <Modal size="wide" title="Tạo FTP" onClose={() => setCreating(false)}>
+        <Modal
+          size="wide"
+          title={translate("Tạo FTP")}
+          onClose={() => setCreating(false)}
+        >
           <CreateForm
             manager={manager}
             onCancel={() => setCreating(false)}
@@ -223,24 +230,27 @@ export default function FTPPage() {
       {created && (
         <div className="card border-emerald-200 bg-emerald-50 p-5 text-sm">
           <div className="mb-3 font-semibold text-emerald-800">
-            Thông tin đăng nhập FTP. Hãy lưu lại, mật khẩu sẽ không hiển thị
-            lại.
+            {translate(
+              "Thông tin đăng nhập FTP. Hãy lưu lại, mật khẩu sẽ không hiển thị lại.",
+            )}
           </div>
           <dl className="grid max-w-xl grid-cols-[8rem_1fr] gap-x-3 gap-y-1.5 font-mono">
             <dt className="font-sans text-slate-500">Host</dt>
-            <dd>{host}</dd>
-            <dt className="font-sans text-slate-500">Cổng</dt>
+            <dd>{translate(host)}</dd>
+            <dt className="font-sans text-slate-500">{translate("Cổng")}</dt>
             <dd>21 (FTP / FTPS explicit)</dd>
             <dt className="font-sans text-slate-500">User</dt>
-            <dd>{created.a.login}</dd>
-            <dt className="font-sans text-slate-500">Mật khẩu</dt>
-            <dd className="break-all">{created.password}</dd>
+            <dd>{translate(created.a.login)}</dd>
+            <dt className="font-sans text-slate-500">
+              {translate("Mật khẩu")}
+            </dt>
+            <dd className="break-all">{translate(created.password)}</dd>
           </dl>
           <button
             className="btn-ghost mt-4 px-3 py-1 text-xs"
             onClick={() => setCreated(null)}
           >
-            Đã lưu, đóng
+            {translate("Đã lưu, đóng")}
           </button>
         </div>
       )}
@@ -250,18 +260,22 @@ export default function FTPPage() {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3">Đăng nhập</th>
-              <th className="px-4 py-3">Thư mục</th>
-              {manager && <th className="px-4 py-3">Tài khoản</th>}
+              <th className="px-4 py-3">{translate("Đăng nhập")}</th>
+              <th className="px-4 py-3">{translate("Thư mục")}</th>
+              {manager && (
+                <th className="px-4 py-3">{translate("Tài khoản")}</th>
+              )}
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {list.map((a) => (
               <tr key={a.id}>
-                <td className="px-4 py-3 font-mono font-medium">{a.login}</td>
+                <td className="px-4 py-3 font-mono font-medium">
+                  {translate(a.login)}
+                </td>
                 <td className="px-4 py-3 font-mono text-slate-600">
-                  ~/{a.dir}
+                  ~/{translate(a.dir)}
                 </td>
                 {manager && (
                   <td className="px-4 py-3 text-slate-600">{a.username}</td>
@@ -276,13 +290,13 @@ export default function FTPPage() {
                         setDlgError("");
                       }}
                     >
-                      Mật khẩu
+                      {translate("Mật khẩu")}
                     </button>
                     <button
                       className="btn-ghost px-2.5 py-1 text-xs text-red-600"
                       onClick={() => setDeleting(a)}
                     >
-                      Xóa
+                      {translate("Xóa")}
                     </button>
                   </div>
                 </td>
@@ -294,7 +308,7 @@ export default function FTPPage() {
                   colSpan={4}
                   className="px-4 py-8 text-center text-slate-500"
                 >
-                  Chưa có tài khoản FTP nào.
+                  {translate("Chưa có tài khoản FTP nào.")}
                 </td>
               </tr>
             )}
@@ -304,7 +318,7 @@ export default function FTPPage() {
 
       {pwFor && (
         <Modal
-          title={`Đổi mật khẩu ${pwFor.login}`}
+          title={translate("Đổi mật khẩu {0}", [pwFor.login])}
           onClose={() => setPwFor(null)}
         >
           <form onSubmit={savePassword} className="space-y-4">
@@ -331,31 +345,31 @@ export default function FTPPage() {
                 className="btn-ghost"
                 onClick={() => setPwFor(null)}
               >
-                Hủy
+                {translate("Hủy")}
               </button>
-              <button className="btn-primary">Lưu</button>
+              <button className="btn-primary">{translate("Lưu")}</button>
             </div>
           </form>
         </Modal>
       )}
       {deleting && (
         <Modal
-          title={`Xóa FTP ${deleting.login}`}
+          title={translate("Xóa FTP {0}", [deleting.login])}
           onClose={() => setDeleting(null)}
         >
           <p className="text-sm text-slate-600">
-            Chỉ xóa tài khoản đăng nhập; file trong ~/{deleting.dir} được giữ
-            lại.
+            {translate("Chỉ xóa tài khoản đăng nhập; file trong ~/")}{" "}
+            {translate(deleting.dir)} {translate("được giữ lại.")}
           </p>
           <div className="mt-5 flex justify-end gap-2">
             <button className="btn-ghost" onClick={() => setDeleting(null)}>
-              Hủy
+              {translate("Hủy")}
             </button>
             <button
               className="btn bg-red-600 text-white hover:bg-red-700"
               onClick={confirmDelete}
             >
-              Xóa
+              {translate("Xóa")}
             </button>
           </div>
         </Modal>

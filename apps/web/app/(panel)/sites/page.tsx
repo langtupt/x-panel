@@ -1,4 +1,6 @@
 "use client";
+import { localeTag } from "@/lib/i18n";
+import { t as translate } from "@/lib/i18n";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
@@ -14,6 +16,7 @@ import {
 import { useTask } from "@/lib/useTask";
 import { ErrorBox, Modal } from "@/components/ui";
 import { TaskCard } from "@/components/task";
+import { SitePHP } from "@/components/site-php";
 import { useSession } from "../session";
 
 const sslBadge: Record<SSLStatus, { label: string; cls: string }> = {
@@ -132,12 +135,16 @@ function SiteForm({
   return (
     <form onSubmit={submit} className="card space-y-4 p-5">
       <h2 className="font-semibold">
-        {editing ? `Sửa website ${editing.domain}` : "Thêm website"}
+        {translate(
+          editing
+            ? translate("Sửa website {0}", [editing.domain])
+            : translate("Thêm website"),
+        )}
       </h2>
       <div className="modal-grid">
         {owners && !editing && (
           <div>
-            <label className="label">Tài khoản sở hữu</label>
+            <label className="label">{translate("Tài khoản sở hữu")}</label>
             <select
               className="input"
               required
@@ -147,7 +154,9 @@ function SiteForm({
               }
             >
               {owners.length === 0 && (
-                <option value="">Chưa có tài khoản người dùng nào</option>
+                <option value="">
+                  {translate("Chưa có tài khoản người dùng nào")}
+                </option>
               )}
               {owners.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -158,7 +167,7 @@ function SiteForm({
           </div>
         )}
         <div>
-          <label className="label">Tên miền</label>
+          <label className="label">{translate("Tên miền")}</label>
           <input
             className="input"
             required
@@ -173,11 +182,12 @@ function SiteForm({
               checked={f.www}
               onChange={(e) => setF({ ...f, www: e.target.checked })}
             />
-            Thêm www.{f.domain || "tên-miền"}
+            {translate("Thêm www.")}{" "}
+            {translate(f.domain || translate("tên-miền"))}
           </label>
         </div>
         <div>
-          <label className="label">Tên miền phụ (alias)</label>
+          <label className="label">{translate("Tên miền phụ (alias)")}</label>
           <input
             className="input"
             placeholder="shop.example.com, example.net"
@@ -185,11 +195,11 @@ function SiteForm({
             onChange={(e) => setF({ ...f, aliases: e.target.value })}
           />
           <p className="mt-1 text-xs text-slate-400">
-            Phân tách bằng dấu phẩy hoặc khoảng trắng.
+            {translate("Phân tách bằng dấu phẩy hoặc khoảng trắng.")}
           </p>
         </div>
         <div>
-          <label className="label">Loại ứng dụng</label>
+          <label className="label">{translate("Loại ứng dụng")}</label>
           <select
             className="input"
             value={f.app_type}
@@ -197,7 +207,7 @@ function SiteForm({
           >
             {["html", "php", "laravel", "nodejs", "nextjs", "go"].map((t) => (
               <option key={t} value={t}>
-                {t}
+                {translate(t)}
               </option>
             ))}
           </select>
@@ -216,37 +226,41 @@ function SiteForm({
                 }
               }}
             >
-              Nhận diện từ mã nguồn
+              {translate("Nhận diện từ mã nguồn")}
             </button>
           )}
-          <label className="label">Phiên bản PHP (PHP / Laravel)</label>
+          <label className="label">
+            {translate("Phiên bản PHP (PHP / Laravel)")}
+          </label>
           <select
             className="input"
             value={f.php_version}
             onChange={(e) => setF({ ...f, php_version: e.target.value })}
           >
-            <option value="">Không dùng PHP (web tĩnh)</option>
+            <option value="">{translate("Không dùng PHP (web tĩnh)")}</option>
             {php?.installed.map((v) => (
               <option key={v} value={v}>
-                PHP {v}
+                PHP {translate(v)}
               </option>
             ))}
           </select>
           {php && php.installed.length === 0 && (
             <p className="mt-1 text-xs text-amber-700">
-              Máy chủ chưa cài phiên bản PHP nào.
+              {translate("Máy chủ chưa cài phiên bản PHP nào.")}
             </p>
           )}
         </div>
         <div>
-          <label className="label">Thư mục gốc (document root)</label>
+          <label className="label">
+            {translate("Thư mục gốc (document root)")}
+          </label>
           <div className="flex items-center rounded-lg border border-slate-300 bg-slate-50 text-sm">
             <span className="truncate px-3 text-slate-500">
-              ~/www/{f.domain || "domain"}/
+              ~/www/{translate(f.domain || "domain")}/
             </span>
             <input
               className="input rounded-l-none border-0 border-l"
-              placeholder="(để trống) hoặc public"
+              placeholder={translate("(để trống) hoặc public")}
               value={f.doc_root}
               onChange={(e) => setF({ ...f, doc_root: e.target.value })}
             />
@@ -258,7 +272,7 @@ function SiteForm({
       </div>
       <div>
         <label className="label">
-          Phiên bản Node.js / Go (trống: mới nhất đã cài)
+          {translate("Phiên bản Node.js / Go (trống: mới nhất đã cài)")}
         </label>
         <input
           className="input"
@@ -268,7 +282,7 @@ function SiteForm({
       </div>
       <div>
         <label className="label">
-          Biến môi trường (KEY=value, mỗi dòng một biến)
+          {translate("Biến môi trường (KEY=value, mỗi dòng một biến)")}
         </label>
         <textarea
           className="input font-mono"
@@ -277,7 +291,7 @@ function SiteForm({
           onChange={(e) => setF({ ...f, envText: e.target.value })}
         />
         <p className="text-xs text-slate-500">
-          Lưu cấu hình rồi Build &amp; restart để áp dụng.
+          {translate("Lưu cấu hình rồi Build & restart để áp dụng.")}
         </p>
       </div>
       {!editing && (
@@ -287,16 +301,22 @@ function SiteForm({
             checked={f.sample}
             onChange={(e) => setF({ ...f, sample: e.target.checked })}
           />
-          Tạo dự án mẫu và build (chỉ thư mục trống)
+          {translate("Tạo dự án mẫu và build (chỉ thư mục trống)")}
         </label>
       )}
       <ErrorBox msg={error} />
       <div className="modal-actions">
         <button className="btn-primary" disabled={saving}>
-          {saving ? "Đang lưu…" : editing ? "Lưu" : "Tạo website"}
+          {translate(
+            saving
+              ? translate("Đang lưu…")
+              : editing
+                ? translate("Lưu")
+                : translate("Tạo website"),
+          )}
         </button>
         <button type="button" className="btn-ghost" onClick={onCancel}>
-          Hủy
+          {translate("Hủy")}
         </button>
       </div>
     </form>
@@ -318,11 +338,14 @@ function SSLCell({
   return (
     <div className="space-y-1">
       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${b.cls}`}>
-        {b.label}
+        {translate(b.label)}
       </span>
       {site.ssl_status === "active" && site.ssl_expires_at && (
         <div className="text-xs text-slate-500">
-          đến {new Date(site.ssl_expires_at).toLocaleDateString("vi-VN")}
+          {translate("đến")}{" "}
+          {translate(
+            new Date(site.ssl_expires_at).toLocaleDateString(localeTag()),
+          )}
         </div>
       )}
       <div className="flex gap-1.5">
@@ -331,7 +354,11 @@ function SSLCell({
             className="text-xs text-brand-600 hover:underline"
             onClick={onIssue}
           >
-            {site.ssl_status === "active" ? "Cấp lại" : "Cấp Let's Encrypt"}
+            {translate(
+              site.ssl_status === "active"
+                ? translate("Cấp lại")
+                : translate("Cấp Let's Encrypt"),
+            )}
           </button>
         )}
         {site.ssl_status === "active" && (
@@ -339,7 +366,7 @@ function SSLCell({
             className="text-xs text-slate-500 hover:underline"
             onClick={onDisable}
           >
-            Tắt
+            {translate("Tắt")}
           </button>
         )}
       </div>
@@ -363,6 +390,7 @@ export default function SitesPage() {
   const [deleting, setDeleting] = useState<Site | null>(null);
   const [tasks, setTasks] = useState<Record<number, Task>>({});
   const [notes, setNotes] = useState<string[]>([]);
+  const [phpSite, setPHPSite] = useState<Site | null>(null);
   const [logs, setLogs] = useState<{ domain: string; log: string } | null>(
     null,
   );
@@ -449,7 +477,9 @@ export default function SitesPage() {
         <div>
           <h1 className="text-xl font-semibold">Website</h1>
           <p className="text-sm text-slate-500">
-            Mỗi website có vhost nginx và PHP-FPM chạy bằng user của tài khoản.
+            {translate(
+              "Mỗi website có vhost nginx và PHP-FPM chạy bằng user của tài khoản.",
+            )}
           </p>
         </div>
         {!form && (
@@ -457,7 +487,7 @@ export default function SitesPage() {
             className="btn-primary"
             onClick={() => setForm({ editing: null })}
           >
-            + Thêm website
+            {translate("+ Thêm website")}
           </button>
         )}
       </div>
@@ -480,7 +510,7 @@ export default function SitesPage() {
           key={n}
           className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800"
         >
-          {n}
+          {translate(n)}
         </p>
       ))}
 
@@ -488,9 +518,11 @@ export default function SitesPage() {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3">Tên miền</th>
-              {manager && <th className="px-4 py-3">Tài khoản</th>}
-              <th className="px-4 py-3">Ứng dụng</th>
+              <th className="px-4 py-3">{translate("Tên miền")}</th>
+              {manager && (
+                <th className="px-4 py-3">{translate("Tài khoản")}</th>
+              )}
+              <th className="px-4 py-3">{translate("Ứng dụng")}</th>
               <th className="px-4 py-3">SSL</th>
               <th className="px-4 py-3" />
             </tr>
@@ -509,12 +541,12 @@ export default function SitesPage() {
                   </a>
                   {s.aliases.length > 0 && (
                     <div className="text-xs text-slate-500">
-                      {s.aliases.join(", ")}
+                      {translate(s.aliases.join(", "))}
                     </div>
                   )}
                   <div className="text-xs text-slate-400">
                     ~/www/{s.domain}
-                    {s.doc_root && "/" + s.doc_root}
+                    {translate(s.doc_root && "/" + s.doc_root)}
                   </div>
                   {tasks[s.id] && (
                     <div className="mt-2 max-w-xl">
@@ -526,10 +558,11 @@ export default function SitesPage() {
                   <td className="px-4 py-3 text-slate-600">{s.username}</td>
                 )}
                 <td className="px-4 py-3">
-                  {s.app_type} {s.php_version || s.runtime}
+                  {translate(s.app_type)}{" "}
+                  {translate(s.php_version || s.runtime)}
                   {s.port > 0 && (
                     <div className="text-xs text-slate-500">
-                      127.0.0.1:{s.port}
+                      127.0.0.1:{translate(s.port)}
                     </div>
                   )}
                 </td>
@@ -543,6 +576,14 @@ export default function SitesPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-1.5">
+                    {["php", "laravel"].includes(s.app_type) && (
+                      <button
+                        className="btn-ghost px-2.5 py-1 text-xs"
+                        onClick={() => setPHPSite(s)}
+                      >
+                        PHP
+                      </button>
+                    )}
                     <button
                       className="btn-ghost px-2.5 py-1 text-xs"
                       disabled={!!tasks[s.id]}
@@ -578,13 +619,13 @@ export default function SitesPage() {
                       className="btn-ghost px-2.5 py-1 text-xs"
                       onClick={() => setForm({ editing: s })}
                     >
-                      Sửa
+                      {translate("Sửa")}
                     </button>
                     <button
                       className="btn-ghost px-2.5 py-1 text-xs text-red-600"
                       onClick={() => setDeleting(s)}
                     >
-                      Xóa
+                      {translate("Xóa")}
                     </button>
                   </div>
                 </td>
@@ -596,7 +637,7 @@ export default function SitesPage() {
                   colSpan={5}
                   className="px-4 py-8 text-center text-slate-500"
                 >
-                  Chưa có website nào.
+                  {translate("Chưa có website nào.")}
                 </td>
               </tr>
             )}
@@ -604,32 +645,45 @@ export default function SitesPage() {
         </table>
       </div>
 
+      {phpSite && (
+        <SitePHP
+          site={phpSite}
+          admin={me?.role === "admin"}
+          onClose={() => setPHPSite(null)}
+        />
+      )}
       {logs && (
-        <Modal size="large" title={`Logs ${logs.domain}`} onClose={() => setLogs(null)}>
+        <Modal
+          size="large"
+          title={translate(`Logs ${logs.domain}`)}
+          onClose={() => setLogs(null)}
+        >
           <pre className="max-h-96 overflow-auto whitespace-pre-wrap text-xs">
-            {logs.log || "Chưa có nhật ký"}
+            {logs.log || translate("Chưa có nhật ký")}
           </pre>
         </Modal>
       )}
       {deleting && (
         <Modal
-          title={`Xóa website ${deleting.domain}`}
+          title={translate("Xóa website {0}", [deleting.domain])}
           onClose={() => setDeleting(null)}
         >
           <p className="text-sm text-slate-600">
-            Cấu hình nginx/PHP và chứng chỉ SSL của website sẽ bị gỡ. Mã nguồn
-            trong
-            <code className="mx-1">~/www/{deleting.domain}</code>được giữ lại.
+            {translate(
+              "Cấu hình nginx/PHP và chứng chỉ SSL của website sẽ bị gỡ. Mã nguồn trong",
+            )}{" "}
+            <code className="mx-1">~/www/{deleting.domain}</code>{" "}
+            {translate("được giữ lại.")}
           </p>
           <div className="mt-5 flex justify-end gap-2">
             <button className="btn-ghost" onClick={() => setDeleting(null)}>
-              Hủy
+              {translate("Hủy")}
             </button>
             <button
               className="btn bg-red-600 text-white hover:bg-red-700"
               onClick={confirmDelete}
             >
-              Xóa
+              {translate("Xóa")}
             </button>
           </div>
         </Modal>

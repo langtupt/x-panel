@@ -60,7 +60,7 @@ func VerifyTOTP(secret, code string, now time.Time) bool {
 		return false
 	}
 	key, err := b32.DecodeString(strings.ToUpper(secret))
-	if err != nil {
+	if err != nil || len(key) < 20 {
 		return false
 	}
 	step := uint64(now.Unix() / totpStep)
