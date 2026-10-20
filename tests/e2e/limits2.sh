@@ -81,7 +81,7 @@ curl -sk --resolve bw.example.com:80:127.0.0.1 http://bw.example.com/ | grep -q 
 for _ in 1 2 3 4 5; do c cust GET /stats/accounts >/dev/null; [ "$(jq ".[0].bandwidth_blocked" /tmp/out)" = true ] && break; sleep 1; done
 expect "$(jq ".[0].bandwidth_blocked" /tmp/out)" true "stats show the block"
 # Simulate the month changing while nginx still has the previous block.
-psqlx "UPDATE resource_samples SET at=date_trunc('month', now()) - interval '1 minute' WHERE user_id=$U; UPDATE users SET bw_blocked_month=(date_trunc('month', now()) - interval '1 day')::date WHERE id=$U"
+psqlx "DELETE FROM resource_samples WHERE user_id=$U; INSERT INTO resource_samples (user_id, at, mem_mb, tasks, db_mb, mail_mb, bw_bytes, requests) VALUES ($U, date_trunc('month', now()) - interval '1 minute', 0, 0, 0, 0, 1610612736, 1); UPDATE users SET bw_blocked_month=(date_trunc('month', now()) - interval '1 day')::date WHERE id=$U"
 for _ in $(seq 1 30); do [ "$(get)" = 200 ] && break; sleep 2; done
 expect "$(get)" 200 "previous month's block cleared automatically"
 psqlx "INSERT INTO resource_samples (user_id, at, mem_mb, tasks, db_mb, mail_mb, bw_bytes, requests) VALUES ($U, now() - interval '1 minute', 0, 0, 0, 0, 1610612736, 1)"
