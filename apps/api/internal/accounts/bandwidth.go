@@ -16,7 +16,8 @@ func (s *Service) enforceBandwidth(ctx context.Context) error {
 			SELECT user_id, sum(bw_bytes) AS bytes FROM resource_samples
 			WHERE at >= date_trunc('month', now()) GROUP BY user_id)
 		SELECT u.id, COALESCE(p.bandwidth_gb > 0 AND COALESCE(used.bytes, 0) >= p.bandwidth_gb::bigint << 30, false) AS over,
-			COALESCE(u.bw_blocked_month = date_trunc('month', now())::date, false) AS blocked
+			u.bw_blocked_month IS NOT NULL AS blocked,
+			COALESCE(u.bw_blocked_month <> date_trunc('month', now())::date, false) AS stale
 		FROM users u
 		LEFT JOIN packages p ON p.id = u.package_id
 		LEFT JOIN used ON used.user_id = u.id
@@ -26,12 +27,14 @@ func (s *Service) enforceBandwidth(ctx context.Context) error {
 	}
 	for rows.Next() {
 		var id int64
-		var over, blocked bool
-		if err := rows.Scan(&id, &over, &blocked); err != nil {
+		var over, blocked, stale bool
+		if err := rows.Scan(&id, &over, &blocked, &stale); err != nil {
 			rows.Close()
 			return err
 		}
-		if over != blocked {
+		// nginx retains the old configuration across a month boundary. Clear
+		// it (or refresh the marker if this month is already over its limit).
+		if over != blocked || stale {
 			changes = append(changes, change{id, over})
 		}
 	}

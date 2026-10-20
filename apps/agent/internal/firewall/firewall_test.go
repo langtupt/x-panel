@@ -79,4 +79,13 @@ func TestNginxConf(t *testing.T) {
 	if !strings.Contains(jailConf(agentproto.DefaultFirewall()), "banaction = xpanel") {
 		t.Error("fail2ban does not ban into the firewall")
 	}
+	c = Defaults()
+	c.HTTPBurst = 0
+	if err := Validate(&c); err != nil {
+		t.Fatal(err)
+	}
+	conf = nginxRateConf(c)
+	if strings.Contains(conf, "burst=0") || !strings.Contains(conf, "limit_req zone=xp_req;") {
+		t.Fatalf("zero burst must produce a valid limit without a burst parameter: %s", conf)
+	}
 }

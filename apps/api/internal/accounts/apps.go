@@ -42,6 +42,11 @@ func (s *Service) InstallApp(ctx context.Context, actor *users.User, p agentprot
 	if a.Builtin {
 		return nil, apperr.Invalid("%s được cài sẵn cùng panel", a.Name)
 	}
+	// The legacy POST /phpmyadmin endpoint has no version parameter. Resolve
+	// its alias against the live catalog now that versions are explicit.
+	if p.ID == "phpmyadmin" && p.Version == "latest" && len(a.Available) > 0 {
+		p.Version = a.Available[0]
+	}
 	if !slices.Contains(a.Available, p.Version) {
 		return nil, apperr.Invalid("phiên bản %q của %s không có trong danh sách", p.Version, a.Name)
 	}

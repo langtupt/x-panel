@@ -180,7 +180,12 @@ func nginxRateConf(c agentproto.FirewallConfig) string {
 	}
 	b.WriteString("}\nmap $xp_limited $xp_limit_key {\n    0 \"\";\n    1 $binary_remote_addr;\n}\n")
 	if c.HTTPRate > 0 {
-		fmt.Fprintf(&b, "limit_req_zone $xp_limit_key zone=xp_req:20m rate=%dr/s;\nlimit_req zone=xp_req burst=%d nodelay;\n", c.HTTPRate, c.HTTPBurst)
+		fmt.Fprintf(&b, "limit_req_zone $xp_limit_key zone=xp_req:20m rate=%dr/s;\nlimit_req zone=xp_req", c.HTTPRate)
+		// nginx rejects an explicit burst=0; omitting it means no burst.
+		if c.HTTPBurst > 0 {
+			fmt.Fprintf(&b, " burst=%d nodelay", c.HTTPBurst)
+		}
+		b.WriteString(";\n")
 		b.WriteString("limit_req_status 429;\nlimit_req_log_level warn;\n")
 	}
 	if c.HTTPConn > 0 {

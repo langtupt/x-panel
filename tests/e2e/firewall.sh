@@ -28,6 +28,9 @@ expect "$(c cust GET /firewall)" 403 "customers cannot see the firewall"
 
 echo "### no self-lockout"
 CFG=$(base)
+expect "$(c admin PUT /firewall "$(echo "$CFG" | jq -c '.http_burst = 0')")" 200 "zero burst is valid"
+nginx -t >/dev/null 2>&1 && ok "zero burst keeps nginx valid" || bad "zero burst broke nginx"
+expect "$(c admin PUT /firewall "$CFG")" 200 "restore burst setting"
 expect "$(c admin PUT /firewall "$(echo "$CFG" | jq -c '.block = ["127.0.0.1"]')")" 400 "blocking your own IP refused"
 expect "$(c admin PUT /firewall "$(echo "$CFG" | jq -c '.block = ["1.2.3.4; flush ruleset"]')")" 400 "malformed address refused"
 expect "$(c admin POST /firewall/ban '{"ip":"127.0.0.1","minutes":5}')" 400 "cannot ban your own IP"

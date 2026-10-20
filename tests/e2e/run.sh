@@ -39,9 +39,16 @@ printf "XPANEL_ACME_DIR=https://pebble:14000/dir\nXPANEL_ACME_INSECURE=true\n" >
 systemctl restart xpanel-agent
 apt-get install -y -q jq >/dev/null 2>&1'
 
-for t in ${TESTS:-web db ftp-files-pma files auth-cron limits applications isolation ssl mail backup stats}; do
+# Read a stable snapshot even if a developer edits the mounted test sources.
+docker exec "$NAME" cp -a /e2e /root/e2e
+for t in ${TESTS:-web db ftp-files-pma files auth-cron limits applications isolation ssl mail backup stats limits2 malware firewall}; do
   echo "======== $t"
-  docker exec "$NAME" bash "/e2e/$t.sh" || FAILED="${FAILED:-} $t"
+  if docker exec "$NAME" bash "/root/e2e/$t.sh"; then
+    echo "SUITE PASS: $t"
+  else
+    FAILED="${FAILED:-} $t"
+    echo "SUITE FAIL: $t"
+  fi
 done
 echo "Container $NAME is left running for inspection (docker rm -f $NAME xpanel-e2e-pebble)."
 if [ -n "${FAILED:-}" ]; then echo "SUITES FAILED:$FAILED"; exit 1; fi

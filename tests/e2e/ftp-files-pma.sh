@@ -70,8 +70,12 @@ c fcust POST /files/op '{"request":{"op":"delete","paths":["/www/restored","/www
 
 step "phpMyAdmin install (task) + served on panel port"
 c admin POST /phpmyadmin; T=$(jq .id /tmp/out)
+if ! [[ "$T" =~ ^[1-9][0-9]*$ ]]; then
+  echo "FAIL phpMyAdmin installation did not return a task ID"; cat /tmp/out; exit 1
+fi
 for i in $(seq 1 120); do st=$(curl -sk -b /tmp/admin "${H[@]}" $B/api/tasks/$T | jq -r .status); [ "$st" = done ] || [ "$st" = failed ] && break; sleep 2; done
 curl -sk -b /tmp/admin "${H[@]}" $B/api/tasks/$T | jq -r '.status + " | " + (.log | split("\n") | map(select(length>0)) | .[-2:] | join(" / "))'
+[ "$st" = done ] || { echo "FAIL phpMyAdmin installation task: $st"; exit 1; }
 c admin GET /phpmyadmin
 curl -sk -o /dev/null -w "panel port redirects %{http_code} %{redirect_url}\n" $B/phpmyadmin/
 curl -sk -o /tmp/pma.html -w "phpmyadmin %{http_code} " https://127.0.0.1:8890/phpmyadmin/; grep -o 'name="pma_username"' /tmp/pma.html | head -1
