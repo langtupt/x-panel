@@ -1,9 +1,53 @@
 # X-Panel
 
-Hosting control panel gọn nhẹ (Nginx + PHP-FPM) cho **Debian 12/13 và Ubuntu 22.04/24.04**: website (PHP, Laravel, Node.js, Next.js, Go), database MariaDB/PostgreSQL, FTP/SFTP, quản lý file, cron, chứng chỉ SSL (Let's Encrypt / tải lên / tự ký), email (Postfix + Dovecot + DKIM) và Roundcube Webmail.
-Phân cấp tài khoản **Admin → Đại lý (Reseller) → Người dùng** với gói giới hạn tài nguyên.
+**Control panel hosting gọn nhẹ, cài bằng 1 lệnh** cho VPS **Ubuntu 22.04/24.04** và **Debian 12/13**:
+website (HTML, PHP, Laravel, Node.js, Next.js, Go), database MariaDB/PostgreSQL, FTP/SFTP, quản lý file
+có trình soạn thảo code, cron, SSL Let's Encrypt, email (Postfix + Dovecot + DKIM) và Roundcube Webmail,
+sao lưu mã hóa lên Google Drive, thống kê tài nguyên. Phân cấp **Admin → Đại lý → Khách hàng** với gói
+giới hạn ổ đĩa / CPU / RAM, mỗi khách cách ly hoàn toàn.
 
-## Kiến trúc
+## 🚀 Cài đặt — 1 lệnh
+
+**1.** Tạo VPS **mới** (Ubuntu 24.04 khuyên dùng, RAM ≥ 1 GB), mở cổng **22, 80, 443, 8888** ở firewall của
+nhà cung cấp.<br>
+**2.** Đăng nhập VPS bằng tài khoản **root** (Windows: mở PowerShell, gõ `ssh root@IP-VPS`).<br>
+**3.** Dán lệnh sau rồi nhấn Enter:
+
+```bash
+apt-get update && apt-get install -y curl && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh | bash
+```
+
+Sau 3–10 phút, màn hình hiện **địa chỉ panel, tài khoản `admin` và mật khẩu** (chỉ hiện một lần — hãy ghi lại):
+
+```
+  Địa chỉ   : https://IP-VPS:8888
+  Tài khoản : admin
+  Mật khẩu  : Xk3pQ9vT2mLw8RzA
+```
+
+Mở địa chỉ đó trên trình duyệt (cảnh báo chứng chỉ lần đầu: chọn *Advanced → Proceed*) và đăng nhập.
+
+| Việc cần làm | Lệnh (chạy bằng root) |
+|---|---|
+| Tự đặt mật khẩu admin khi cài | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| ADMIN_PASSWORD='MatKhau12345' bash` |
+| **Cập nhật** lên bản mới (giữ nguyên dữ liệu) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| bash` |
+| Quên mật khẩu admin | như dòng đầu, với mật khẩu mới |
+| **Gỡ sạch** X-Panel (xóa cả dữ liệu khách) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| bash` |
+| Gỡ panel nhưng giữ website/database/email | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_KEEP_DATA=1 bash` |
+
+📘 **Hướng dẫn chi tiết từ A đến Z** (chuẩn bị VPS, mở cổng, đăng nhập SSH từ Windows, các bước sau khi cài,
+email, sao lưu, xử lý lỗi): **[docs/CAI-DAT.md](docs/CAI-DAT.md)**
+
+Trình cài đặt tự kiểm tra hệ điều hành / RAM / ổ đĩa, **từ chối cài lên máy đã có panel hoặc web server khác**,
+tải bản phát hành mới nhất cho CPU của máy (amd64/arm64) và kiểm tra SHA-256, rồi tối ưu VPS (swap khi RAM thấp,
+giới hạn log, MariaDB theo RAM, gzip, fail2ban, firewall).
+
+Cổng dùng thêm khi cần: 8890 (phpMyAdmin/Adminer), 21 + 30000–30100 (FTP), 25, 465, 587, 993, 995 (email),
+2096 (webmail).
+
+## Dành cho nhà phát triển
+
+### Kiến trúc
 
 ```
 Trình duyệt ──HTTPS :8888──▶ nginx ──▶ xpanel-api (Go, user "xpanel", unix socket chỉ nginx mở được)
@@ -24,31 +68,6 @@ Trình duyệt ──HTTPS :8888──▶ nginx ──▶ xpanel-api (Go, user "
 | `deploy/` | systemd unit, nginx config, docker-compose cho dev |
 | `installer/install.sh` | Script cài đặt 1 lệnh |
 | `scripts/build-release.sh` | Đóng gói `dist/xpanel-linux-<arch>.tar.gz` |
-
-## Cài đặt nhanh (1 lệnh)
-
-Trên VPS **mới** chạy Debian 12/13 hoặc Ubuntu 22.04/24.04, đăng nhập bằng **root** (tối thiểu 1 GB RAM):
-
-```bash
-apt-get update && apt-get install -y curl ca-certificates && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/installer/bootstrap.sh | bash
-```
-
-Đặt sẵn mật khẩu admin (không đặt thì sinh ngẫu nhiên). Cài xong, địa chỉ panel, tài khoản và mật khẩu hiển thị ngay trên màn hình; mật khẩu **không được lưu** trên máy chủ nên hãy ghi lại:
-
-```bash
-apt-get update && apt-get install -y curl ca-certificates && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/installer/bootstrap.sh | ADMIN_PASSWORD='MatKhauManh123' bash
-```
-
-Đăng nhập bằng user thường có quyền sudo thì thay `| bash` bằng `| sudo bash` (và thêm `sudo` trước `apt-get`).
-Bản cài tối giản của Debian/Ubuntu thường chưa có `curl` và `sudo`, nên lệnh trên cài `curl` trước.
-
-Script tải bản phát hành mới nhất cho CPU của máy (amd64/arm64), kiểm tra SHA-256, cài đặt, bật quota ổ đĩa
-và tối ưu VPS (swap khi RAM thấp, giới hạn log, MariaDB theo RAM, gzip, fail2ban). Chạy lại lệnh = nâng cấp.
-
-Sau khi cài: mở **https://IP-VPS:8888**, vào **Applications** cài PHP, Node.js…, **Mail server** và
-**Roundcube Webmail** nếu cần (webmail chạy ở **https://IP-VPS:2096/webmail/**).
-Cổng cần mở ở firewall của nhà cung cấp VPS: 21, 22, 80, 443, 8888, 8890 (phpMyAdmin/Adminer), 30000–30100
-(FTP passive), và khi dùng mail: 25, 465, 587, 110, 143, 993, 995, 2096 (webmail).
 
 ## Cài từ mã nguồn
 

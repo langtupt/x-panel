@@ -138,7 +138,8 @@ pg psql -tAc "SELECT 1 FROM pg_database WHERE datname='xpanel'" | grep -q 1 || p
 log "Cài đặt vào $PREFIX"
 install -d -m 0755 "$PREFIX/bin"
 systemctl stop xpanel-api xpanel-agent 2>/dev/null || true
-install -m 0755 "$SRC/bin/xpanel-api" "$SRC/bin/xpanel-agent" "$SRC/enable-quota.sh" "$PREFIX/bin/"
+install -m 0755 "$SRC/bin/xpanel-api" "$SRC/bin/xpanel-agent" "$SRC/enable-quota.sh" "$SRC/uninstall.sh" "$PREFIX/bin/"
+ln -sf "$PREFIX/bin/uninstall.sh" /usr/local/sbin/xpanel-uninstall
 rm -rf "$PREFIX/web.new" && cp -r "$SRC/web" "$PREFIX/web.new" && rm -rf "$PREFIX/web" && mv "$PREFIX/web.new" "$PREFIX/web"
 chmod -R a+rX "$PREFIX/web"
 
