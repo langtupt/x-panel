@@ -39,6 +39,7 @@ type Mailbox = {
   address: string;
   local_part: string;
   quota_mb: number;
+  used_mb?: number;
   created_at: string;
 };
 type Alias = {
@@ -57,6 +58,7 @@ type Detail = MailDomain & {
   mailbox_list: Mailbox[];
   alias_list: Alias[];
   dns: DNSRecord[];
+  mail_free_mb: number | null;
 };
 type Status = { installed: boolean; webmail: boolean; hostname: string };
 type Tab = "boxes" | "aliases" | "dns" | "clients";
@@ -375,6 +377,13 @@ function MailboxDialog({
         <div>
           <label className="label">{translate("Dung lượng hộp thư")}</label>
           <QuotaField value={quota} onChange={setQuota} />
+          {d.mail_free_mb !== null && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {translate("Dung lượng email được trừ vào dung lượng gói. Có thể cấp thêm tối đa {0} MB.", [
+                d.mail_free_mb + (box?.quota_mb ?? 0),
+              ])}
+            </p>
+          )}
         </div>
         <ErrorBox msg={error} />
         <div className="flex justify-end gap-2">
@@ -724,7 +733,7 @@ function DomainView({
                           </div>
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground">
-                          {quotaLabel(m.quota_mb)}
+                          <UsageCell used={m.used_mb} quota={m.quota_mb} />
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground">
                           {new Date(m.created_at).toLocaleDateString(
@@ -1192,6 +1201,27 @@ export default function MailPage() {
             load();
           }}
         />
+      )}
+    </div>
+  );
+}
+
+function UsageCell({ used, quota }: { used?: number; quota: number }) {
+  const label = quotaLabel(quota);
+  if (used === undefined) return <>{label}</>;
+  const pct = quota > 0 ? Math.min(100, (used / quota) * 100) : 0;
+  return (
+    <div className="min-w-32 space-y-1">
+      <div className="text-xs">
+        {used < 10 ? used.toFixed(1) : Math.round(used)} MB / {label}
+      </div>
+      {quota > 0 && (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
       )}
     </div>
   );

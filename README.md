@@ -64,8 +64,8 @@ Swap, quota settings, network configuration and downloaded files in `/root` rema
 
 | Area | Capabilities |
 |---|---|
-| Accounts | Admin → reseller → customer hierarchy, hosting packages, suspension and audit logs |
-| Resources | Separate Linux users, disk quotas and account-level CPU/RAM limits |
+| Accounts | Admin → reseller → customer hierarchy, hosting packages, suspension, audit logs, TOTP 2FA with one-time recovery codes |
+| Resources | Separate Linux users, disk quotas (mailboxes count towards the package), account-level CPU/RAM limits, monthly bandwidth limit (sites pause when used up) |
 | Websites | HTML, PHP, Laravel, Node.js, Next.js and Go; nginx virtual hosts and reverse proxies |
 | Applications | Live version discovery, background installation tasks, installed versions and supported uninstall actions |
 | PHP | Parallel versions, extensions, global FPM settings, site overrides and logs |
@@ -73,7 +73,8 @@ Swap, quota settings, network configuration and downloaded files in `/root` rema
 | Files | Browser file manager, code editor, uploads, FTP and SFTP |
 | TLS | Let's Encrypt certificates |
 | Email | Postfix, Dovecot, DKIM and Roundcube webmail |
-| Backups | Encrypted backups to Google Drive |
+| Backups | Encrypted backups to each account's Google Drive; restore or recreate an account on another server. Database and supported mailbox passwords are retained; FTP passwords must be reset — see [docs/SAO-LUU.md](docs/SAO-LUU.md) |
+| Security | Malware rules, optional ClamAV, quarantine and opt-in OpenAI analysis/cleaning with the account's own API key; nftables, nginx limits, fail2ban, login lockout and alerts — see [docs/BAO-MAT.md](docs/BAO-MAT.md) |
 | Operations | Cron jobs, task logs, server metrics and administrator-controlled reboot |
 | Languages | Vietnamese and English with flag selectors |
 
@@ -146,6 +147,14 @@ Direct and repeat installation were verified on Debian 13 without Docker. A 1-vC
 These were short local smoke tests with the client sharing server CPU. They do not establish Internet latency, sustained stability or WordPress/Laravel capacity. Ubuntu 24.04 testing also covered runtimes, sample sites, database isolation, suspension/reactivation and PHP management. This does not mean every feature was tested on every supported OS version.
 
 ## Security and operations
+
+Host firewall limits can reduce connection floods and password guessing; they
+cannot stop a volumetric DDoS attack that saturates the VPS network connection.
+Use upstream provider protection where needed. Malware rules and AI analysis can
+produce false positives and false negatives; review findings before changing files.
+AI analysis sends up to 60 KiB of flagged file content to OpenAI and uses the
+hosting account's API credits. ClamAV signature-download and scan failures must
+be checked in task logs.
 
 - The API runs as the unprivileged `xpanel` user; a root agent accepts allowlisted operations over a restricted Unix socket.
 - Authentication includes short-lived access tokens, rotating refresh tokens, role permissions, two-factor authentication and audit logs.

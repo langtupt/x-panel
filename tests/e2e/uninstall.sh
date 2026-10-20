@@ -10,6 +10,8 @@ c() { local jar=$1 m=$2 p=$3 d=${4:-}
 ok()  { echo "PASS $*"; }
 bad() { echo "FAIL $*"; FAIL=1; }
 
+# The previous suite may just have restarted the API.
+for _ in $(seq 1 30); do [ "$(curl -sk -o /dev/null -w '%{http_code}' $B/api/health)" = 200 ] && break; sleep 1; done
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
 c admin POST /users '{"username":"ucust","password":"Client12345","role":"user"}' >/dev/null; U=$(jq .id /tmp/out)
 c admin POST /sites "{\"user_id\":$U,\"domain\":\"gone.example.com\",\"aliases\":[],\"app_type\":\"html\",\"doc_root\":\"\"}" >/dev/null
@@ -32,6 +34,8 @@ id xpanel >/dev/null 2>&1 && bad "xpanel user still exists" || ok "service user 
 mariadb -e "USE ucust_shop" 2>/dev/null && bad "customer database still exists" || ok "customer database dropped"
 (cd /tmp && runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='xpanel'") | grep -q 1 && bad "panel database still exists" || ok "panel database dropped"
 nft list table inet xpanel_apps >/dev/null 2>&1 && bad "firewall table left" || ok "firewall table removed"
+nft list table inet xpanel_fw >/dev/null 2>&1 && bad "X-Panel firewall left" || ok "X-Panel firewall removed"
+[ -e /etc/nginx/conf.d/xpanel-ratelimit.conf ] && bad "nginx limits left" || ok "nginx limits removed"
 grep -q "BEGIN X-Panel" /etc/ssh/sshd_config && bad "sshd block left" || ok "sshd config restored"
 sshd -t && ok "sshd config valid" || bad "sshd config broken"
 nginx -t >/dev/null 2>&1 && systemctl is-active -q nginx && ok "nginx still healthy" || bad "nginx broken"

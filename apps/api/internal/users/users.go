@@ -28,21 +28,23 @@ const (
 )
 
 type User struct {
-	ID           int64     `json:"id"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"`
-	Role         Role      `json:"role"`
-	ParentID     *int64    `json:"parent_id"`
-	ParentName   *string   `json:"parent_name"`
-	PackageID    *int64    `json:"package_id"`
-	PackageName  *string   `json:"package_name"`
-	DiskLimitMB  *int      `json:"disk_limit_mb"`
-	LinuxUID     *int      `json:"linux_uid"`
-	TOTPSecret   *string   `json:"-"` // sealed by package auth
-	TOTPEnabled  bool      `json:"totp_enabled"`
-	Status       Status    `json:"status"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           int64   `json:"id"`
+	Username     string  `json:"username"`
+	Email        string  `json:"email"`
+	PasswordHash string  `json:"-"`
+	Role         Role    `json:"role"`
+	ParentID     *int64  `json:"parent_id"`
+	ParentName   *string `json:"parent_name"`
+	PackageID    *int64  `json:"package_id"`
+	PackageName  *string `json:"package_name"`
+	DiskLimitMB  *int    `json:"disk_limit_mb"`
+	LinuxUID     *int    `json:"linux_uid"`
+	TOTPSecret   *string `json:"-"` // sealed by package auth
+	TOTPEnabled  bool    `json:"totp_enabled"`
+	// Set by a login that used a 2FA recovery code (for the audit log).
+	RecoveryCodeUsed bool      `json:"-"`
+	Status           Status    `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
 
 	// Filled from the agent's quota report, not stored.
 	DiskUsedMB *int `json:"disk_used_mb"`

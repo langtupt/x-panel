@@ -16,6 +16,7 @@ web() { curl -s -o /tmp/body -w '%{http_code}' -H "Host: $1" "http://127.0.0.1$2
 asphp() { runuser -u "$1" -- php8.3 -r "$2" 2>&1; }
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "isoa isob" "Iso *"
 c admin POST /packages '{"name":"Iso '"$(date +%s)"'","kind":"user","disk_mb":2000,"max_sites":5,"cpu_pct":100,"mem_mb":1024}' >/dev/null; PK=$(jq .id /tmp/out)
 for u in isoa isob; do
   c admin POST /users "{\"username\":\"$u\",\"password\":\"Client12345\",\"role\":\"user\",\"package_id\":$PK}" >/dev/null
@@ -25,11 +26,19 @@ A_ID=$(curl -sk -b /tmp/admin "${H[@]}" $B/api/users | jq '.users[]|select(.user
 B_ID=$(curl -sk -b /tmp/admin "${H[@]}" $B/api/users | jq '.users[]|select(.username=="isob").id')
 
 site() { # site <jar> <domain> <type>
-  c "$1" POST /sites "{\"domain\":\"$2\",\"aliases\":[],\"app_type\":\"$3\",\"php_version\":\"8.3\",\"doc_root\":\"\",\"sample\":true,\"env\":{}}" >/dev/null
-  local t; t=$(jq -r '.task.id // empty' /tmp/out); [ -n "$t" ] && wait_task "$t"; jq -r .id /tmp/out; }
-A_PHP=$(site isoa a.iso.example.com php)
-B_PHP=$(site isob b.iso.example.com php)
-B_NODE=$(site isob bnode.iso.example.com nodejs)
+  local status id t
+  status=$(c "$1" POST /sites "{\"domain\":\"$2\",\"aliases\":[],\"app_type\":\"$3\",\"php_version\":\"8.3\",\"doc_root\":\"\",\"sample\":true,\"env\":{}}")
+  if [ "$status" != 201 ]; then
+    echo "FAIL setup $2: HTTP $status" >&2; cat /tmp/out >&2; return 1
+  fi
+  id=$(jq -er '.id | select(type == "number" and . > 0)' /tmp/out) || return 1
+  t=$(jq -er '.task.id | select(type == "number" and . > 0)' /tmp/out) || return 1
+  wait_task "$t" >&2 || return 1
+  printf '%s\n' "$id"
+}
+A_PHP=$(site isoa a.iso.example.com php) || exit 1
+B_PHP=$(site isob b.iso.example.com php) || exit 1
+B_NODE=$(site isob bnode.iso.example.com nodejs) || exit 1
 expect "$(web b.iso.example.com /)" 200 "B's PHP site serves"
 expect "$(web bnode.iso.example.com /)" 200 "B's Node site serves through nginx"
 
@@ -45,7 +54,7 @@ for unit in $(systemctl list-units --type=service --no-legend 'xpanel-app-iso*' 
 done
 
 echo "### 2. Application ports"
-B_PORT=$(curl -sk -b /tmp/isob "${H[@]}" $B/api/sites | jq ".[]|select(.id==$B_NODE).port")
+B_PORT=$(curl -sk -b /tmp/isob "${H[@]}" $B/api/sites | jq -er --argjson id "$B_NODE" '.[] | select(.id == $id) | .port | select(type == "number" and . >= 10000 and . <= 59999)') || { bad "missing or invalid application port"; exit 1; }
 r=$(asphp isoa "echo @fsockopen('127.0.0.1', $B_PORT, \$e, \$s, 3) ? 'CONNECTED' : 'DENIED';"); expect "$r" DENIED "A cannot connect to B's app port $B_PORT"
 r=$(asphp isob "echo @fsockopen('127.0.0.1', $B_PORT, \$e, \$s, 3) ? 'CONNECTED' : 'DENIED';"); expect "$r" CONNECTED "B can reach its own app"
 expect "$(web bnode.iso.example.com /)" 200 "nginx still reaches B's app"
@@ -84,5 +93,6 @@ c admin PATCH /users/$B_ID/status '{"status":"active"}' >/dev/null
 expect "$(web b.iso.example.com /)" 200 "B's PHP back after reactivation"
 
 for id in $A_ID $B_ID; do c admin DELETE /users/$id >/dev/null; done
-nft list set inet xpanel_apps ports 2>/dev/null | grep -q "$B_PORT" && bad "port rule left after delete" || ok "port rules cleaned up"
+# Query the exact element: an empty/partial text match cannot prove cleanup.
+nft get element inet xpanel_apps ports "{ $B_PORT }" >/dev/null 2>&1 && bad "port rule left after delete" || ok "port rules cleaned up"
 [ "$FAIL" = 0 ] && echo "PASS isolation" || { echo "FAIL isolation"; exit 1; }

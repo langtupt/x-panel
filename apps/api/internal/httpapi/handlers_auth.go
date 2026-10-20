@@ -63,7 +63,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setAuthCookies(w, tokens)
-	s.audit.Record(r.Context(), audit.Entry{ActorID: &u.ID, Action: "auth.login", IP: ip})
+	action := "auth.login"
+	if u.RecoveryCodeUsed {
+		action = "auth.login_recovery_code"
+	}
+	s.audit.Record(r.Context(), audit.Entry{ActorID: &u.ID, Action: action, IP: ip})
 	writeJSON(w, http.StatusOK, u)
 }
 
@@ -257,7 +261,8 @@ func (s *Server) handleTOTPEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := currentUser(r)
-	if err := s.auth.EnableTOTP(r.Context(), me, in.Secret, in.Code); errors.Is(err, auth.ErrTOTPEnabled) {
+	codes, err := s.auth.EnableTOTP(r.Context(), me, in.Secret, in.Code)
+	if errors.Is(err, auth.ErrTOTPEnabled) {
 		writeErr(w, http.StatusConflict, err.Error())
 		return
 	} else if errors.Is(err, auth.ErrTOTPInvalid) {
@@ -268,7 +273,7 @@ func (s *Server) handleTOTPEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit.Record(r.Context(), audit.Entry{ActorID: &me.ID, Action: "auth.2fa_enable", IP: clientIP(r)})
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, map[string]any{"recovery_codes": codes})
 }
 
 // POST /api/me/2fa/disable {password, code}
@@ -294,4 +299,39 @@ func (s *Server) handleTOTPDisable(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit.Record(r.Context(), audit.Entry{ActorID: &me.ID, Action: "auth.2fa_disable", IP: clientIP(r)})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// GET /api/me/2fa/recovery-codes -> number of unused recovery codes
+func (s *Server) handleRecoveryCodesLeft(w http.ResponseWriter, r *http.Request) {
+	n, err := s.auth.RecoveryCodesLeft(r.Context(), currentUser(r).ID)
+	if err != nil {
+		s.internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"remaining": n})
+}
+
+// POST /api/me/2fa/recovery-codes {password, code} -> a new set (old ones stop working)
+func (s *Server) handleRegenerateRecoveryCodes(w http.ResponseWriter, r *http.Request) {
+	if !notImpersonating(w, r) {
+		return
+	}
+	var in struct {
+		Password string `json:"password"`
+		Code     string `json:"code"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	me := currentUser(r)
+	codes, err := s.auth.RegenerateRecoveryCodes(r.Context(), me, in.Password, in.Code)
+	if errors.Is(err, auth.ErrInvalidCredentials) || errors.Is(err, auth.ErrTOTPInvalid) {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	} else if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	s.audit.Record(r.Context(), audit.Entry{ActorID: &me.ID, Action: "auth.2fa_recovery_regenerate", IP: clientIP(r)})
+	writeJSON(w, http.StatusOK, map[string]any{"recovery_codes": codes})
 }

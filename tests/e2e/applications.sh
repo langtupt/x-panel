@@ -39,6 +39,7 @@ web() {
 apt-get install -y -qq jq >/dev/null 2>&1
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin@123!}"
 req POST /auth/login "$(jq -nc --arg pw "$ADMIN_PASSWORD" '{username:"admin",password:$pw}')"
+XP_JAR=/tmp/apps-cookie; . "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "appcust" "Apps acceptance *"
 req GET /users
 OLD=$(jq -r '.users[] | select(.username=="appcust") | .id' /tmp/apps-response)
 if [ -n "$OLD" ]; then req DELETE "/users/$OLD" '' 204; fi

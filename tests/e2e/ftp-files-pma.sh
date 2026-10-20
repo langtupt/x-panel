@@ -10,6 +10,7 @@ FTP() { lftp -u "$1,$2" -e "set ftp:ssl-allow ${4:-no}; set ssl:verify-certifica
 export DEBIAN_FRONTEND=noninteractive; apt-get install -y -qq sshpass lftp openssh-client >/dev/null 2>&1
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "fcust fother" "FTP2"
 c admin POST /packages '{"name":"FTP2","kind":"user","disk_mb":500,"max_ftp":2,"max_sites":1}' >/dev/null; P=$(jq .id /tmp/out)
 c admin POST /users "{\"username\":\"fcust\",\"password\":\"Client12345\",\"role\":\"user\",\"package_id\":$P}" >/dev/null; U=$(jq .id /tmp/out)
 c admin POST /users '{"username":"fother","password":"Client12345","role":"user"}' >/dev/null; O=$(jq .id /tmp/out)
@@ -69,8 +70,12 @@ c fcust POST /files/op '{"request":{"op":"delete","paths":["/www/restored","/www
 
 step "phpMyAdmin install (task) + served on panel port"
 c admin POST /phpmyadmin; T=$(jq .id /tmp/out)
+if ! [[ "$T" =~ ^[1-9][0-9]*$ ]]; then
+  echo "FAIL phpMyAdmin installation did not return a task ID"; cat /tmp/out; exit 1
+fi
 for i in $(seq 1 120); do st=$(curl -sk -b /tmp/admin "${H[@]}" $B/api/tasks/$T | jq -r .status); [ "$st" = done ] || [ "$st" = failed ] && break; sleep 2; done
 curl -sk -b /tmp/admin "${H[@]}" $B/api/tasks/$T | jq -r '.status + " | " + (.log | split("\n") | map(select(length>0)) | .[-2:] | join(" / "))'
+[ "$st" = done ] || { echo "FAIL phpMyAdmin installation task: $st"; exit 1; }
 c admin GET /phpmyadmin
 curl -sk -o /dev/null -w "panel port redirects %{http_code} %{redirect_url}\n" $B/phpmyadmin/
 curl -sk -o /tmp/pma.html -w "phpmyadmin %{http_code} " https://127.0.0.1:8890/phpmyadmin/; grep -o 'name="pma_username"' /tmp/pma.html | head -1

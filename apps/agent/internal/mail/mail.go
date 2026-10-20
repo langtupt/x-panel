@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -764,4 +765,35 @@ func MigrateDovecot(ctx context.Context) error {
 		return fmt.Errorf("dovecot config test failed: %s", out)
 	}
 	return run.Cmd(ctx, "systemctl", "reload", "dovecot")
+}
+
+// Usage reports the size of every mailbox directory of a domain.
+func Usage(p agentproto.MailUsageParams) (agentproto.MailUsage, error) {
+	out := agentproto.MailUsage{Bytes: map[string]int64{}}
+	if err := validate.Domain(p.Domain); err != nil {
+		return out, err
+	}
+	root := filepath.Join(VmailRoot, p.Domain)
+	entries, err := os.ReadDir(root)
+	if errors.Is(err, os.ErrNotExist) {
+		return out, nil
+	} else if err != nil {
+		return out, err
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		var total int64
+		_ = filepath.WalkDir(filepath.Join(root, e.Name()), func(_ string, d fs.DirEntry, err error) error {
+			if err == nil && d.Type().IsRegular() {
+				if info, err := d.Info(); err == nil {
+					total += info.Size()
+				}
+			}
+			return nil
+		})
+		out.Bytes[e.Name()] = total
+	}
+	return out, nil
 }

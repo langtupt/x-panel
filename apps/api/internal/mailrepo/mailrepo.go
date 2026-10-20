@@ -25,13 +25,15 @@ type Domain struct {
 }
 
 type Mailbox struct {
-	ID           int64     `json:"id"`
-	DomainID     int64     `json:"domain_id"`
-	Address      string    `json:"address"`
-	LocalPart    string    `json:"local_part"`
-	PasswordHash string    `json:"-"`
-	QuotaMB      int       `json:"quota_mb"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           int64  `json:"id"`
+	DomainID     int64  `json:"domain_id"`
+	Address      string `json:"address"`
+	LocalPart    string `json:"local_part"`
+	PasswordHash string `json:"-"`
+	QuotaMB      int    `json:"quota_mb"`
+	// Stored size, filled in for the domain detail view.
+	UsedMB    *float64  `json:"used_mb,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Alias struct {

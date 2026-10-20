@@ -88,6 +88,38 @@ function PasswordCard() {
   );
 }
 
+/** Recovery codes are shown exactly once, right after they are issued. */
+function RecoveryCodes({ codes, user, onClose }: { codes: string[]; user: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const text = `X-Panel — ${translate("Mã dự phòng 2FA")} (${user})\n${codes.join("\n")}\n`;
+  function download() {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    a.download = `xpanel-recovery-codes-${user}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  return (
+    <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+      <div className="text-sm font-medium text-amber-900">{translate("Lưu các mã dự phòng này ngay")}</div>
+      <p className="text-xs text-amber-800">
+        {translate("Khi mất điện thoại, nhập một mã thay cho mã 6 số lúc đăng nhập. Mỗi mã dùng được một lần; mã chỉ hiển thị lần này.")}
+      </p>
+      <div className="grid grid-cols-2 gap-2 rounded-lg bg-white p-3 font-mono text-sm sm:grid-cols-5">
+        {codes.map((c) => <span key={c}>{c}</span>)}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn-ghost"
+          onClick={() => navigator.clipboard.writeText(text).then(() => setCopied(true))}>
+          {translate(copied ? "Đã chép" : "Sao chép")}
+        </button>
+        <button type="button" className="btn-ghost" onClick={download}>{translate("Tải file .txt")}</button>
+        <button type="button" className="btn-primary" onClick={onClose}>{translate("Tôi đã lưu")}</button>
+      </div>
+    </div>
+  );
+}
+
 function TwoFactorCard() {
   const me = useSession();
   const [enabled, setEnabled] = useState(me.totp_enabled);
@@ -98,6 +130,9 @@ function TwoFactorCard() {
   } | null>(null);
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [codes, setCodes] = useState<string[] | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [regen, setRegen] = useState({ password: "", code: "" });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
 
@@ -120,10 +155,12 @@ function TwoFactorCard() {
     e.preventDefault();
     setError("");
     try {
-      await api("/me/2fa/enable", {
+      const r = await api<{ recovery_codes: string[] }>("/me/2fa/enable", {
         method: "POST",
         body: { secret: setup!.secret, code },
       });
+      setCodes(r.recovery_codes);
+      setRemaining(r.recovery_codes.length);
       setEnabled(true);
       setSetup(null);
       setCode("");
@@ -132,6 +169,29 @@ function TwoFactorCard() {
           "Đã bật xác thực 2 lớp. Lần đăng nhập sau sẽ cần mã từ ứng dụng.",
         ),
       );
+    } catch (err) {
+      setError(errMsg(err));
+    }
+  }
+
+  useEffect(() => {
+    if (enabled)
+      api<{ remaining: number }>("/me/2fa/recovery-codes")
+        .then((r) => setRemaining(r.remaining))
+        .catch(() => setRemaining(null));
+  }, [enabled]);
+
+  async function regenerate(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    try {
+      const r = await api<{ recovery_codes: string[] }>("/me/2fa/recovery-codes", {
+        method: "POST",
+        body: regen,
+      });
+      setCodes(r.recovery_codes);
+      setRemaining(r.recovery_codes.length);
+      setRegen({ password: "", code: "" });
     } catch (err) {
       setError(errMsg(err));
     }
@@ -224,6 +284,37 @@ function TwoFactorCard() {
                 {translate("Hủy")}
               </button>
             </div>
+          </div>
+        </form>
+      )}
+
+      {codes && <RecoveryCodes codes={codes} user={me.username} onClose={() => setCodes(null)} />}
+
+      {enabled && !codes && (
+        <form onSubmit={regenerate} className="space-y-3 rounded-lg border border-slate-200 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-medium">{translate("Mã dự phòng")}</div>
+              <div className="text-xs text-slate-500">
+                {translate("Dùng để đăng nhập khi mất điện thoại. Mỗi mã dùng được một lần.")}
+                {remaining !== null && (
+                  <> <b className={remaining <= 2 ? "text-red-600" : ""}>{translate("Còn {0} mã", [remaining])}</b></>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3 md:items-end">
+            <div>
+              <label className="label">{translate("Mật khẩu")}</label>
+              <input className="input" type="password" required value={regen.password}
+                onChange={(e) => setRegen({ ...regen, password: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">{translate("Mã 6 số hiện tại")}</label>
+              <input className="input font-mono" required inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
+                value={regen.code} onChange={(e) => setRegen({ ...regen, code: e.target.value.replace(/D/g, "") })} />
+            </div>
+            <button className="btn-ghost">{translate("Tạo bộ mã mới")}</button>
           </div>
         </form>
       )}

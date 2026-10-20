@@ -160,6 +160,8 @@ func (s *Service) accountManifest(ctx context.Context, u *users.User) (json.RawM
 		Domain    string             `json:"domain"`
 		Mailboxes []mailrepo.Mailbox `json:"mailboxes"`
 		Aliases   []mailrepo.Alias   `json:"aliases"`
+		// Bcrypt hashes, so mailboxes keep their passwords on another server.
+		PasswordHashes map[string]string `json:"password_hashes"`
 	}
 	var mail []mailDomain
 	for _, d := range domains {
@@ -172,7 +174,11 @@ func (s *Service) accountManifest(ctx context.Context, u *users.User) (json.RawM
 		if err != nil {
 			return nil, c, err
 		}
-		mail = append(mail, mailDomain{Domain: d.Domain, Mailboxes: boxes, Aliases: aliases})
+		hashes := map[string]string{}
+		for _, mb := range boxes {
+			hashes[mb.LocalPart] = mb.PasswordHash
+		}
+		mail = append(mail, mailDomain{Domain: d.Domain, Mailboxes: boxes, Aliases: aliases, PasswordHashes: hashes})
 	}
 	cron, err := s.cron.ByUser(ctx, u.ID)
 	if err != nil {
@@ -283,6 +289,9 @@ type RestoreInput struct {
 	Databases  bool   `json:"databases"`
 	Mail       bool   `json:"mail"`
 	Passphrase string `json:"passphrase"` // for backups made before the passphrase was changed
+	// Recreate sites, databases, mailboxes, cron jobs and FTP accounts listed
+	// in the backup that the account lacks (moving to another server).
+	Recreate bool `json:"recreate"`
 }
 
 type restoreJob struct {
@@ -291,6 +300,7 @@ type restoreJob struct {
 	Databases  bool   `json:"databases"`
 	Mail       bool   `json:"mail"`
 	Passphrase string `json:"passphrase,omitempty"` // sealed
+	Recreate   bool   `json:"recreate,omitempty"`
 }
 
 func (s *Service) RestoreBackup(ctx context.Context, actor *users.User, id int64, in RestoreInput) (*tasks.Task, error) {
@@ -298,7 +308,7 @@ func (s *Service) RestoreBackup(ctx context.Context, actor *users.User, id int64
 	if err != nil {
 		return nil, err
 	}
-	if !in.Files && !in.Databases && !in.Mail {
+	if !in.Files && !in.Databases && !in.Mail && !in.Recreate {
 		return nil, apperr.Invalid("chọn ít nhất một phần để khôi phục")
 	}
 	// The account (same username) must exist now; for a deleted account the
@@ -312,7 +322,7 @@ func (s *Service) RestoreBackup(ctx context.Context, actor *users.User, id int64
 			return nil, err
 		}
 	}
-	job := restoreJob{BackupID: b.ID, Files: in.Files, Databases: in.Databases, Mail: in.Mail}
+	job := restoreJob{BackupID: b.ID, Files: in.Files, Databases: in.Databases, Mail: in.Mail, Recreate: in.Recreate}
 	if in.Passphrase != "" {
 		if job.Passphrase, err = s.secrets.Seal(in.Passphrase); err != nil {
 			return nil, err
@@ -357,6 +367,16 @@ func (s *Service) runBackupRestore(ctx context.Context, t *tasks.Task, logf func
 	}
 	if err != nil {
 		return err
+	}
+	if job.Recreate {
+		logf("Đọc manifest của %s", b.FileName)
+		manifest, err := s.readBackupManifest(ctx, u, creds, b.fileID, pass)
+		if err != nil {
+			return err
+		}
+		if err := s.recreateFromManifest(ctx, u, manifest, logf); err != nil {
+			return err
+		}
 	}
 	p := agentproto.BackupRestoreParams{Username: u.Username, Drive: creds, FileID: b.fileID, Passphrase: pass, Files: job.Files}
 	// Only databases and mail domains the account owns now are written.

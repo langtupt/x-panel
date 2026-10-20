@@ -53,6 +53,8 @@ func (s *Service) RegisterTasks(q *tasks.Queue) {
 	q.Handle(TaskSSLIssue, s.runSSLIssue)
 	q.Handle(TaskPanelSSL, s.runPanelSSL)
 	q.Handle(TaskBackupCreate, s.runBackupCreate)
+	q.Handle(TaskMalwareScan, s.runMalwareScan)
+	q.Handle(TaskMalwareInstall, s.runMalwareInstall)
 	q.Handle(TaskBackupRestore, s.runBackupRestore)
 	q.Handle(TaskPHPInstall, s.runPHPInstall)
 	q.Handle("php.manage", s.runPHPManage)
@@ -74,6 +76,11 @@ func (s *Service) syncWeb(ctx context.Context, tx pgx.Tx, owner *users.User) ([]
 			return nil, err
 		}
 		p.CPUPct, p.MemMB = pkg.CPUPct, pkg.MemMB
+	}
+	// A subquery, so an account being deleted (row already gone) reads false.
+	if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT bw_blocked_month = date_trunc('month', now())::date
+		FROM users WHERE id=$1), false)`, owner.ID).Scan(&p.OverBandwidth); err != nil {
+		return nil, err
 	}
 	for _, st := range list {
 		p.Sites = append(p.Sites, agentproto.WebSite{PHPConfig: st.PHPConfig, Domain: st.Domain, Aliases: st.Aliases,

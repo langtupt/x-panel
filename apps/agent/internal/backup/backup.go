@@ -176,6 +176,14 @@ func writeArchive(ctx context.Context, w io.Writer, u *user.User, p agentproto.B
 	if _, err := tw.Write(p.Manifest); err != nil {
 		return err
 	}
+	if auth, _ := json.Marshal(dbAuth(ctx, p.Databases)); len(auth) > 2 {
+		if err := tw.WriteHeader(&tar.Header{Name: dbAuthName, Mode: 0o600, Size: int64(len(auth)), ModTime: now}); err != nil {
+			return err
+		}
+		if _, err := tw.Write(auth); err != nil {
+			return err
+		}
+	}
 
 	log.printf("Thư mục home %s", u.HomeDir)
 	if err := addHome(ctx, tw, u, log); err != nil {
@@ -381,6 +389,7 @@ func Restore(ctx context.Context, p agentproto.BackupRestoreParams) (agentproto.
 		}
 	}()
 	restoredDBs := map[string]bool{}
+	auth := map[string]string{}
 	manifestSeen := false
 	for {
 		h, err := tr.Next()
@@ -406,6 +415,12 @@ func Restore(ctx context.Context, p agentproto.BackupRestoreParams) (agentproto.
 			if json.Unmarshal(b, &m) != nil || m.Username != p.Username {
 				return res(fmt.Errorf("backup này thuộc tài khoản %q, không phải %q", m.Username, p.Username))
 			}
+		case h.Name == dbAuthName:
+			if h.Size > 1<<20 {
+				return res(ErrBadBackup)
+			}
+			b, _ := io.ReadAll(io.LimitReader(tr, 1<<20))
+			auth = parseDBAuth(b)
 		case strings.HasPrefix(h.Name, "home/"):
 			if !p.Files {
 				continue
@@ -430,6 +445,11 @@ func Restore(ctx context.Context, p agentproto.BackupRestoreParams) (agentproto.
 				return res(fmt.Errorf("database %s: %w", name, err))
 			}
 			restoredDBs[name] = true
+			if err := applyDBAuth(ctx, d, auth); err != nil {
+				log.printf("  không khôi phục được mật khẩu user %s: %v", d.User, err)
+			} else if auth[dbAuthKey(d.Engine, d.User)] != "" {
+				log.printf("  user %s dùng lại mật khẩu cũ", d.User)
+			}
 		case strings.HasPrefix(h.Name, "mail/"):
 			rest := strings.TrimPrefix(h.Name, "mail/")
 			domain, rel, _ := strings.Cut(rest, "/")
@@ -639,6 +659,14 @@ func restoreGrant(ctx context.Context, d agentproto.BackupDB, login, password st
 func writeMail(domain, rel string, h *tar.Header, r io.Reader) error {
 	base := filepath.Join(mailRoot, domain)
 	info, err := os.Lstat(base)
+	if errors.Is(err, os.ErrNotExist) {
+		// A domain that has received no mail yet (e.g. just recreated on
+		// a new server); ownership is fixed to vmail after the restore.
+		if err := os.Mkdir(base, 0o700); err != nil {
+			return err
+		}
+		info, err = os.Lstat(base)
+	}
 	if err != nil {
 		return err
 	}
@@ -671,4 +699,45 @@ func writeMailAt(base, rel string, h *tar.Header, r io.Reader) error {
 		return errors.Join(copyErr, f.Close())
 	}
 	return nil
+}
+
+// ReadManifest downloads a backup only as far as its manifest (the first
+// entry) and returns it, so the panel can recreate the account's sites,
+// databases and mailboxes before restoring their data.
+func ReadManifest(ctx context.Context, p agentproto.BackupManifestParams) (agentproto.BackupManifest, error) {
+	if _, err := account(p.Username); err != nil {
+		return agentproto.BackupManifest{}, err
+	}
+	body, err := gdrive.New(p.Drive).Download(ctx, p.FileID)
+	if err != nil {
+		return agentproto.BackupManifest{}, err
+	}
+	defer body.Close()
+	dec, err := NewDecrypter(bufio.NewReaderSize(body, 1<<16), p.Passphrase)
+	if err != nil {
+		return agentproto.BackupManifest{}, err
+	}
+	gz, err := gzip.NewReader(dec)
+	if err != nil {
+		return agentproto.BackupManifest{}, ErrBadBackup
+	}
+	tr := tar.NewReader(gz)
+	h, err := tr.Next()
+	if err != nil || h.Name != "manifest.json" || h.Typeflag != tar.TypeReg || h.Size > 16<<20 {
+		return agentproto.BackupManifest{}, ErrBadBackup
+	}
+	b, err := io.ReadAll(io.LimitReader(tr, 16<<20))
+	if err != nil {
+		return agentproto.BackupManifest{}, err
+	}
+	var m struct {
+		Username string `json:"username"`
+	}
+	if json.Unmarshal(b, &m) != nil {
+		return agentproto.BackupManifest{}, ErrBadBackup
+	}
+	if m.Username != p.Username {
+		return agentproto.BackupManifest{}, fmt.Errorf("backup này thuộc tài khoản %q, không phải %q", m.Username, p.Username)
+	}
+	return agentproto.BackupManifest{Manifest: b}, nil
 }

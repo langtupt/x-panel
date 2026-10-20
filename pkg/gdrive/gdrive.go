@@ -52,9 +52,10 @@ type Creds struct {
 }
 
 type File struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Size string `json:"size"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Size        string `json:"size"`
+	CreatedTime string `json:"createdTime,omitempty"`
 }
 
 type Client struct {
@@ -391,4 +392,42 @@ func init() {
 	deviceURL, tokenURL, revokeURL = base+"/device/code", base+"/token", base+"/revoke"
 	apiURL = base + "/drive/v3"
 	uploadURL = base + "/upload/drive/v3/files?uploadType=resumable&fields=id,name,size"
+}
+
+// List returns the files (not folders) directly inside folder. With the
+// drive.file scope Drive shows only files created by the same OAuth client,
+// which is what lets another server find an account's backups.
+func (c *Client) List(ctx context.Context, folder string) ([]File, error) {
+	q := fmt.Sprintf("'%s' in parents and mimeType != '%s' and trashed = false", strings.ReplaceAll(folder, "'", `\'`), folderMime)
+	var out []File
+	token := ""
+	for {
+		u := apiURL + "/files?pageSize=1000&fields=nextPageToken,files(id,name,size,createdTime)&q=" + url.QueryEscape(q)
+		if token != "" {
+			u += "&pageToken=" + url.QueryEscape(token)
+		}
+		resp, err := c.do(ctx, http.MethodGet, u, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		var page struct {
+			Files         []File `json:"files"`
+			NextPageToken string `json:"nextPageToken"`
+		}
+		err = func() error {
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiErr(resp)
+			}
+			return json.NewDecoder(resp.Body).Decode(&page)
+		}()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, page.Files...)
+		if page.NextPageToken == "" || len(out) > 100000 {
+			return out, nil
+		}
+		token = page.NextPageToken
+	}
 }

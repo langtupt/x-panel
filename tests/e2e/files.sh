@@ -12,6 +12,7 @@ bad() { echo "FAIL $*"; FAIL=1; }
 expect() { [ "$1" = "$2" ] && ok "$3 ($1)" || { bad "$3: got $1, want $2"; head -c 300 /tmp/out; echo; }; }
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "fmuser fmother"
 c admin POST /users '{"username":"fmuser","password":"Client12345","role":"user"}' >/dev/null; U=$(jq .id /tmp/out)
 c admin POST /users '{"username":"fmother","password":"Client12345","role":"user"}' >/dev/null; O=$(jq .id /tmp/out)
 c fm POST /auth/login '{"username":"fmuser","password":"Client12345"}' >/dev/null

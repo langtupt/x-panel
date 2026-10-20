@@ -46,6 +46,10 @@ func (s *Service) RunStats(ctx context.Context) {
 	for {
 		if err := s.sampleStats(ctx); err != nil && ctx.Err() == nil {
 			s.log.Warn("resource stats", "err", err)
+		} else if err == nil {
+			if err := s.enforceBandwidth(ctx); err != nil && ctx.Err() == nil {
+				s.log.Warn("bandwidth limit", "err", err)
+			}
 		}
 		select {
 		case <-ctx.Done():
@@ -181,10 +185,12 @@ type AccountStats struct {
 	Package    *StatsLimit `json:"package"`
 	Latest     *StatsPoint `json:"latest"`
 	// Totals over the requested range and the current calendar month.
-	BandwidthBytes      int64        `json:"bandwidth_bytes"`
-	Requests            int64        `json:"requests"`
-	MonthBandwidthBytes int64        `json:"month_bandwidth_bytes"`
-	Points              []StatsPoint `json:"points"`
+	BandwidthBytes      int64 `json:"bandwidth_bytes"`
+	Requests            int64 `json:"requests"`
+	MonthBandwidthBytes int64 `json:"month_bandwidth_bytes"`
+	// Sites are blocked for the rest of the month (bandwidth used up).
+	BandwidthBlocked bool         `json:"bandwidth_blocked"`
+	Points           []StatsPoint `json:"points"`
 }
 
 type StatsLimit struct {
@@ -235,6 +241,7 @@ func (s *Service) Stats(ctx context.Context, actor *users.User, rangeName string
 		where += fmt.Sprintf(` AND u.id=$%d`, len(args))
 	}
 	rows, err := s.pool.Query(ctx, `SELECT u.id, u.username, pu.username, u.status,
+		COALESCE(u.bw_blocked_month = date_trunc('month', now())::date, false),
 		p.name, p.disk_mb, p.cpu_pct, p.mem_mb, p.bandwidth_gb
 		FROM users u LEFT JOIN users pu ON pu.id=u.parent_id LEFT JOIN packages p ON p.id=u.package_id
 		WHERE `+where+` ORDER BY u.username`, args...)
@@ -247,7 +254,7 @@ func (s *Service) Stats(ctx context.Context, actor *users.User, rangeName string
 		var pname *string
 		var l StatsLimit
 		var disk, cpu, mem, bw *int
-		if err := rows.Scan(&a.UserID, &a.Username, &a.ParentName, &a.Status, &pname, &disk, &cpu, &mem, &bw); err != nil {
+		if err := rows.Scan(&a.UserID, &a.Username, &a.ParentName, &a.Status, &a.BandwidthBlocked, &pname, &disk, &cpu, &mem, &bw); err != nil {
 			rows.Close()
 			return nil, err
 		}

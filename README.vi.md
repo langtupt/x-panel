@@ -265,6 +265,8 @@ Lưu ý: cron và phiên SFTP chưa nằm trong slice này.
 
 - **Xác thực 2 lớp (TOTP)** ở trang *Tài khoản của tôi*: quét QR (Google Authenticator, Authy…), secret
   được mã hóa AES-GCM trong DB (khóa dẫn xuất từ `XPANEL_JWT_SECRET` — đổi secret này thì 2FA phải bật lại).
+  Khi bật 2FA, panel cấp **10 mã dự phòng** (mỗi mã dùng một lần, chỉ lưu mã băm) để đăng nhập khi mất điện thoại:
+  ở màn hình đăng nhập chọn *Mất điện thoại? Dùng mã dự phòng*. Tạo bộ mã mới cần mật khẩu + mã 6 số hiện tại.
   Tự đổi mật khẩu cũng ở đây (đăng xuất mọi phiên khác; với tài khoản hosting đổi luôn mật khẩu SFTP).
 - **Đăng nhập thay**: admin/đại lý mở panel với quyền của tài khoản mình quản lý (có thanh báo và nút quay lại,
   ghi nhật ký; không đổi được mật khẩu/2FA trong lúc đăng nhập thay; không lồng nhau).
@@ -278,7 +280,8 @@ Lưu ý: cron và phiên SFTP chưa nằm trong slice này.
 |---|---|---|
 | POST | `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout` | công khai |
 | GET | `/api/me`, `/api/me/overview` | đã đăng nhập |
-| POST | `/api/me/password`, `/api/me/2fa/setup`, `/api/me/2fa/enable`, `/api/me/2fa/disable` | đã đăng nhập (không khi đang đăng nhập thay) |
+| POST | `/api/me/password`, `/api/me/2fa/setup`, `/api/me/2fa/enable`, `/api/me/2fa/disable`, `/api/me/2fa/recovery-codes` | đã đăng nhập (không khi đang đăng nhập thay) |
+| GET/POST | `/api/backups`, `/api/backups/import`, `/api/backups/{id}/restore` | chủ tài khoản hoặc tài khoản quản lý (import: chủ tài khoản) |
 | POST | `/api/auth/impersonate` / `/api/auth/unimpersonate` | admin, reseller (tài khoản mình quản lý) |
 | GET/POST, PUT/DELETE | `/api/cron`, `/api/cron/{id}` | chủ tài khoản hoặc tài khoản quản lý |
 | GET | `/api/audit?before=` | đã đăng nhập (phạm vi theo vai trò) |
@@ -317,21 +320,21 @@ Mọi request thay đổi dữ liệu phải gửi header `X-XPanel: 1` (chống
 - [x] Tuần 9–10 (phần 1): giới hạn CPU/RAM theo tài khoản (cgroups, PHP-FPM riêng)
 - [x] Email (Postfix, Dovecot, DKIM), Roundcube Webmail, chứng chỉ SSL (Let's Encrypt / tải lên / tự ký)
 - [x] Backup/restore mã hóa lên Google Drive, thống kê tài nguyên theo tài khoản, rà soát bảo mật
+- [x] Mã dự phòng 2FA, khóa website khi hết băng thông, email tính vào dung lượng gói, chuyển tài khoản sang máy chủ mới
+- [x] Quét mã độc (luật riêng + ClamAV, cách ly, phân tích và làm sạch bằng ChatGPT), tường lửa chống flood/DDoS và dò mật khẩu, thông báo trong panel và email
 
 ## Sao lưu lên Google Drive
 
-Trang **Sao lưu** (admin):
+Mỗi tài khoản hosting tự kết nối **Google Drive của chính mình** (OAuth client riêng), tự đặt passphrase và lịch.
+Backup gồm home, database, hộp thư và cấu hình tài khoản; nén, mã hóa AES-256-GCM rồi tải thẳng lên Drive, không
+cần chỗ trống trên VPS. Panel chỉ dùng quyền `drive.file`. File home được đọc và ghi **dưới quyền của chính tài
+khoản**, nên symlink cài cắm không kéo được file hệ thống vào backup. **Mất passphrase thì không khôi phục được.**
 
-1. Vào [Google Cloud Console](https://console.cloud.google.com/apis/credentials), bật **Google Drive API**, tạo
-   **OAuth client ID** loại **TVs and Limited Input devices** (màn hình đồng ý: thêm email của bạn vào *Test users*).
-2. Dán Client ID / Client secret vào panel → panel hiện mã → mở `google.com/device`, nhập mã, đồng ý.
-3. Đặt **passphrase mã hóa** (≥ 12 ký tự), lịch (hằng ngày / hằng tuần), giờ chạy và số bản giữ lại.
+**Chuyển sang máy chủ mới:** tạo tài khoản cùng tên → kết nối cùng OAuth client → *Tìm backup trên Drive* →
+khôi phục với *Tạo lại cấu hình còn thiếu*. Website, database, hộp thư, cron, FTP được tạo lại; database và hộp
+thư giữ mật khẩu cũ.
 
-Mỗi bản backup gồm thư mục home (website), dump database (MariaDB/PostgreSQL) và hộp thư của một tài khoản; được
-nén và mã hóa AES-256-GCM (khóa scrypt từ passphrase) rồi tải thẳng lên Drive theo luồng, không cần chỗ trống trên
-VPS. Panel chỉ dùng quyền `drive.file` (chỉ thấy file do chính nó tạo). File home được đọc và ghi lại **dưới quyền
-của chính tài khoản đó**, nên symlink cài cắm không thể kéo file hệ thống vào backup. Khách hàng và đại lý thấy,
-tạo và khôi phục backup của tài khoản mình quản lý; **mất passphrase thì không khôi phục được**.
+Hướng dẫn từng bước (tạo OAuth client trên Google Cloud, khôi phục, chuyển máy): **[docs/SAO-LUU.md](docs/SAO-LUU.md)**
 
 ## Thống kê tài nguyên
 
@@ -339,6 +342,24 @@ Trang **Thống kê tài nguyên** đo mỗi 5 phút cho từng tài khoản: CP
 ứng dụng Node/Go, build và cron), số tiến trình, ổ đĩa (quota), database, hộp thư, băng thông và lượt truy cập
 (đọc dần từ log nginx của từng website). Biểu đồ 24 giờ / 7 ngày / 30 ngày, so với giới hạn của gói; lưu 35 ngày.
 Admin xem mọi tài khoản, đại lý xem khách của mình, khách chỉ xem chính mình.
+
+**Băng thông theo tháng:** khi tài khoản dùng hết băng thông của gói trong tháng, các website trả trang *503 – hết
+băng thông* (cron, ứng dụng, email vẫn chạy); tự mở lại sang tháng mới hoặc khi được nâng gói (kiểm tra mỗi 5 phút).
+
+**Email tính vào dung lượng gói:** với gói có giới hạn ổ đĩa, mỗi hộp thư phải có dung lượng; tổng dung lượng hộp
+thư được trừ vào quota file của tài khoản (luôn giữ tối thiểu 100 MB cho website), nên file + email không vượt gói.
+Trang Email hiện mức đã dùng của từng hộp thư.
+
+## Quét mã độc và tường lửa
+
+- **Quét mã độc** (mọi tài khoản): bộ luật nhận diện webshell và mã bị chèn, cộng ClamAV nếu admin cài. Có lịch quét
+  tự động, cách ly vào khu chỉ root đọc được, phân tích và làm sạch bằng **ChatGPT với API key của chính tài khoản**,
+  và thông báo qua chuông trong panel hoặc email. Trình quét chạy dưới user của tài khoản nên không đọc được file người khác.
+- **Tường lửa** (admin, bật sẵn): giới hạn kết nối và request theo IP (nftables + nginx); fail2ban cho SSH, FTP, mail
+  và HTTP flood, chặn lâu hơn với IP tái phạm; tự chặn IP và khóa tạm tài khoản khi đăng nhập panel sai nhiều lần;
+  danh sách IP luôn cho phép hoặc luôn chặn; xem và gỡ chặn ngay trên panel.
+
+Chi tiết: **[docs/BAO-MAT.md](docs/BAO-MAT.md)**
 
 ## Các lớp bảo mật chính
 

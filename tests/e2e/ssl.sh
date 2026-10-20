@@ -12,6 +12,7 @@ expect() { [ "$1" = "$2" ] && ok "$3 ($1)" || { bad "$3: got $1, want $2"; head 
 served_issuer() { echo | openssl s_client -connect 127.0.0.1:443 -servername "$1" 2>/dev/null | openssl x509 -noout -issuer 2>/dev/null; }
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "sslcust sslother"
 c admin POST /users '{"username":"sslcust","password":"Client12345","role":"user"}' >/dev/null; U=$(jq .id /tmp/out)
 c admin POST /sites "{\"user_id\":$U,\"domain\":\"ssl.example.com\",\"aliases\":[\"www.ssl.example.com\"],\"app_type\":\"html\",\"doc_root\":\"\"}" >/dev/null
 S=$(jq .id /tmp/out)

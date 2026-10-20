@@ -76,6 +76,7 @@ rm -rf /etc/systemd/system/xpanel-*.d /etc/systemd/system.control/xpanel-* /run/
 q systemctl daemon-reload
 q systemctl reset-failed
 q nft delete table inet xpanel_apps
+q nft delete table inet xpanel_fw
 
 # ---------------------------------------------------------------- customer data
 if [ "$KEEP" != 1 ]; then
@@ -112,7 +113,7 @@ say "Removing panel files, configuration and panel database"
 (cd /tmp && runuser -u postgres -- psql -c "DROP ROLE IF EXISTS xpanel" >/dev/null 2>&1) || true
 
 rm -f /etc/nginx/conf.d/xpanel-panel.conf /etc/nginx/conf.d/xpanel-webmail.conf /etc/nginx/conf.d/xpanel-dbtools.conf \
-      /etc/nginx/conf.d/00-xpanel-tuning.conf
+      /etc/nginx/conf.d/00-xpanel-tuning.conf /etc/nginx/conf.d/xpanel-ratelimit.conf
 rm -rf /etc/nginx/conf.d/xpanel /var/log/nginx/xpanel
 for pool in /etc/php/*/fpm/pool.d/xpanel-*.conf; do [ -e "$pool" ] && rm -f "$pool"; done
 rm -f /etc/php/*/fpm/conf.d/99-xpanel.ini
@@ -125,10 +126,12 @@ else
   # Keep site certificates and runtimes customers' apps may still use.
   rm -rf /opt/xpanel/bin /opt/xpanel/web /opt/xpanel/phpmyadmin /opt/xpanel/adminer /opt/xpanel/roundcube \
          /var/lib/xpanel/acme* /var/lib/xpanel/pma-tmp /var/lib/xpanel/webmail /var/lib/xpanel/backup-tmp \
-         /etc/xpanel/xpanel.env /etc/xpanel/agent.env /etc/xpanel/nginx /run/xpanel /run/xpanel-api
+         /etc/xpanel/xpanel.env /etc/xpanel/agent.env /etc/xpanel/nginx /run/xpanel /run/xpanel-api \
+         /etc/xpanel/firewall.json /var/lib/xpanel/quarantine /var/lib/xpanel/bans
 fi
 rm -f /usr/local/sbin/xpanel-uninstall /etc/logrotate.d/xpanel-nginx /etc/sysctl.d/90-xpanel.conf /etc/systemd/journald.conf.d/90-xpanel.conf \
       /etc/mysql/mariadb.conf.d/90-xpanel.cnf /etc/fail2ban/jail.d/xpanel.conf /etc/fail2ban/jail.d/xpanel-mail.conf \
+      /etc/fail2ban/jail.d/xpanel-firewall.local /etc/fail2ban/action.d/xpanel.conf \
       /etc/dovecot/conf.d/99-xpanel.conf /etc/systemd/system/opendkim.service.d/xpanel.conf /etc/apt/sources.list.d/xpanel-php.list \
       /var/log/xpanel-install.log
 rm -f /etc/logrotate.d/xpanel-php

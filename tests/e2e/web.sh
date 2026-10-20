@@ -15,6 +15,7 @@ web() { curl -s -o /tmp/body -w '%{http_code}' -H "Host: $1" "http://127.0.0.1${
 webs() { curl -sk -o /tmp/body -w '%{http_code}' --resolve "$1:443:127.0.0.1" "https://$1${2:-/}"; echo " $(head -c 120 /tmp/body | tr '\n' ' ')"; }
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "cust1 cust2" "Web"
 step "admin: PHP list before";             c admin GET /php
 step "admin: install PHP 8.3 (task)";      c admin POST /php/8.3; T=$(jq .id /tmp/out); wait_task admin $T
 step "admin: install again (expect 409)";  c admin POST /php/8.3

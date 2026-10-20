@@ -16,10 +16,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Operations } from "@/components/operations";
+import { NotificationBell } from "@/components/notifications";
 import {
   Activity,
   BarChart3,
   Blocks,
+  BrickWall,
   ChevronRight,
   Clock3,
   Database,
@@ -36,6 +38,7 @@ import {
   Server,
   Settings2,
   ShieldCheck,
+  ShieldAlert,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -128,6 +131,20 @@ const NAV: NavItem[] = [
     roles: ["admin", "reseller"],
     icon: Package,
     group: "Quản trị",
+  },
+  {
+    href: "/firewall/",
+    label: "Tường lửa",
+    roles: ["admin"],
+    icon: BrickWall,
+    group: "Quản trị",
+  },
+  {
+    href: "/malware/",
+    label: "Quét mã độc",
+    roles: ALL,
+    icon: ShieldAlert,
+    group: "Hệ thống",
   },
   {
     href: "/backups/",
@@ -337,6 +354,7 @@ export default function PanelLayout({
                     {translate("Trung tâm tác vụ")}
                   </TooltipContent>
                 </Tooltip>
+                <NotificationBell />
                 <div className="h-5 w-px bg-border" />
                 <Button variant="ghost" size="sm" onClick={logout}>
                   <LogOut className="size-3.5" />

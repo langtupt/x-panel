@@ -24,6 +24,7 @@ npm run build
 cp -r out "$OUT/web"
 
 echo "==> Installer"
+cp "$ROOT/LICENSE" "$OUT/LICENSE"
 cp -r "$ROOT/deploy" "$OUT/deploy"
 rm -f "$OUT/deploy/docker-compose.dev.yml"
 install -m 0755 "$ROOT/installer/install.sh" "$ROOT/installer/enable-quota.sh" "$ROOT/installer/tuning.sh" "$ROOT/uninstall.sh" "$OUT/"

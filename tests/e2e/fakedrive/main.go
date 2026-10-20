@@ -88,6 +88,16 @@ func main() {
 			if m := parentRe.FindStringSubmatch(q); m != nil {
 				parent = m[1]
 			}
+			if strings.Contains(q, "mimeType != ") {
+				// List of the files in a folder.
+				for _, f := range files {
+					if f.Parent == parent && f.Mime == "" {
+						out = append(out, map[string]string{"id": f.ID, "name": f.Name, "size": strconv.Itoa(len(f.Data)), "createdTime": "2026-01-01T00:00:00Z"})
+					}
+				}
+				json.NewEncoder(w).Encode(map[string]any{"files": out})
+				return
+			}
 			for _, f := range files {
 				if f.Name == name && f.Parent == parent && f.Mime != "" {
 					out = append(out, map[string]string{"id": f.ID})

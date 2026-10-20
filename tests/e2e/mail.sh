@@ -26,6 +26,7 @@ send() { # login password from rcpt subject [port]
 imap_count() { curl -sk --max-time 20 "imaps://127.0.0.1/" -u "$1:$2" -X 'STATUS INBOX (MESSAGES)' 2>/dev/null | grep -o 'MESSAGES [0-9]*' | awk '{print $2}'; }
 
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+. "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "mailcust mailother" "MailPkg"
 install_app php
 install_app mailserver
 for p in 25 587 465 993 995; do ss -ltn | grep -q ":$p " && ok "port $p listening" || bad "port $p not listening"; done
@@ -43,8 +44,8 @@ expect "$(c other POST /mail/domains '{"domain":"corp.example.com"}')" 409 "same
 expect "$(c cust POST /mail/domains/$D/mailboxes '{"local_part":"info","password":"MailPass12345","quota_mb":50}')" 201 "mailbox info@"
 expect "$(c cust POST /mail/domains/$D/mailboxes '{"local_part":"Bad..x","password":"MailPass12345"}')" 400 "invalid local part"
 expect "$(c cust POST /mail/domains/$D/mailboxes '{"local_part":"weak","password":"short"}')" 400 "weak password"
-expect "$(c cust POST /mail/domains/$D/mailboxes '{"local_part":"boss","password":"BossPass12345"}')" 201 "mailbox boss@"; BOSS=$(jq .id /tmp/out)
-expect "$(c cust POST /mail/domains/$D/mailboxes '{"local_part":"third","password":"MailPass12345"}')" 409 "package mailbox limit"
+expect "$(c cust POST /mail/domains/$D/mailboxes '{"local_part":"boss","password":"BossPass12345","quota_mb":50}')" 201 "mailbox boss@"; BOSS=$(jq .id /tmp/out)
+expect "$(c cust POST /mail/domains/$D/mailboxes '{"local_part":"third","password":"MailPass12345","quota_mb":50}')" 409 "package mailbox limit"
 expect "$(c cust POST /mail/domains/$D/aliases '{"local_part":"sales","destinations":["info@corp.example.com"]}')" 201 "alias sales@ -> info@"
 expect "$(c cust POST /mail/domains/$D/aliases '{"local_part":"info","destinations":["boss@corp.example.com"]}')" 409 "alias cannot shadow a mailbox"
 expect "$(c cust GET /mail/domains/$D)" 200 "domain detail"
