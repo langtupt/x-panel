@@ -126,7 +126,9 @@ id xpanel >/dev/null 2>&1 || useradd --system --gid xpanel --home-dir /var/lib/x
   --create-home --shell /usr/sbin/nologin xpanel
 # Shared state lives here (ACME webroot read by nginx, phpMyAdmin sessions), so it
 # must be traversable; Ubuntu 24.04 creates homes as 0750.
-chmod 0755 /var/lib/xpanel
+# An existing account named xpanel can have another home (e.g. /home/xpanel).
+# Ensure the service state independently, without moving that account's home.
+install -d -m 0755 -o xpanel -g xpanel /var/lib/xpanel
 
 # ---------------------------------------------------------------- database
 # The API connects over the local socket with peer auth (OS user xpanel =
