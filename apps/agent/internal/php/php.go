@@ -67,6 +67,10 @@ func Install(ctx context.Context, d distro.Distro, version string) (string, erro
 	if err == nil {
 		err = step(run.Opts{Timeout: time.Minute}, "systemctl", "enable", "--now", d.PHPFPMService(version))
 	}
+	if err == nil {
+		// Package postinst may already have started FPM before our INI was written.
+		err = step(run.Opts{Timeout: time.Minute}, "systemctl", "reload-or-restart", d.PHPFPMService(version))
+	}
 	return log.String(), err
 }
 
