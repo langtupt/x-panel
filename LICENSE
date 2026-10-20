@@ -1,0 +1,71 @@
+X-Panel Non-Commercial License 1.0
+
+Copyright (c) 2026 X-Panel contributors.
+Each contributor retains copyright in their contributions.
+
+1. Permission
+
+Subject to the conditions below, individuals and organizations may use, copy,
+install, study, modify and redistribute this software and its documentation
+(the "Software") solely for non-commercial purposes, free of charge.
+Permitted purposes include personal projects, education, research and
+non-commercial organizational activities.
+
+2. Commercial use is prohibited
+
+Without a separate written license from the applicable copyright holders,
+you may not use the Software for commercial purposes. This includes:
+
+- selling, licensing, renting or otherwise monetizing the Software or a
+  modified version;
+- providing paid hosting, managed services, SaaS, control-panel access or
+  other paid services using the Software;
+- bundling the Software with a product or service sold for a fee; and
+- using the Software to operate or support revenue-generating business
+  activities, including internal commercial infrastructure.
+
+These restrictions apply to individuals and organizations alike, including
+commercial companies and nonprofit organizations. An organization's legal
+status alone does not determine whether a use is non-commercial.
+
+3. Redistribution and modifications
+
+Any permitted redistribution, including modified versions, must retain this
+license and all copyright and attribution notices. Modified versions must
+clearly identify that they have been changed. Recipients must receive the
+same non-commercial permissions and restrictions; you may not relicense the
+Software or your modifications to remove these restrictions.
+
+4. Third-party components and trademarks
+
+This license applies only to material whose copyright holders have made it
+available under this license. Third-party dependencies, bundled components
+and other separately licensed material remain governed by their respective
+licenses. This license grants no rights to trademarks, logos or brand names.
+
+5. Termination
+
+Your permissions under this license terminate automatically if you violate
+its conditions. After termination, you must stop using and redistributing
+the Software unless the applicable copyright holders reinstate permission
+in writing.
+
+6. No warranty or liability
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. TO THE MAXIMUM EXTENT
+PERMITTED BY APPLICABLE LAW, THE AUTHORS AND COPYRIGHT HOLDERS SHALL NOT BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+7. Other rights
+
+All rights not expressly granted are reserved. Commercial use requires a
+separate written agreement; this license does not promise its availability.
+For licensing inquiries, contact the project maintainer through the GitHub
+repository: https://github.com/langtupt/x-panel.
+
+This is a source-available, non-commercial license. It is not an
+OSI-approved open-source license.

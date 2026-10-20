@@ -224,6 +224,17 @@ The agent requires Linux. Optional systemd-container integration tools are avail
 
 English UI messages are in `apps/web/lib/locales/en.json`. The language preference is shared between browser tabs. Stored identifiers and server-generated logs retain their original values.
 
+## License
+
+X-Panel is available under the [X-Panel Non-Commercial License 1.0](LICENSE).
+Individuals and organizations may use, modify and redistribute it for
+**non-commercial purposes only**, retaining the license and attribution.
+Commercial use, including paid hosting, resale, SaaS and internal infrastructure
+supporting revenue-generating business activities, requires a separate written
+license from the applicable copyright holders. Third-party components retain
+their own licenses. This is a source-available license, not an OSI-approved
+open-source license. See [LICENSE](LICENSE) for the governing terms.
+
 ---
 
 X-Panel · Hosting control panel — a product of [socsmart.com](https://socsmart.com).

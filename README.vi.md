@@ -2,6 +2,17 @@
 
 [English](README.md) · **Tiếng Việt**
 
+## Giấy phép
+
+X-Panel áp dụng [X-Panel Non-Commercial License 1.0](LICENSE). Cá nhân và tổ chức
+được sử dụng, sửa đổi và phân phối lại **chỉ cho mục đích phi thương mại**, giữ
+nguyên giấy phép và thông tin tác giả. Không được bán lại, cung cấp hosting/dịch
+vụ trả phí, SaaS hoặc dùng làm hạ tầng phục vụ hoạt động kinh doanh tạo doanh thu
+nếu chưa có giấy phép riêng bằng văn bản từ chủ sở hữu bản quyền tương ứng.
+Thành phần bên thứ ba giữ giấy phép riêng. Đây là giấy phép cho phép xem và sử
+dụng mã nguồn có hạn chế thương mại, không phải giấy phép nguồn mở được OSI
+phê duyệt. Điều khoản đầy đủ bằng tiếng Anh tại [LICENSE](LICENSE) được áp dụng.
+
 **Control panel hosting gọn nhẹ, cài bằng 1 lệnh** cho VPS **Ubuntu 22.04/24.04** và **Debian 12/13**:
 website (HTML, PHP, Laravel, Node.js, Next.js, Go), database MariaDB/PostgreSQL, FTP/SFTP, quản lý file
 có trình soạn thảo code, cron, SSL Let's Encrypt, email (Postfix + Dovecot + DKIM) và Roundcube Webmail,
