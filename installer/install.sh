@@ -18,24 +18,24 @@ log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*"; }
 die()  { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
 
-[ "$(id -u)" -eq 0 ] || die "Cần chạy bằng root (sudo)."
+[ "$(id -u)" -eq 0 ] || die "Root access is required. Run this script as root or with sudo."
 [ -f "$SRC/bin/xpanel-api" ] && [ -f "$SRC/bin/xpanel-agent" ] && [ -d "$SRC/web" ] \
-  || die "Không tìm thấy bin/ và web/ cạnh install.sh. Hãy chạy từ thư mục release."
+  || die "Missing bin/ or web/ beside install.sh. Run the installer from the extracted release directory."
 
 # ---------------------------------------------------------------- detect OS
 . /etc/os-release
 MAJOR="${VERSION_ID%%.*}"
 case "$ID" in
-  debian) [ "$MAJOR" -ge 12 ] || die "Cần Debian 12 trở lên." ;;
-  ubuntu) case "$VERSION_ID" in 22.04|24.04) ;; *) die "Cần Ubuntu 22.04 hoặc 24.04." ;; esac ;;
-  *)      die "Hệ điều hành chưa hỗ trợ: $ID (chỉ hỗ trợ Debian và Ubuntu)." ;;
+  debian) [ "$MAJOR" -ge 12 ] || die "Debian 12 or later is required." ;;
+  ubuntu) case "$VERSION_ID" in 22.04|24.04) ;; *) die "Ubuntu 22.04 or 24.04 is required." ;; esac ;;
+  *)      die "Unsupported operating system: $ID. Only Debian and Ubuntu are supported." ;;
 esac
-log "Hệ điều hành: $PRETTY_NAME"
+log "Operating system: $PRETTY_NAME"
 
 # ---------------------------------------------------------------- packages
 export DEBIAN_FRONTEND=noninteractive
 apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update -q \
-  || die "Không cập nhật được APT. Kiểm tra DNS, kết nối mạng và địa chỉ kho gói trong lỗi ở trên."
+  || die "APT update failed. Check the DNS, connectivity and repository errors above."
 apt-get -o Acquire::Retries=3 install -y -q nginx postgresql mariadb-server quota openssl curl ca-certificates \
   pure-ftpd openssh-server cron nftables
 systemctl enable --now postgresql nginx mariadb cron
@@ -50,8 +50,8 @@ if [ "$MEM_MB" -lt 4096 ] && [ "$(swapon --noheadings 2>/dev/null | wc -l)" = 0 
   SWAP_MB=$(( MEM_MB < 2048 ? 2048 : 1024 ))
   if fallocate -l "${SWAP_MB}M" /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count="$SWAP_MB" status=none; then
     chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile \
-      && echo "/swapfile none swap sw 0 0" >>/etc/fstab && log "Đã tạo swap ${SWAP_MB} MB" \
-      || { warn "Không tạo được swap"; rm -f /swapfile; }
+      && echo "/swapfile none swap sw 0 0" >>/etc/fstab && log "Created ${SWAP_MB} MB of swap" \
+      || { warn "Unable to create swap"; rm -f /swapfile; }
   fi
 fi
 AUTO_TUNE="${XPANEL_AUTO_TUNE:-1}"
@@ -123,7 +123,7 @@ pg psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='xpanel'" | grep -q 1 || pg c
 pg psql -tAc "SELECT 1 FROM pg_database WHERE datname='xpanel'" | grep -q 1 || pg createdb -O xpanel xpanel
 
 # ---------------------------------------------------------------- files
-log "Cài đặt vào $PREFIX"
+log "Installing to $PREFIX"
 install -d -m 0755 "$PREFIX/bin"
 systemctl stop xpanel-api xpanel-agent 2>/dev/null || true
 install -m 0755 "$SRC/bin/xpanel-api" "$SRC/bin/xpanel-agent" "$SRC/enable-quota.sh" "$SRC/uninstall.sh" "$SRC/tuning.sh" "$PREFIX/bin/"
@@ -231,10 +231,10 @@ EOF
     if ! systemctl restart fail2ban 2>/dev/null; then
       # Older filters lack journal support for pure-ftpd: keep SSH protection.
       sed -i '/^\[pure-ftpd\]/,$d' /etc/fail2ban/jail.d/xpanel.conf
-      systemctl restart fail2ban 2>/dev/null || warn "fail2ban chưa khởi động được (journalctl -u fail2ban)"
+      systemctl restart fail2ban 2>/dev/null || warn "Unable to start fail2ban. Check: journalctl -u fail2ban"
     fi
   else
-    warn "Không cài được fail2ban"
+    warn "Unable to install fail2ban"
   fi
 fi
 
@@ -249,7 +249,7 @@ run_api migrate
 # or to reset it on an upgrade); otherwise a random one is generated once.
 ADMIN_PASS="${ADMIN_PASSWORD:-}"
 if [ -n "$ADMIN_PASS" ] && [ "${#ADMIN_PASS}" -lt 10 ]; then
-  die "ADMIN_PASSWORD phải có ít nhất 10 ký tự."
+  die "ADMIN_PASSWORD must contain at least 10 characters."
 fi
 if [ "$FIRST_INSTALL" = 1 ]; then
   [ -n "$ADMIN_PASS" ] || ADMIN_PASS="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 16)"
@@ -269,12 +269,12 @@ for _ in $(seq 1 30); do
   sleep 0.5
 done
 curl -sf -o /dev/null --unix-socket "$API_SOCK" http://xpanel/api/health \
-  || die "xpanel-api không khởi động được, xem: journalctl -u xpanel-api"
+  || die "Unable to start xpanel-api. Check: journalctl -u xpanel-api"
 
 # The one-line installer turns on disk quotas here, so the login details
 # below are the last thing on screen.
 if [ "${XPANEL_ENABLE_QUOTA:-0}" = 1 ]; then
-  "$SRC/enable-quota.sh" || warn "Chưa bật được quota tự động (/home cần ext4 hoặc xfs)."
+  "$SRC/enable-quota.sh" || warn "Unable to enable quotas automatically. /home must use ext4 or XFS."
 fi
 QUOTA_ON=1
 findmnt -n -o OPTIONS --target /home | grep -qE '(^|,)(usrquota|quota|uquota|usrjquota=[^,]*)(,|$)' || QUOTA_ON=0
@@ -283,26 +283,26 @@ LOCAL_IP="$(hostname -I | awk '{print $1}')"
 PUBLIC_IP="$(curl -4 -fsS -m 4 https://api.ipify.org 2>/dev/null | grep -E '^[0-9.]+$' || true)"
 echo
 printf '\033[1;32m%s\033[0m\n' "=================================================================="
-printf '\033[1;32m  X-Panel đã cài xong\033[0m\n'
+printf '\033[1;32m  X-Panel installation complete\033[0m\n'
 printf '\033[1;32m%s\033[0m\n' "=================================================================="
 if [ -n "$PUBLIC_IP" ] && [ "$PUBLIC_IP" != "$LOCAL_IP" ]; then
-  echo "  Địa chỉ   : https://$PUBLIC_IP:$PANEL_PORT"
-  echo "              https://$LOCAL_IP:$PANEL_PORT   (mạng nội bộ)"
+  echo "  Panel URL : https://$PUBLIC_IP:$PANEL_PORT"
+  echo "              https://$LOCAL_IP:$PANEL_PORT   (private network)"
 else
-  echo "  Địa chỉ   : https://$LOCAL_IP:$PANEL_PORT"
+  echo "  Panel URL : https://$LOCAL_IP:$PANEL_PORT"
 fi
-echo "  Tài khoản : admin"
+echo "  Username  : admin"
 if [ -n "$ADMIN_PASS" ]; then
-  printf '  Mật khẩu  : \033[1m%s\033[0m\n' "$ADMIN_PASS"
+  printf '  Password  : \033[1m%s\033[0m\n' "$ADMIN_PASS"
   echo
-  warn "Hãy lưu mật khẩu này ngay: nó chỉ hiển thị một lần và không được lưu trên máy chủ."
-  echo "   Quên mật khẩu: chạy lại lệnh cài kèm ADMIN_PASSWORD='mật-khẩu-mới'."
+  warn "Save this password now. It is displayed only once and is not stored on the server."
+  echo "   To reset the password, rerun the installer with ADMIN_PASSWORD='your-new-password'."
 else
-  echo "  Mật khẩu  : giữ nguyên như trước (đã nâng cấp, dữ liệu và cấu hình được giữ nguyên)"
+  echo "  Password  : unchanged (upgrade completed; data and configuration retained)"
 fi
 printf '\033[1;32m%s\033[0m\n' "=================================================================="
-warn "Chứng chỉ panel là self-signed, trình duyệt sẽ cảnh báo lần đầu (chọn Advanced → Proceed)."
+warn "The panel uses a self-signed certificate. Your browser will display a warning on first access (Advanced > Proceed)."
 if [ "$QUOTA_ON" = 0 ]; then
-  warn "Quota ổ đĩa chưa bật trên /home: giới hạn dung lượng của gói chưa có hiệu lực."
-  warn "Bật bằng: $PREFIX/bin/enable-quota.sh"
+  warn "Disk quotas are not enabled on /home. Hosting package disk limits are not enforced yet."
+  warn "Enable quotas with: $PREFIX/bin/enable-quota.sh"
 fi

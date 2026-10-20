@@ -39,7 +39,7 @@ export PATH="$TMP/bin:$PATH" XPANEL_PURGE_PACKAGES=1 XPANEL_CONFIRM=XOA-SACH
 if APT_FAIL=100 bash "$ROOT/uninstall.sh" >"$TMP/fail.log" 2>&1; then
   echo 'FAIL: ignored APT failure'; exit 1
 fi
-grep -q 'APT purge thất bại' "$TMP/fail.log"
+grep -q 'APT purge failed' "$TMP/fail.log"
 if grep -q '/var/lib/mysql' "$CALLS"; then
   echo 'FAIL: deleted database directory after failed purge'; exit 1
 fi

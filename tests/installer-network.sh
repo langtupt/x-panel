@@ -20,12 +20,12 @@ export PATH="$TMP/mock:$PATH"
 if XPANEL_FORCE=1 bash "$ROOT/install.sh" >"$TMP/dns.log" 2>&1; then
   echo 'FAIL: installer accepted broken DNS'; exit 1
 fi
-grep -q 'Không phân giải được github.com' "$TMP/dns.log"
+grep -q 'Unable to resolve github.com' "$TMP/dns.log"
 test ! -e "$APT_CALLS"
 if bash "$TMP/release/install.sh" >"$TMP/apt.log" 2>&1; then
   echo 'FAIL: installer accepted failed APT update'; exit 1
 fi
-grep -q 'Không cập nhật được APT' "$TMP/apt.log"
+grep -q 'APT update failed' "$TMP/apt.log"
 grep -q 'APT::Update::Error-Mode=any' "$APT_CALLS"
 test "$(wc -l <"$APT_CALLS")" -eq 1
 echo 'PASS: DNS failure stops before downloads; APT update failure stops before installation'

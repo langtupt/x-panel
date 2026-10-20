@@ -1,17 +1,12 @@
 #!/usr/bin/env bash
-# X-Panel — gỡ cài đặt (đăng nhập root rồi dán):
-#
-#   curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh | bash
-#
-# Mặc định XÓA SẠCH: panel và toàn bộ dữ liệu khách hàng (website, thư mục
-# home, database, email, FTP, cron, chứng chỉ). Các gói phần mềm (nginx, PHP,
-# MariaDB, PostgreSQL, Postfix, Dovecot…) được giữ lại.
-#
-# Tuỳ chọn (biến môi trường, đặt trước "bash"):
-#   XPANEL_KEEP_DATA=1        giữ lại dữ liệu khách hàng (home, database, email);
-#                             chỉ gỡ panel
-#   XPANEL_PURGE_PACKAGES=1   gỡ luôn các gói phần mềm X-Panel đã cài
-#   XPANEL_CONFIRM=XOA-SACH   không hỏi xác nhận (dùng cho script tự động)
+# X-Panel uninstaller. Run as root:
+# curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh | bash
+# Default: remove panel and customer data; retain hosting service packages.
+# Options (environment variables before bash):
+# XPANEL_KEEP_DATA=1       Remove panel while retaining customer data.
+# XPANEL_PURGE_PACKAGES=1  Also purge hosting packages and their data/configuration.
+# XPANEL_CONFIRM=DELETE-ALL  Skip interactive confirmation for automation.
+# Legacy XOA-SACH / XOA SACH confirmations remain accepted for compatibility.
 set -euo pipefail
 
 main() {
@@ -21,14 +16,14 @@ warn() { printf '\033[1;33m!!\033[0m %s\n' "$*"; }
 die()  { printf '\033[1;31mxx %s\033[0m\n' "$*" >&2; exit 1; }
 q()    { "$@" >/dev/null 2>&1 || true; }
 
-[ "$(id -u)" -eq 0 ] || die "Cần quyền root. Đăng nhập root (hoặc: sudo -i) rồi dán lại lệnh."
+[ "$(id -u)" -eq 0 ] || die "Root access is required. Log in as root (or run sudo -i), then run the command again."
 KEEP="${XPANEL_KEEP_DATA:-0}"
 PURGE="${XPANEL_PURGE_PACKAGES:-0}"
 [ "$KEEP" != 1 ] || [ "$PURGE" != 1 ] \
-  || die "Không thể vừa giữ dữ liệu vừa purge các gói/database. Chỉ chọn một chế độ."
+  || die "Data retention and package purge cannot be combined. Select one mode only."
 
 if [ "$PURGE" != 1 ] && [ ! -e /etc/xpanel ] && [ ! -e /opt/xpanel ] && ! systemctl cat xpanel-api >/dev/null 2>&1; then
-  die "Không thấy X-Panel trên máy này."
+  die "No X-Panel installation was found on this server."
 fi
 
 # ---------------------------------------------------------------- inventory
@@ -44,34 +39,34 @@ N_DBS=$(pgq "SELECT count(*) FROM databases"); N_DBS=${N_DBS:-?}
 N_BOXES=$(pgq "SELECT count(*) FROM mailboxes"); N_BOXES=${N_BOXES:-?}
 
 echo
-printf '\033[1;31m%s\033[0m\n' "================= GỠ CÀI ĐẶT X-PANEL ================="
-echo "  Panel, dịch vụ, cấu hình và database của panel sẽ bị xóa."
+printf '\033[1;31m%s\033[0m\n' "================= UNINSTALL X-PANEL ================="
+echo "  The panel, its services, configuration and panel database will be removed."
 if [ "$KEEP" = 1 ]; then
-  echo "  Dữ liệu khách hàng được GIỮ LẠI (XPANEL_KEEP_DATA=1)."
+  echo "  Customer data will be RETAINED (XPANEL_KEEP_DATA=1)."
 else
-  echo "  XÓA VĨNH VIỄN dữ liệu khách hàng:"
-  echo "    - $N_USERS tài khoản hosting (user Linux + thư mục /home/<user>)"
-  echo "    - $N_SITES website, $N_DBS database, $N_BOXES hộp thư email (/var/mail/vhosts)"
-  echo "  Không thể khôi phục. Hãy tải backup về trước nếu cần."
+  echo "  The following customer data will be PERMANENTLY DELETED:"
+  echo "    - $N_USERS hosting accounts (Linux users and /home/<user> directories)"
+  echo "    - $N_SITES websites, $N_DBS databases, $N_BOXES mailboxes (/var/mail/vhosts)"
+  echo "  This action cannot be undone. Download any required backups before continuing."
 fi
 if [ "$PURGE" = 1 ]; then
-  echo "  Gỡ TOÀN BỘ các gói nginx, PHP, MariaDB, PostgreSQL, Pure-FTPd, Postfix, Dovecot, OpenDKIM, fail2ban."
-  echo "  Xóa cả dữ liệu/cấu hình của các dịch vụ này, kể cả được cài ngoài X-Panel."
+  echo "  PURGE nginx, PHP, MariaDB, PostgreSQL, Pure-FTPd, Postfix, Dovecot, OpenDKIM and fail2ban packages."
+  echo "  Their data and configuration will also be deleted, including services installed outside X-Panel."
 else
-  echo "  Các gói nginx, PHP, MariaDB, PostgreSQL, FTP/mail vẫn được GIỮ LẠI."
-  echo "  Muốn gỡ cả các gói: hủy rồi chạy lại với XPANEL_PURGE_PACKAGES=1."
+  echo "  nginx, PHP, MariaDB, PostgreSQL and FTP/mail packages will be RETAINED."
+  echo "  To purge packages as well, cancel and run again with XPANEL_PURGE_PACKAGES=1."
 fi
 printf '\033[1;31m%s\033[0m\n' "======================================================"
 
-if [ "${XPANEL_CONFIRM:-}" != "XOA-SACH" ]; then
-  [ -r /dev/tty ] || die "Cần xác nhận: chạy lại với XPANEL_CONFIRM=XOA-SACH trước \"bash\"."
-  printf 'Gõ  XOA SACH  để tiếp tục (Enter để hủy): '
+if [ "${XPANEL_CONFIRM:-}" != "DELETE-ALL" ] && [ "${XPANEL_CONFIRM:-}" != "XOA-SACH" ]; then
+  [ -r /dev/tty ] || die "Confirmation is required: run again with XPANEL_CONFIRM=DELETE-ALL before \"bash\"."
+  printf 'Type DELETE ALL to continue (press Enter to cancel): '
   { read -r answer </dev/tty; } 2>/dev/null || answer=""
-  [ "$answer" = "XOA SACH" ] || die "Đã hủy, không thay đổi gì."
+  [ "$answer" = "DELETE ALL" ] || [ "$answer" = "XOA SACH" ] || die "Cancelled. No changes were made."
 fi
 
 # ---------------------------------------------------------------- panel services
-say "Dừng dịch vụ X-Panel"
+say "Stopping X-Panel services"
 q systemctl disable --now xpanel-api xpanel-agent
 units=$(systemctl list-units --all --plain --no-legend 'xpanel-*' 2>/dev/null | awk '{print $1}')
 for u in $units; do q systemctl stop "$u"; q systemctl disable "$u"; done
@@ -84,7 +79,7 @@ q nft delete table inet xpanel_apps
 
 # ---------------------------------------------------------------- customer data
 if [ "$KEEP" != 1 ]; then
-  say "Xóa database của khách hàng"
+  say "Removing customer databases"
   printf '%s\n' "$MARIA_DBS" | while read -r db user; do
     [ -n "$db" ] || continue
     q mariadb -e "DROP DATABASE IF EXISTS \`$db\`; DROP USER IF EXISTS '$user'@'localhost';"
@@ -95,7 +90,7 @@ if [ "$KEEP" != 1 ]; then
     done
   fi
 
-  say "Xóa tài khoản hosting và thư mục home"
+  say "Removing hosting accounts and home directories"
   for u in $HOSTING_USERS; do
     case "$u" in root|xpanel|postgres|mysql|www-data|"") continue ;; esac
     id "$u" >/dev/null 2>&1 || continue
@@ -105,14 +100,14 @@ if [ "$KEEP" != 1 ]; then
     rm -rf "/home/${u:?}"
   done
 
-  say "Xóa email"
+  say "Removing customer email data"
   rm -rf /var/mail/vhosts /etc/dovecot/xpanel-users /etc/postfix/xpanel /etc/opendkim/keys
   q userdel vmail
   rm -f /etc/pure-ftpd/pureftpd.passwd /etc/pure-ftpd/pureftpd.pdb
 fi
 
 # ---------------------------------------------------------------- panel files
-say "Xóa panel, cấu hình và database của panel"
+say "Removing panel files, configuration and panel database"
 (cd /tmp && runuser -u postgres -- psql -c "DROP DATABASE IF EXISTS xpanel" >/dev/null 2>&1) || true
 (cd /tmp && runuser -u postgres -- psql -c "DROP ROLE IF EXISTS xpanel" >/dev/null 2>&1) || true
 
@@ -160,7 +155,7 @@ if grep -q "BEGIN X-Panel" /etc/ssh/sshd_config 2>/dev/null; then
   if sshd -t; then
     systemctl try-reload-or-restart ssh 2>/dev/null || true
   else
-    warn "sshd_config không hợp lệ sau khi gỡ khối X-Panel; kiểm tra bằng: sshd -t"
+    warn "Invalid sshd_config after removing the X-Panel block. Run: sshd -t"
   fi
 fi
 q userdel xpanel-pma
@@ -171,20 +166,20 @@ if [ -z "$XPANEL_HOME" ] || [ "$XPANEL_HOME" = /var/lib/xpanel ]; then
   q userdel xpanel
   q groupdel xpanel
 else
-  warn "Giữ tài khoản xpanel có home $XPANEL_HOME (không phải tài khoản dịch vụ do installer tạo)."
+  warn "Preserving the existing xpanel account with home $XPANEL_HOME; it was not created as an installer service account."
 fi
 [ "$KEEP" = 1 ] || q groupdel xpanel-sftp
 
 if [ "$PURGE" = 1 ]; then
-  say "Gỡ các gói phần mềm"
+  say "Purging hosting service packages"
   export DEBIAN_FRONTEND=noninteractive
   # Include rc packages: a previous remove can leave configuration behind.
   pkgs=$( { dpkg-query -W -f='${binary:Package} ${db:Status-Abbrev}\n' 'nginx*' 'libnginx-mod-*' 'php*' 'mariadb-*' 'postgresql*' 'pure-ftpd*' 'postfix*' \
          'dovecot-*' 'opendkim*' 'fail2ban' 'debsuryorg-archive-keyring' 2>/dev/null || true; } | awk '$2 ~ /^(ii|rc)/ {print $1}')
   if [ -n "$pkgs" ]; then
-    apt-get purge -y -q $pkgs || die "APT purge thất bại. Khắc phục lỗi ở trên rồi chạy lại cùng XPANEL_PURGE_PACKAGES=1; chưa xóa thư mục database."
+    apt-get purge -y -q $pkgs || die "APT purge failed. Resolve the errors above and rerun with XPANEL_PURGE_PACKAGES=1. Database directories have not been deleted."
   fi
-  apt-get autoremove --purge -y -q || die "APT autoremove thất bại. Có thể chạy lại cùng XPANEL_PURGE_PACKAGES=1."
+  apt-get autoremove --purge -y -q || die "APT autoremove failed. Resolve the issue and rerun with XPANEL_PURGE_PACKAGES=1."
   rm -rf /etc/php /etc/nginx /etc/mysql /var/lib/mysql /etc/postgresql /var/lib/postgresql /etc/dovecot /etc/postfix \
          /etc/opendkim /etc/pure-ftpd /opt/xpanel
   for f in /etc/apt/sources.list.d/*ondrej* /etc/apt/sources.list.d/*pgdg*; do [ -e "$f" ] && rm -f "$f"; done
@@ -202,15 +197,15 @@ q systemctl daemon-reload
 q sysctl --system
 
 echo
-printf '\033[1;32m%s\033[0m\n' "Đã gỡ X-Panel."
-[ "$KEEP" = 1 ] && echo "Dữ liệu khách hàng vẫn còn trong /home, MariaDB/PostgreSQL và /var/mail/vhosts."
+printf '\033[1;32m%s\033[0m\n' "X-Panel has been uninstalled."
+[ "$KEEP" = 1 ] && echo "Customer data remains in /home, MariaDB/PostgreSQL and /var/mail/vhosts."
 if [ "$PURGE" = 1 ]; then
-  echo "Đã purge các gói dịch vụ hosting và xóa thư mục dữ liệu/cấu hình của chúng."
+  echo "Hosting service packages and their data/configuration directories have been removed."
 else
-  echo "Các gói nginx, PHP, MariaDB… vẫn còn. Chạy dọn tiếp bằng:"
+  echo "nginx, PHP and database packages remain installed. To purge them, run:"
   echo "curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh | XPANEL_PURGE_PACKAGES=1 bash"
 fi
-echo "Swap /swapfile (nếu installer đã tạo) và quota ổ đĩa được giữ nguyên."
+echo "Swap (/swapfile, if created by the installer) and disk quota settings have been retained."
 }
 
 main "$@"

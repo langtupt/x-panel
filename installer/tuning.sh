@@ -34,7 +34,7 @@ net.core.somaxconn = $accept
 net.ipv4.tcp_max_syn_backlog = $syn
 fs.inotify.max_user_watches = 524288
 EOF
-  sysctl -q -p /etc/sysctl.d/90-xpanel.conf || warn "Không áp dụng được một số sysctl; kiểm tra giới hạn của VPS."
+  sysctl -q -p /etc/sysctl.d/90-xpanel.conf || warn "Some sysctl settings could not be applied. Check the VPS restrictions."
 }
 
 xpanel_tune_mariadb() {
@@ -68,7 +68,7 @@ EOF
     if [ "$existed" = 1 ]; then cp -p "$backup" "$conf"; else rm -f "$conf"; fi
     rm -f "$backup"
     systemctl restart mariadb || true
-    die "Cấu hình MariaDB không hợp lệ; đã khôi phục cấu hình trước đó."
+    die "Invalid MariaDB configuration. The previous configuration has been restored."
   fi
   rm -f "$backup"
   cat >/etc/logrotate.d/xpanel-mariadb <<'EOF'
@@ -107,7 +107,7 @@ opcache.revalidate_freq=2
 EOF
     if ! "/usr/sbin/php-fpm$ver" -t >/dev/null 2>&1; then
       if [ "$existed" = 1 ]; then cp -p "$backup" "$ini/98-xpanel-performance.ini"; else rm -f "$ini/98-xpanel-performance.ini"; fi
-      rm -f "$backup"; die "PHP $ver không hợp lệ; đã khôi phục INI trước đó."
+      rm -f "$backup"; die "PHP $ver configuration validation failed. The previous INI has been restored."
     fi
     rm -f "$backup"
     # Includes masters generated for individual accounts and sites.
@@ -148,7 +148,7 @@ EOF
       if [ "$existed" = 1 ]; then cp -p "$backup" "$conf"; else rm -f "$conf"; fi
       rm -f "$backup"
       systemctl restart "postgresql@$ver-$cluster" || true
-      die "Không áp dụng được cấu hình PostgreSQL; đã khôi phục cấu hình trước đó."
+      die "Unable to apply PostgreSQL settings. The previous configuration has been restored."
     fi
     rm -f "$backup"
   done < <(pg_lsclusters -h)
@@ -166,7 +166,7 @@ xpanel_tune_nginx() {
     events && /}/ { events=0 }
     { print }
     END { if (!found) exit 1 }
-  ' /etc/nginx/nginx.conf >"$tmp" || { rm -f "$tmp" "$previous"; die "Không tìm thấy events.worker_connections; giữ nguyên nginx.conf."; }
+  ' /etc/nginx/nginx.conf >"$tmp" || { rm -f "$tmp" "$previous"; die "events.worker_connections was not found. nginx.conf has not been changed."; }
   cat "$tmp" >/etc/nginx/nginx.conf; rm -f "$tmp"
   # Main context include on supported distro packages.
   if ! grep -qE '^[[:space:]]*worker_rlimit_nofile[[:space:]]' /etc/nginx/nginx.conf; then
@@ -180,7 +180,7 @@ xpanel_tune_nginx() {
     cp -p "$previous" /etc/nginx/nginx.conf
     rm -f /etc/nginx/modules-enabled/99-xpanel-performance.conf
     rm -f "$previous"
-    die "Kiểm tra nginx thất bại; đã khôi phục nginx.conf."
+    die "nginx configuration validation failed. nginx.conf has been restored."
   fi
   systemctl daemon-reload
   # Apply the service descriptor limit as well as the nginx worker configuration.
@@ -189,7 +189,7 @@ xpanel_tune_nginx() {
     rm -f /etc/nginx/modules-enabled/99-xpanel-performance.conf
     rm -f "$previous"
     systemctl restart nginx || true
-    die "Nginx không khởi động được; đã khôi phục nginx.conf."
+    die "Unable to start nginx. nginx.conf has been restored."
   fi
   rm -f "$previous"
 }
