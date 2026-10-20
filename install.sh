@@ -4,7 +4,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh | bash
 #
 # Chưa có curl (bản cài tối giản):
-#   apt-get update && apt-get install -y curl && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh | bash
+#   apt-get -o APT::Update::Error-Mode=any update && apt-get install -y curl ca-certificates && curl -fSL -o /tmp/xpanel-install.sh https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh && bash /tmp/xpanel-install.sh
 #
 # Tuỳ chọn (biến môi trường, đặt trước "bash"):
 #   ADMIN_PASSWORD='...'   mật khẩu admin (mặc định: tạo ngẫu nhiên và hiện ở cuối)
@@ -68,9 +68,14 @@ fi
 
 # ---------------------------------------------------------------- download
 export DEBIAN_FRONTEND=noninteractive
+getent ahosts github.com >/dev/null 2>&1 \
+  || die "Không phân giải được github.com. Kiểm tra kết nối mạng và DNS của VPS (getent hosts github.com). Xem mục khắc phục DNS trong README; script không tự thay DNS hệ thống."
 if ! command -v curl >/dev/null || ! command -v sha256sum >/dev/null; then
   say "Cài curl"
-  apt-get update -q </dev/null >/dev/null && apt-get install -y -q curl ca-certificates coreutils </dev/null >/dev/null
+  apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update -q </dev/null \
+    || die "Không cập nhật được APT. Kiểm tra lỗi DNS/kết nối hoặc kho gói ở trên."
+  apt-get -o Acquire::Retries=3 install -y -q curl ca-certificates coreutils </dev/null \
+    || die "Không cài được curl và chứng chỉ CA. Kiểm tra kết nối đến kho gói ở trên."
 fi
 
 if [ "$XP_VERSION" = latest ]; then

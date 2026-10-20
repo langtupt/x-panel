@@ -34,8 +34,9 @@ log "Hệ điều hành: $PRETTY_NAME"
 
 # ---------------------------------------------------------------- packages
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -q
-apt-get install -y -q nginx postgresql mariadb-server quota openssl curl ca-certificates \
+apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update -q \
+  || die "Không cập nhật được APT. Kiểm tra DNS, kết nối mạng và địa chỉ kho gói trong lỗi ở trên."
+apt-get -o Acquire::Retries=3 install -y -q nginx postgresql mariadb-server quota openssl curl ca-certificates \
   pure-ftpd openssh-server cron nftables
 systemctl enable --now postgresql nginx mariadb cron
 

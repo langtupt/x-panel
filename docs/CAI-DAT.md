@@ -75,13 +75,13 @@ Lần đầu hỏi `Are you sure you want to continue connecting` thì gõ `yes`
 Sao chép **nguyên dòng** dưới đây, dán vào cửa sổ SSH (PowerShell: chuột phải để dán) và nhấn Enter:
 
 ```bash
-apt-get update && apt-get install -y curl && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh | bash
+apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update && apt-get install -y curl ca-certificates && curl -fSL --retry 3 -o /tmp/xpanel-install.sh https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh && bash /tmp/xpanel-install.sh
 ```
 
 Muốn tự đặt mật khẩu admin (ít nhất 10 ký tự) thì dùng lệnh này thay cho lệnh trên:
 
 ```bash
-apt-get update && apt-get install -y curl && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh | ADMIN_PASSWORD='MatKhauCuaBan123' bash
+apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update && apt-get install -y curl ca-certificates && curl -fSL --retry 3 -o /tmp/xpanel-install.sh https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh && ADMIN_PASSWORD='MatKhauCuaBan123' bash /tmp/xpanel-install.sh
 ```
 
 Quá trình cài mất khoảng **3–10 phút**. Trình cài đặt tự:
@@ -194,6 +194,7 @@ Cách "sạch" nhất vẫn là **cài lại hệ điều hành** từ trang qu�
 
 | Hiện tượng | Cách xử lý |
 |---|---|
+| `Temporary failure resolving` | DNS của VPS không hoạt động; xem [hướng dẫn kiểm tra DNS](../README.md#không-tải-được-gói-temporary-failure-resolving), sửa DNS rồi chạy lại. |
 | `curl: command not found` | Dùng đúng lệnh ở bước 4 (có phần `apt-get install -y curl` ở đầu). |
 | `sudo: command not found` | Bạn đang là root rồi — bỏ chữ `sudo`. |
 | `Cần quyền root` | Gõ `sudo -i` rồi dán lại lệnh. |

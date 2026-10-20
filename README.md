@@ -14,7 +14,7 @@ nhà cung cấp.<br>
 **3.** Dán lệnh sau rồi nhấn Enter:
 
 ```bash
-apt-get update && apt-get install -y curl && curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh | bash
+apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update && apt-get -o Acquire::Retries=3 install -y curl ca-certificates && curl -fSL --retry 3 -o /tmp/xpanel-install.sh https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh && bash /tmp/xpanel-install.sh
 ```
 
 Sau 3–10 phút, màn hình hiện **địa chỉ panel, tài khoản `admin` và mật khẩu** (chỉ hiện một lần — hãy ghi lại):
@@ -44,6 +44,44 @@ giới hạn log, MariaDB theo RAM, gzip, fail2ban, firewall).
 
 Cổng dùng thêm khi cần: 8890 (phpMyAdmin/Adminer), 21 + 30000–30100 (FTP), 25, 465, 587, 993, 995 (email),
 2096 (webmail).
+
+### Không tải được gói: `Temporary failure resolving`
+
+Ví dụ `Temporary failure resolving 'deb.debian.org'` hoặc `security.debian.org`:
+VPS chưa phân giải được DNS, nên APT chưa cài được curl và **script X-Panel chưa chạy**.
+`apt-get update` có thể chỉ cảnh báo rồi dùng danh sách gói cũ; lệnh ở trên yêu cầu
+APT dừng nếu có kho không cập nhật được. `--fix-missing` không sửa được DNS.
+
+Kiểm tra bằng root (không cần cài thêm gói):
+
+```bash
+ip route
+cat /etc/resolv.conf
+getent hosts deb.debian.org security.debian.org raw.githubusercontent.com github.com
+```
+
+Nếu không có default route, kiểm tra cấu hình mạng/gateway trong console của nhà cung cấp VPS.
+Nếu có route nhưng không phân giải được tên miền, cấu hình DNS do nhà cung cấp cung cấp,
+hoặc thử DNS công cộng `1.1.1.1` và `8.8.8.8` nếu mạng cho phép. Với systemd-resolved
+đang hoạt động, áp dụng tạm cho card mạng ra Internet:
+
+```bash
+iface=$(ip -4 route show default | awk '/default/ {print $5; exit}')
+test -n "$iface" && resolvectl dns "$iface" 1.1.1.1 8.8.8.8
+resolvectl flush-caches
+```
+
+Nếu **không dùng systemd-resolved**, sao lưu rồi sửa danh sách DNS tạm thời:
+
+```bash
+cp -L /etc/resolv.conf "/root/resolv.conf.before-xpanel-$(date +%Y%m%d-%H%M%S)" && printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf
+```
+
+Chạy lại `getent hosts deb.debian.org raw.githubusercontent.com`; khi có địa chỉ IP,
+chạy lại lệnh cài đặt. Nếu vẫn lỗi, kiểm tra firewall/nhà cung cấp có chặn DNS (UDP/TCP 53)
+hoặc truy cập Internet không. Cấu hình tạm có thể bị DHCP/cloud-init ghi đè sau reboot;
+lưu DNS lâu dài trong cấu hình mạng đang quản lý VPS (netplan, NetworkManager, systemd-networkd
+hoặc giao diện nhà cung cấp). Script không tự ghi đè DNS hệ thống.
 
 ## Dành cho nhà phát triển
 
