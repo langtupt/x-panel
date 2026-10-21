@@ -263,8 +263,13 @@ $config['ip_check'] = true;
 $config['login_rate_limit'] = 5;
 $config['max_message_size'] = '25M';
 $config['request_path'] = '/webmail/';
+` + identitiesLine + `
 `
 }
+
+// identitiesLine keeps one identity whose address is the login: webmail
+// users cannot write another mailbox's address as sender.
+const identitiesLine = "$config['identities_level'] = 3;"
 
 const webmailPool = `; Managed by X-Panel: changes will be overwritten.
 [xpanel-webmail]
@@ -330,6 +335,9 @@ location ^~ /webmail/ {
 // MigrateWebmail rewrites the webmail server block written by older versions
 // (no PATH_INFO: Roundcube 1.7 loaded without CSS/JS). Run at agent start.
 func MigrateWebmail(ctx context.Context) error {
+	if err := migrateIdentities(); err != nil {
+		return err
+	}
 	old, err := os.ReadFile(webmailServerConf)
 	if err != nil || string(old) == webmailServer {
 		return nil
@@ -342,4 +350,23 @@ func MigrateWebmail(ctx context.Context) error {
 		return fmt.Errorf("nginx config test failed: %s", out)
 	}
 	return nginxctl.Reload(ctx)
+}
+
+// migrateIdentities adds identitiesLine to the Roundcube configuration of
+// older installs (opening without O_CREATE/chmod keeps its owner and mode).
+func migrateIdentities() error {
+	path := filepath.Join(WebmailDir, "config/config.inc.php")
+	b, err := os.ReadFile(path)
+	if err != nil || strings.Contains(string(b), "identities_level") {
+		return nil
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString(identitiesLine + "\n"); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }

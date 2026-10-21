@@ -217,7 +217,7 @@ func configurePostfix(ctx context.Context, host string) error {
 			}
 		}
 	}
-	return nil
+	return configureFromCheck(ctx)
 }
 
 // dovecot24 reports whether Dovecot 2.4 (new configuration syntax, Debian 13+) is installed.
