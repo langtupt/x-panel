@@ -16,6 +16,10 @@ EXT=https://$IP:8888
 c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
 . "$(dirname "$0")/lib.sh"; xp_cleanup_on_exit "fwcust"
 c admin POST /users '{"username":"fwcust","password":"Client12345","role":"user","email":"fwcust@example.com"}' >/dev/null
+FU=$(jq .id /tmp/out)
+# Floods must reach a website: unknown host names are closed (444) before
+# any limit applies.
+c admin POST /sites "{\"user_id\":$FU,\"domain\":\"fw.example.com\",\"aliases\":[],\"app_type\":\"html\",\"doc_root\":\"\"}" >/dev/null
 base() { c admin GET /firewall >/dev/null; jq -c '.config' /tmp/out; }
 
 echo "### enabled by default"
@@ -38,12 +42,12 @@ expect "$(c admin POST /firewall/ban '{"ip":"127.0.0.1","minutes":5}')" 400 "can
 echo "### HTTP flood limit"
 expect "$(c admin PUT /firewall "$(echo "$CFG" | jq -c '.http_rate = 5 | .http_burst = 5 | .flood_ban = false | .block = ["198.51.100.0/24"]')")" 200 "tight limits applied"
 nft list set inet xpanel_fw deny4 | grep -q "198.51.100.0/24" && ok "deny list in nftables" || bad "deny list missing"
-codes=$(for i in $(seq 1 40); do curl -sk -o /dev/null -w '%{http_code}\n' "http://$IP/"; done | sort | uniq -c | tr '\n' ' ')
+codes=$(for i in $(seq 1 40); do curl -sk -o /dev/null -w '%{http_code}\n' -H "Host: fw.example.com" "http://$IP/"; done | sort | uniq -c | tr '\n' ' ')
 echo "$codes" | grep -q " 429" && ok "flood answered with 429 ($codes)" || bad "no 429 in flood: $codes"
-codes=$(for i in $(seq 1 40); do curl -sk -o /dev/null -w '%{http_code}\n' "http://127.0.0.1/"; done | sort | uniq -c | tr '\n' ' ')
+codes=$(for i in $(seq 1 40); do curl -sk -o /dev/null -w '%{http_code}\n' -H "Host: fw.example.com" "http://127.0.0.1/"; done | sort | uniq -c | tr '\n' ' ')
 echo "$codes" | grep -q " 429" && bad "localhost limited: $codes" || ok "localhost exempt"
 expect "$(c admin PUT /firewall "$(echo "$CFG" | jq -c --arg ip "$IP" '.http_rate = 5 | .http_burst = 5 | .allow = [$ip]')")" 200 "allow-listed"
-codes=$(for i in $(seq 1 40); do curl -sk -o /dev/null -w '%{http_code}\n' "http://$IP/"; done | sort | uniq -c | tr '\n' ' ')
+codes=$(for i in $(seq 1 40); do curl -sk -o /dev/null -w '%{http_code}\n' -H "Host: fw.example.com" "http://$IP/"; done | sort | uniq -c | tr '\n' ' ')
 echo "$codes" | grep -q " 429" && bad "allow-listed IP still limited: $codes" || ok "allow-listed IP not limited"
 
 echo "### panel login: IP ban"

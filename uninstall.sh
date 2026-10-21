@@ -239,20 +239,28 @@ if [ "$PURGE" = 1 ]; then
   export DEBIAN_FRONTEND=noninteractive
   # Include rc packages: a previous remove can leave configuration behind.
   pkgs=$( { dpkg-query -W -f='${binary:Package} ${db:Status-Abbrev}\n' 'nginx*' 'libnginx-mod-*' 'php*' 'mariadb-*' 'postgresql*' 'pure-ftpd*' 'postfix*' \
-         'dovecot-*' 'opendkim*' 'fail2ban' 'clamav*' 'libclamav*' 'redis-server' 'redis-tools' 'memcached' \
+         'dovecot-*' 'opendkim*' 'opendmarc*' 'dbconfig-no-thanks' 'fail2ban' 'clamav*' 'libclamav*' 'redis-server' 'redis-tools' 'memcached' \
          'python3-systemd' 'quota' 'nodejs' 'debsuryorg-archive-keyring' 2>/dev/null || true; } | awk '$2 ~ /^(ii|rc)/ {print $1}')
   if [ -n "$pkgs" ]; then
     apt-get purge -y -q $pkgs || die "APT purge failed. Resolve the errors above and rerun with XPANEL_PURGE_PACKAGES=1. Database directories have not been deleted."
   fi
   apt-get autoremove --purge -y -q || die "APT autoremove failed. Resolve the issue and rerun with XPANEL_PURGE_PACKAGES=1."
   rm -rf /etc/php /etc/nginx /etc/mysql /var/lib/mysql /etc/postgresql /var/lib/postgresql /etc/dovecot /etc/postfix \
-         /etc/opendkim /etc/pure-ftpd /etc/clamav /var/lib/clamav /etc/redis /var/lib/redis /opt/xpanel
+         /etc/opendkim /etc/opendmarc.conf /etc/systemd/system/opendmarc.service.d /etc/pure-ftpd /etc/clamav /var/lib/clamav /etc/redis /var/lib/redis /opt/xpanel
   for f in /etc/apt/sources.list.d/*ondrej* /etc/apt/sources.list.d/*pgdg* /etc/apt/sources.list.d/nodesource* \
            /etc/apt/trusted.gpg.d/*ondrej* /etc/apt/keyrings/nodesource* /usr/share/keyrings/nodesource*; do
     [ -e "$f" ] && rm -f "$f"
   done
   rm -f /usr/local/bin/composer
   rm -f /etc/ssl/private/pure-ftpd.pem
+  # Purged packages leave their AppArmor profiles loaded until the next boot.
+  if [ -w /sys/kernel/security/apparmor/.remove ]; then
+    for p in /usr/sbin/clamd /usr/bin/freshclam /usr/sbin/clamonacc /usr/bin/clamscan; do
+      if grep -q "^$p " /sys/kernel/security/apparmor/profiles 2>/dev/null; then
+        printf '%s' "$p" >/sys/kernel/security/apparmor/.remove 2>/dev/null || true
+      fi
+    done
+  fi
   rm -rf /run/clamav /run/redis /run/mysqld /run/postgresql /run/php /var/log/clamav /var/log/redis /var/log/mysql /var/log/postgresql
   # nginx's default page; anything else in /var/www is kept.
   rm -f /var/www/html/index.nginx-debian.html

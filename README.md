@@ -40,7 +40,11 @@ Setting `ADMIN_PASSWORD` on an existing installation resets the admin password. 
 
 ### Updating
 
-Run the installation command again to update while retaining configuration and data. Back up your server first. Schedule a maintenance window: applying performance settings can restart nginx and databases and reload PHP.
+The installed release is shown in the sidebar (for example `Hosting workspace · v1.2.7`).
+
+From v1.2.6, administrators update from **System → Updates**: the page compares the installed release with the latest GitHub release, installs it with one click and shows the installer log. **Automatic updates** install a newer release every night between 03:00 and 05:00 (server time). The update runs that release's own installer (SHA-256 verified) in a separate systemd unit (`xpanel-update`, log `/var/log/xpanel-update.log`), so the panel restart does not interrupt it. Websites, email and data keep running; the panel itself is unavailable for about a minute.
+
+You can also run the installation command again; servers on v1.2.5 or older must do this once. Back up your server first. Applying performance settings can restart nginx and databases and reload PHP.
 
 ### Uninstalling
 
@@ -116,7 +120,9 @@ Upload source code under `/home/<user>/www/<domain>`, select the application typ
 
 PHP/Laravel websites and process-based applications have separate systemd services inside the customer's resource slice. Static HTML is served by nginx. Node.js, Next.js and Go receive an automatic localhost port and reverse proxy. Custom applications must respect `PORT`; Node.js apps should also respect `HOST` and bind to localhost.
 
-**Build & restart** runs the appropriate npm, Composer/Laravel or Go build as the customer's Linux user, with a 30-minute timeout. Database migrations are not run automatically. Laravel uses the `public` document root; Node.js apps need a `start` script.
+**Build & restart** runs the appropriate npm, Composer/Laravel or Go build as the customer's Linux user, with a 30-minute timeout, then the site's **deploy commands** (for example `php artisan migrate --force`; `php` and `composer` use the site's PHP version, and a failing command stops the build). Laravel uses the `public` document root; Node.js apps need a `start` script.
+
+**Restart** restarts a site's service in seconds without building: PHP/Laravel sites clear OPcache and reload environment variables, Node.js apps run changed code. Next.js and Go code, `package.json` and Laravel `.env`/config changes still need **Build & restart**.
 
 Each site supports environment variables and service logs. `PORT`, `HOST`, `PATH` and `HOME` are reserved. Environment files are root-owned with mode `0600`; values remain visible to the site owner and authorized managing accounts.
 
@@ -180,6 +186,11 @@ be checked in task logs.
 - Hosting users have separate Linux accounts and resource slices. File permissions and database access restrict cross-customer access.
 - Databases listen locally by default. Backup credentials and two-factor secrets are encrypted using a server-specific key.
 - fail2ban protects supported authentication services. Mail configuration includes authenticated submission and DKIM controls.
+- Mail: on ports 587/465 a mailbox may only send as its own address or aliases that deliver to it — both the envelope sender and the `From:`/`Sender:` header lines are checked (a small milter in the agent on `127.0.0.1:8892`). Webmail keeps one identity per mailbox with a fixed address.
+- Inbound mail (port 25) is checked by OpenDKIM and OpenDMARC: messages failing DMARC for a domain that publishes `p=reject` are rejected, the others carry an `Authentication-Results` header. The DNS records suggested for hosted domains are SPF `-all` and DMARC `p=reject`, so mail forged with a hosted domain is refused by this server and by other providers. Domains that also send through another service (newsletter tools, Google Workspace…) must add it to SPF and sign with DKIM, or use `p=quarantine`.
+- Customer PostgreSQL roles always log in with their password (no peer login by Linux user name); Adminer can only reach the customer cluster at `127.0.0.1:5433`.
+- Requests for unknown host names (or the bare IP) are closed on port 80 and refused during the TLS handshake on 443.
+- Malware scanning can use ClamAV; administrators can stop the resident `clamd` (about 1 GB of RAM) from the Malware page, in which case scans use `clamscan`.
 - Reboot requires administrator confirmation, rejects impersonated sessions and pending/running tasks, and records an audit event.
 
 The dashboard shows server IP, CPU, RAM, swap, storage, uptime, kernel and network totals. Metrics refresh every five seconds. Network totals are since boot; the CPU chart retains up to 30 samples in the current viewing session.

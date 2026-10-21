@@ -114,6 +114,7 @@ for asset in $(grep -oE '(href|src)="static.php/[^"]+.(css|js)[^"]*"' /tmp/rc | 
   expect "$(curl -sk -o /dev/null -w '%{http_code}' "$W/webmail/$asset")" 200 "webmail asset ${asset%%\?*}"
 done
 code=$(curl -sk -o /dev/null -w "%{http_code}" $W/webmail/config/config.inc.php); [ "$code" = 403 ] || [ "$code" = 404 ] && ok "config not reachable ($code)" || bad "config reachable ($code)"
+rm -f /tmp/rcj  # a session left by an earlier run would spoil this login
 TOK=$(curl -sk -c /tmp/rcj -b /tmp/rcj $W/webmail/ | grep -o 'name="_token" value="[^"]*"' | sed 's/.*value="//;s/"//')
 code=$(curl -sk -c /tmp/rcj -b /tmp/rcj -o /dev/null -w '%{http_code} %{redirect_url}' "$W/webmail/?_task=login" \
   --data-urlencode "_token=$TOK" -d "_task=login&_action=login&_timezone=UTC" \
