@@ -52,7 +52,7 @@ curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh 
 
 The uninstaller lists the accounts, websites, databases and mailboxes it will delete, then asks for confirmation: type `DELETE ALL` and press Enter. Pressing Enter on its own cancels without changes. On a server with X-Panel installed, `xpanel-uninstall` runs the same script.
 
-To read the script before running it, download it first: `curl -fSL --retry 3 -o /tmp/xpanel-uninstall.sh https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh`, then `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| bash`.
+To read the script before running it, download it first: `curl -fSL --retry 3 -o /tmp/xpanel-uninstall.sh https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh`, then `bash /tmp/xpanel-uninstall.sh`.\| bash`.
 
 Choose the mode with an environment variable before `bash` (works the same with a downloaded script):
 
