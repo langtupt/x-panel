@@ -73,6 +73,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.accounts.RunBackups(ctx)
 	go s.accounts.RunMalwareScans(ctx)
 	go s.accounts.InitFirewall(ctx)
+	go s.accounts.RunAutoUpdate(ctx)
 }
 
 func (s *Server) Handler() http.Handler {
@@ -196,6 +197,9 @@ func (s *Server) Handler() http.Handler {
 				r.Get("/system/panel-ssl", s.handlePanelSSL)
 				r.Post("/system/panel-ssl", s.handleIssuePanelSSL)
 				r.Post("/system/reboot", s.handleSystemReboot)
+				r.Get("/system/update", s.handleUpdate)
+				r.Post("/system/update", s.handleStartUpdate)
+				r.Put("/system/update", s.handleSaveUpdate)
 				r.Get("/apps", s.handleListApps)
 				r.Post("/apps/{app}/install", s.handleInstallApp)
 				r.Post("/apps/{app}/remove", s.handleRemoveApp)

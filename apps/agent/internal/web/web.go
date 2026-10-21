@@ -239,6 +239,11 @@ func (s *Syncer) syncVhosts(ctx context.Context, p agentproto.WebSyncParams, hom
 			return nil, err
 		}
 	}
+	// An account without websites (e.g. being deleted) keeps no directory;
+	// os.Remove fails harmlessly while a vhost is still there.
+	if len(p.Sites) == 0 {
+		defer os.Remove(dir)
+	}
 
 	fs := fileSet{}
 	entries, _ := os.ReadDir(dir)

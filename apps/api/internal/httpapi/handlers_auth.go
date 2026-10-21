@@ -8,6 +8,7 @@ import (
 	"xpanel/apps/api/internal/audit"
 	"xpanel/apps/api/internal/auth"
 	"xpanel/apps/api/internal/users"
+	"xpanel/pkg/version"
 )
 
 const (
@@ -109,6 +110,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 type meResponse struct {
 	*users.User
+	PanelVersion string `json:"panel_version"`
 	Impersonator *struct {
 		ID       int64  `json:"id"`
 		Username string `json:"username"`
@@ -116,7 +118,7 @@ type meResponse struct {
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
-	res := meResponse{User: currentUser(r)}
+	res := meResponse{User: currentUser(r), PanelVersion: version.Version}
 	if imp := impersonatorID(r); imp != 0 {
 		if u, err := s.users.ByID(r.Context(), imp); err == nil {
 			res.Impersonator = &struct {
