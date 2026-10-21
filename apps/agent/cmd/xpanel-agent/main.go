@@ -101,6 +101,10 @@ func main() {
 	if err := php.MigrateHostingDefaults(context.Background(), d); err != nil {
 		log.Error("php hosting defaults", "err", err)
 	}
+	// Customer PostgreSQL clusters of older releases trusted peer logins.
+	if err := apps.SecureCustomerCluster(context.Background()); err != nil {
+		log.Error("postgres customer hba", "err", err)
+	}
 	// Adminer installed by older releases could connect to any host.
 	if err := apps.RefreshAdminer(); err != nil {
 		log.Error("adminer wrapper", "err", err)
