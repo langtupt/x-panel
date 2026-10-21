@@ -30,7 +30,8 @@ import (
 const (
 	FromCheckAddr = "127.0.0.1:8892"
 	// Postfix fails closed on the submission ports if the agent is down.
-	submissionMilters = "{ inet:" + FromCheckAddr + ", default_action = tempfail }, inet:127.0.0.1:8891"
+	// No spaces around "=": smtpd refuses "default_action = tempfail".
+	submissionMilters = "{ inet:" + FromCheckAddr + ", default_action=tempfail }, inet:127.0.0.1:8891"
 )
 
 // senderOwners caches the senders map (address -> logins allowed to use it).

@@ -105,3 +105,14 @@ func TestMilterSession(t *testing.T) {
 		t.Errorf("own From not accepted: %q", second)
 	}
 }
+
+// smtpd parses per-milter settings itself and dies on "name = value"
+// (postconf/postfix check accept it): every submission then fails.
+func TestSubmissionMiltersSyntax(t *testing.T) {
+	inner := submissionMilters[strings.Index(submissionMilters, "{")+1 : strings.Index(submissionMilters, "}")]
+	for _, part := range strings.Split(inner, ",")[1:] {
+		if strings.Contains(part, " =") || strings.Contains(part, "= ") {
+			t.Errorf("milter attribute %q has spaces around '='", strings.TrimSpace(part))
+		}
+	}
+}
