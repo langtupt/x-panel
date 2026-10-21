@@ -40,13 +40,11 @@ PublicSuffixList /usr/share/publicsuffix/public_suffix_list.dat
 }
 
 // installDMARC adds the packages; dbconfig-no-thanks keeps the package from
-// asking for a MySQL history database.
+// creating a MySQL history database. (Preseeding opendmarc/dbconfig-install
+// does not work: the question is unknown until the package is installed.)
 func installDMARC(ctx context.Context) (string, error) {
-	if _, err := run.With(ctx, run.Opts{Stdin: "opendmarc opendmarc/dbconfig-install boolean false\n"}, "debconf-set-selections"); err != nil {
-		return "", err
-	}
 	return run.With(ctx, aptOpts, "apt-get", "-o", "DPkg::Lock::Timeout=600", "install", "-y", "-q",
-		"--no-install-recommends", "opendmarc", "dbconfig-no-thanks", "publicsuffix")
+		"--no-install-recommends", "opendmarc", "dbconfig-no-thanks")
 }
 
 func configureDMARC(ctx context.Context, host string) error {
