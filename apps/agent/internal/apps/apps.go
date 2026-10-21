@@ -123,7 +123,7 @@ func New(d distro.Distro) *Catalog {
 		},
 		{
 			info: agentproto.AppInfo{ID: "adminer", Name: "Adminer (PostgreSQL)", Category: "tool",
-				Description: "Quản lý PostgreSQL qua web tại https://<máy chủ>:8888/adminer/ — thay cho phpPgAdmin (đã ngừng phát triển, không chạy trên PHP 8)."},
+				Description: "Quản lý PostgreSQL qua web tại https://<máy chủ>:8890/adminer/ — thay cho phpPgAdmin (đã ngừng phát triển, không chạy trên PHP 8)."},
 			available: adminerAvailable,
 			installed: adminerInstalled,
 			install: func(ctx context.Context, v string, logf func(string, ...any)) error {

@@ -80,22 +80,61 @@ func installAdminer(ctx context.Context, d distro.Distro, selected string, logf 
 	return nil
 }
 
-// adminerWrapper only allows logins to the local customer PostgreSQL
-// cluster, so the tool cannot be used to reach other hosts.
+// adminerWrapper only lets Adminer reach the local customer PostgreSQL
+// cluster. Adminer connects before it calls login(), so the server is
+// forced before the include and in credentials(): a crafted ?pgsql=<host>
+// or login form can never send the password to another host.
 var adminerWrapper = `<?php
 // Managed by X-Panel.
+const XPANEL_PG = '127.0.0.1:` + fmt.Sprint(PGPort) + `';
+foreach (['server', 'sqlite', 'oracle', 'mssql', 'mongo', 'elastic', 'clickhouse', 'firebird', 'simpledb', 'imap'] as $k) {
+    unset($_GET[$k]);
+}
+if (isset($_GET['pgsql'])) {
+    $_GET['pgsql'] = XPANEL_PG;
+}
+if (isset($_POST['auth']) && is_array($_POST['auth'])) {
+    $_POST['auth']['driver'] = 'pgsql';
+    $_POST['auth']['server'] = XPANEL_PG;
+}
 function adminer_object() {
     class XPanelAdminer extends Adminer\Adminer {
+        function credentials() {
+            return [XPANEL_PG, $_GET['username'], Adminer\get_password()];
+        }
         function login($login, $password) {
-            return Adminer\DRIVER === 'pgsql'
-                && in_array(Adminer\SERVER, ['127.0.0.1:` + fmt.Sprint(PGPort) + `', 'localhost:` + fmt.Sprint(PGPort) + `'], true)
-                && $password !== '';
+            if (Adminer\DRIVER !== 'pgsql' || Adminer\SERVER !== XPANEL_PG) {
+                return 'Chỉ đăng nhập được PostgreSQL của X-Panel (' . XPANEL_PG . ').';
+            }
+            return parent::login($login, $password);
+        }
+        function loginFormField($name, $heading, $value) {
+            if ($name == 'driver') {
+                return '<input type="hidden" name="auth[driver]" value="pgsql">';
+            }
+            if ($name == 'server') {
+                return $heading . '<input value="' . XPANEL_PG . '" disabled><input type="hidden" name="auth[server]" value="' . XPANEL_PG . '">' . "\n";
+            }
+            return parent::loginFormField($name, $heading, $value);
         }
     }
     return new XPanelAdminer;
 }
 include __DIR__ . '/adminer.php';
 `
+
+// RefreshAdminer rewrites the wrapper of an installed Adminer, so a fix to
+// it reaches servers that installed Adminer with an older X-Panel.
+func RefreshAdminer() error {
+	if _, err := os.Stat(filepath.Join(pma.AdminerDir, "adminer.php")); err != nil {
+		return nil
+	}
+	path := filepath.Join(pma.AdminerDir, "index.php")
+	if old, err := os.ReadFile(path); err == nil && string(old) == adminerWrapper {
+		return nil
+	}
+	return os.WriteFile(path, []byte(adminerWrapper), 0o644)
+}
 
 const adminerSnippet = `# Managed by X-Panel: Adminer (PostgreSQL) on the panel port.
 location = /adminer { return 301 /adminer/; }
