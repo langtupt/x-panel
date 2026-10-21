@@ -43,6 +43,8 @@ if [ -z "$HOSTING_USERS" ]; then # panel database already gone: use the SFTP gro
   HOSTING_USERS="$(getent group xpanel-sftp | cut -d: -f4 | tr ',' '\n' | grep -v '^$' || true)"
 fi
 MARIA_DBS="$(pgq "SELECT name || ' ' || db_user FROM databases WHERE engine='mariadb'")"
+# Host changes made by the installer (swap file, quota mount options).
+HOST_CHANGES="$(cat /etc/xpanel/host-changes /etc/xpanel-host-changes 2>/dev/null || true)"
 N_USERS=$(printf '%s\n' "$HOSTING_USERS" | grep -c . || true)
 N_SITES=$(pgq "SELECT count(*) FROM sites"); N_SITES=${N_SITES:-?}
 N_DBS=$(pgq "SELECT count(*) FROM databases"); N_DBS=${N_DBS:-?}
@@ -60,8 +62,9 @@ else
   echo "  This action cannot be undone. Download any required backups before continuing."
 fi
 if [ "$PURGE" = 1 ]; then
-  echo "  PURGE nginx, PHP, MariaDB, PostgreSQL, Pure-FTPd, Postfix, Dovecot, OpenDKIM, fail2ban, ClamAV, Redis and Memcached packages."
-  echo "  Their data and configuration will also be deleted, including services installed outside X-Panel."
+  echo "  PURGE nginx, PHP, MariaDB, PostgreSQL, Pure-FTPd, Postfix, Dovecot, OpenDKIM, fail2ban, ClamAV, Redis,"
+  echo "  Memcached, Node.js and quota packages. Their data and configuration will also be deleted, including"
+  echo "  services installed outside X-Panel. The swap file and quota options added by the installer are removed."
 else
   echo "  nginx, PHP, MariaDB, PostgreSQL and FTP/mail packages will be RETAINED."
   echo "  To purge them as well, cancel and run again without XPANEL_KEEP_PACKAGES / XPANEL_KEEP_DATA."
@@ -140,6 +143,10 @@ rm -f /etc/php/*/fpm/conf.d/99-xpanel.ini
 rm -f /etc/php/*/fpm/conf.d/98-xpanel-performance.ini
 rm -f /etc/postgresql/*/*/conf.d/90-xpanel-performance.conf
 for v in $(ls /etc/php 2>/dev/null); do q systemctl reload-or-restart "php$v-fpm"; done
+# Remember the host changes for a later XPANEL_PURGE_PACKAGES=1 run.
+if [ "$PURGE" != 1 ] && [ -n "$HOST_CHANGES" ]; then
+  echo "$HOST_CHANGES" >/etc/xpanel-host-changes
+fi
 if [ "$KEEP" != 1 ]; then
   rm -rf /opt/xpanel /etc/xpanel /var/lib/xpanel /etc/xpanel-cron /etc/xpanel-site-apps /run/xpanel*
 else
@@ -194,19 +201,52 @@ fi
 [ "$KEEP" = 1 ] || q groupdel xpanel-sftp
 
 if [ "$PURGE" = 1 ]; then
+  say "Reverting host changes made by the installer"
+  while read -r kind a b; do
+    case "$kind" in
+      quota)
+        q quotaoff -u "$a"
+        awk -v mp="$a" -v opt="$b" 'BEGIN { OFS = "\t" }
+          $1 !~ /^#/ && $2 == mp { n = split($4, o, ","); s = ""
+            for (i = 1; i <= n; i++) if (o[i] != opt) s = s (s == "" ? "" : ",") o[i]
+            $4 = (s == "" ? "defaults" : s) }
+          { print }' /etc/fstab >/etc/fstab.xpanel
+        if findmnt --verify --tab-file /etc/fstab.xpanel >/dev/null 2>&1; then
+          mv /etc/fstab.xpanel /etc/fstab
+          rm -f "${a%/}/aquota.user"
+        else
+          rm -f /etc/fstab.xpanel
+          warn "Kept the $b option in /etc/fstab: the edited file did not verify."
+        fi ;;
+      grub)
+        if [ "$a" = rootflags=uquota ] && [ -f /etc/default/grub ]; then
+          sed -i 's/rootflags=uquota //' /etc/default/grub && q update-grub
+        fi ;;
+      swap)
+        [ "$a" = /swapfile ] || continue
+        q swapoff /swapfile
+        awk '!($1 == "/swapfile" && $3 == "swap")' /etc/fstab >/etc/fstab.xpanel && mv /etc/fstab.xpanel /etc/fstab
+        rm -f /swapfile ;;
+    esac
+  done <<<"$HOST_CHANGES"
+  rm -f /etc/xpanel-host-changes
+
   say "Purging hosting service packages"
   export DEBIAN_FRONTEND=noninteractive
   # Include rc packages: a previous remove can leave configuration behind.
   pkgs=$( { dpkg-query -W -f='${binary:Package} ${db:Status-Abbrev}\n' 'nginx*' 'libnginx-mod-*' 'php*' 'mariadb-*' 'postgresql*' 'pure-ftpd*' 'postfix*' \
          'dovecot-*' 'opendkim*' 'fail2ban' 'clamav*' 'libclamav*' 'redis-server' 'redis-tools' 'memcached' \
-         'python3-systemd' 'debsuryorg-archive-keyring' 2>/dev/null || true; } | awk '$2 ~ /^(ii|rc)/ {print $1}')
+         'python3-systemd' 'quota' 'nodejs' 'debsuryorg-archive-keyring' 2>/dev/null || true; } | awk '$2 ~ /^(ii|rc)/ {print $1}')
   if [ -n "$pkgs" ]; then
     apt-get purge -y -q $pkgs || die "APT purge failed. Resolve the errors above and rerun with XPANEL_PURGE_PACKAGES=1. Database directories have not been deleted."
   fi
   apt-get autoremove --purge -y -q || die "APT autoremove failed. Resolve the issue and rerun with XPANEL_PURGE_PACKAGES=1."
   rm -rf /etc/php /etc/nginx /etc/mysql /var/lib/mysql /etc/postgresql /var/lib/postgresql /etc/dovecot /etc/postfix \
          /etc/opendkim /etc/pure-ftpd /etc/clamav /var/lib/clamav /etc/redis /var/lib/redis /opt/xpanel
-  for f in /etc/apt/sources.list.d/*ondrej* /etc/apt/sources.list.d/*pgdg*; do [ -e "$f" ] && rm -f "$f"; done
+  for f in /etc/apt/sources.list.d/*ondrej* /etc/apt/sources.list.d/*pgdg* /etc/apt/sources.list.d/nodesource* \
+           /etc/apt/trusted.gpg.d/*ondrej* /etc/apt/keyrings/nodesource* /usr/share/keyrings/nodesource*; do
+    [ -e "$f" ] && rm -f "$f"
+  done
   rm -f /usr/local/bin/composer
   rm -f /etc/ssl/private/pure-ftpd.pem
   rm -rf /run/clamav /run/redis /run/mysqld /run/postgresql /run/php /var/log/clamav /var/log/redis /var/log/mysql /var/log/postgresql
@@ -238,7 +278,11 @@ else
   echo "nginx, PHP and database packages remain installed. To purge them, run:"
   echo "curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh | XPANEL_PURGE_PACKAGES=1 bash"
 fi
-echo "Swap (/swapfile, if created by the installer) and disk quota settings have been retained."
+if [ "$PURGE" = 1 ]; then
+  echo "The swap file and quota options added by the installer have been removed; SSH and network settings are unchanged."
+else
+  echo "Swap (/swapfile, if created by the installer) and disk quota settings have been retained."
+fi
 }
 
 main "$@"

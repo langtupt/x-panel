@@ -189,10 +189,11 @@ Tuỳ chọn (đặt trước `bash`):
 | `XPANEL_CONFIRM=XOA-SACH` | không hỏi xác nhận (cho script tự động) |
 
 Lệnh mặc định **gỡ sạch**: ngoài panel và dữ liệu khách, nó purge luôn nginx, PHP, MariaDB,
-PostgreSQL, Postfix, Dovecot, OpenDKIM, Pure-FTPd, fail2ban, ClamAV, Redis, Memcached cùng dữ liệu
+PostgreSQL, Postfix, Dovecot, OpenDKIM, Pure-FTPd, fail2ban, ClamAV, Redis, Memcached, Node.js, quota cùng dữ liệu
 và cấu hình của chúng, kể cả dịch vụ được cài ngoài panel. Máy đã gỡ bằng bản cũ (còn sót gói):
-chạy lại với `XPANEL_PURGE_PACKAGES=1`. Không kết hợp `XPANEL_PURGE_PACKAGES=1` với các biến KEEP. Swap, quota, mạng và các file tự tải
-trong `/root` vẫn được giữ; muốn VPS trở về trạng thái hệ điều hành mới, hãy cài lại OS.
+chạy lại với `XPANEL_PURGE_PACKAGES=1`. Không kết hợp `XPANEL_PURGE_PACKAGES=1` với các biến KEEP. File swap và
+tùy chọn quota do bộ cài tạo cũng được gỡ (quota hết hiệu lực sau lần khởi động lại kế tiếp). Mạng, SSH, ufw và các file
+tự tải trong `/root` vẫn được giữ; muốn VPS trở về trạng thái hệ điều hành mới, hãy cài lại OS.
 
 Cách "sạch" nhất vẫn là **cài lại hệ điều hành** từ trang quản lý của nhà cung cấp VPS.
 
