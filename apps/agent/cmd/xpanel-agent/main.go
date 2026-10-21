@@ -95,6 +95,9 @@ func main() {
 	if err := mail.MigrateDovecot(context.Background()); err != nil {
 		log.Error("update dovecot config", "err", err)
 	}
+	if err := mail.MigrateFromCheck(context.Background()); err != nil {
+		log.Error("submission header From check", "err", err)
+	}
 	if err := firewall.Restore(context.Background()); err != nil {
 		log.Error("restore firewall", "err", err)
 	}
@@ -372,6 +375,8 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	// Submission ports check the header From against the login.
+	go mail.ServeFromCheck(ctx, log)
 	if err := srv.Listen(ctx, *socket, *group); err != nil {
 		log.Error("listen", "err", err)
 		os.Exit(1)
