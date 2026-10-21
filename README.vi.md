@@ -45,13 +45,12 @@ Mở địa chỉ đó trên trình duyệt (cảnh báo chứng chỉ lần đ�
 | Tự đặt mật khẩu admin khi cài | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| ADMIN_PASSWORD='MatKhau12345' bash` |
 | **Cập nhật** lên bản mới (giữ nguyên dữ liệu) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| bash` |
 | Quên mật khẩu admin | như dòng đầu, với mật khẩu mới |
-| Gỡ panel và dữ liệu khách (giữ các gói dịch vụ) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| bash` |
-| **Gỡ toàn bộ**, gồm các gói nginx/PHP/database/mail/FTP | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_PURGE_PACKAGES=1 bash` |
+| **Gỡ sạch toàn bộ** (mặc định): panel, dữ liệu khách và các gói nginx/PHP/database/mail/FTP/ClamAV/Redis | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| bash` |
+| Gỡ panel và dữ liệu khách, giữ các gói dịch vụ | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_KEEP_PACKAGES=1 bash` |
 | Gỡ panel nhưng giữ website/database/email | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_KEEP_DATA=1 bash` |
 
-Chế độ `XPANEL_PURGE_PACKAGES=1` có thể chạy tiếp sau khi đã gỡ panel; nó xóa toàn bộ
-gói và dữ liệu của các dịch vụ hosting kể trên, kể cả cài ngoài X-Panel. Không dùng
-cùng `XPANEL_KEEP_DATA=1`. Swap, quota, cấu hình mạng và file do bạn tự tải trong
+Lệnh gỡ mặc định purge toàn bộ gói và dữ liệu của các dịch vụ hosting kể trên, kể cả cài
+ngoài X-Panel. Máy đã gỡ panel bằng bản cũ còn sót gói: chạy lại với `XPANEL_PURGE_PACKAGES=1`. Swap, quota, cấu hình mạng và file do bạn tự tải trong
 `/root` được giữ nguyên; gỡ phần mềm không tương đương cài lại hệ điều hành.
 
 📘 **Hướng dẫn chi tiết từ A đến Z** (chuẩn bị VPS, mở cổng, đăng nhập SSH từ Windows, các bước sau khi cài,
@@ -398,6 +397,9 @@ API cũ /api/php và /api/phpmyadmin vẫn tương thích.
 - **Build & restart** chạy npm ci/install + build, go build, hoặc Composer + Laravel
   config/view cache bằng user Linux của khách trong slice của tài khoản (tối đa 30 phút).
   Node cần script start trong package.json.
+- **Restart** (cạnh Build & restart): khởi động lại service của website trong vài giây, không build lại —
+  PHP/Laravel xóa OPcache và nạp lại biến môi trường, Node.js chạy mã mới. Next.js, Go và đổi `package.json`/`.env`
+  của Laravel vẫn cần Build & restart. `POST /api/sites/{id}/restart`.
 - Hướng dẫn tải mã nguồn từng loại (cách nén, SFTP, Laravel/Node/Next/Go, lỗi thường gặp): **[docs/TAI-MA-NGUON.md](docs/TAI-MA-NGUON.md)**
 - **Lệnh triển khai** (trong form sửa website): các lệnh chạy sau mỗi lần Build, cùng user và
   môi trường cách ly, ví dụ `php artisan migrate --force`, `php artisan storage:link`,

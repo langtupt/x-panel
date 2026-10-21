@@ -179,6 +179,9 @@ const (
 	ActionSiteDetect = "site.detect"
 	ActionSiteBuild  = "site.build"
 	ActionSiteLogs   = "site.logs"
+	// ActionSiteRestart restarts a built app or a PHP site's FPM master
+	// without building (picks up changed PHP files, .env, plain Node.js code).
+	ActionSiteRestart = "site.restart"
 )
 
 type SiteAppParams struct {
@@ -530,6 +533,7 @@ type BackupManifest struct {
 const (
 	ActionMalwareStatus     = "malware.status"     // -> MalwareStatus
 	ActionMalwareInstall    = "malware.install"    // -> TaskLog (installs ClamAV)
+	ActionMalwareClamd      = "malware.clamd"      // MalwareClamdParams -> TaskLog
 	ActionMalwareScan       = "malware.scan"       // MalwareScanParams -> MalwareScanResult
 	ActionMalwareRead       = "malware.read"       // MalwareFileParams -> MalwareFile
 	ActionMalwareQuarantine = "malware.quarantine" // MalwareQuarantineParams -> MalwareFile (without content)
@@ -542,6 +546,14 @@ type MalwareStatus struct {
 	ClamAV    bool   `json:"clamav"`     // clamscan or clamdscan installed
 	Clamd     bool   `json:"clamd"`      // the daemon answers (fast scans)
 	DBVersion string `json:"db_version"` // signature database
+	// The resident daemon (~1 GB RAM) is installed / enabled at boot.
+	ClamdInstalled bool `json:"clamd_installed"`
+	ClamdEnabled   bool `json:"clamd_enabled"`
+}
+
+// MalwareClamdParams starts (and enables at boot) or stops the ClamAV daemon.
+type MalwareClamdParams struct {
+	Enabled bool `json:"enabled"`
 }
 
 // MalwareScanParams scans an account's home; Since (unix seconds) limits

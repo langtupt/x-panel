@@ -103,6 +103,7 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/me/2fa/recovery-codes", s.handleRegenerateRecoveryCodes)
 
 			r.Post("/sites/{id}/build", s.handleBuildSite)
+			r.Post("/sites/{id}/restart", s.handleRestartSite)
 			r.Get("/sites/{id}/detect", s.handleDetectSite)
 			r.Get("/sites/{id}/logs", s.handleSiteLogs)
 			r.Put("/sites/{id}/php", s.handleSitePHP)
@@ -139,6 +140,7 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/firewall/unlock", s.handleFirewallUnlock)
 			r.Get("/malware/status", s.handleMalwareStatus)
 			r.Post("/malware/install", s.handleMalwareInstall)
+			r.Post("/malware/clamd", s.handleMalwareClamd)
 			r.Get("/malware/settings", s.handleMalwareSettings)
 			r.Put("/malware/settings", s.handleSaveMalwareSettings)
 			r.Get("/malware", s.handleMalwareOverview)

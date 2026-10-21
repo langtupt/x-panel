@@ -19,6 +19,19 @@ func (s *Server) handleBuildSite(w http.ResponseWriter, r *http.Request) {
 	s.audit.Record(r.Context(), audit.Entry{ActorID: &currentUser(r).ID, Action: "site.build", TargetType: "site", TargetID: &id, IP: clientIP(r)})
 	writeJSON(w, http.StatusAccepted, t)
 }
+func (s *Server) handleRestartSite(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	out, err := s.accounts.RestartSite(r.Context(), currentUser(r), id)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.audit.Record(r.Context(), audit.Entry{ActorID: &currentUser(r).ID, Action: "site.restart", TargetType: "site", TargetID: &id, IP: clientIP(r)})
+	writeJSON(w, http.StatusOK, out)
+}
 func (s *Server) handleDetectSite(w http.ResponseWriter, r *http.Request) {
 	s.siteAppInfo(w, r, agentproto.ActionSiteDetect)
 }

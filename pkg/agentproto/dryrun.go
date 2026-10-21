@@ -47,7 +47,7 @@ func (d *DryRun) Call(_ context.Context, action string, params, out any) error {
 			{ID: "mailserver", Name: "Mail server", Category: "mail", Installed: []string{"3.8"}, Available: []string{"3.8"}},
 			{ID: "roundcube", Name: "Roundcube Webmail", Category: "mail", Installed: []string{}, Available: []string{"1.6.11"}},
 		}}
-	case ActionSiteBuild, ActionSiteLogs, ActionAppsInstall, ActionPHPInstall:
+	case ActionSiteBuild, ActionSiteLogs, ActionSiteRestart, ActionAppsInstall, ActionPHPInstall:
 		res = TaskLog{Log: "dry-run: nothing installed"}
 	case ActionSSLIssue:
 		res = SSLIssueResult{ExpiresAt: time.Now().Add(90 * 24 * time.Hour)}

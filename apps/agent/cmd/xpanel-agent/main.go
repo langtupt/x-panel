@@ -143,6 +143,9 @@ func main() {
 	srv.Register(agentproto.ActionMalwareInstall, func(ctx context.Context, _ json.RawMessage) (any, error) {
 		return malware.Install(ctx)
 	})
+	srv.Register(agentproto.ActionMalwareClamd, server.Typed(func(ctx context.Context, p agentproto.MalwareClamdParams) (any, error) {
+		return malware.SetClamd(ctx, p.Enabled)
+	}))
 	srv.Register(agentproto.ActionMalwareScan, server.Typed(func(ctx context.Context, p agentproto.MalwareScanParams) (any, error) {
 		return malware.Scan(ctx, p)
 	}))
@@ -282,6 +285,7 @@ func main() {
 	}))
 	srv.Register(agentproto.ActionSiteDetect, server.Typed(siteapp.Detect))
 	srv.Register(agentproto.ActionSiteLogs, server.Typed(siteapp.Logs))
+	srv.Register(agentproto.ActionSiteRestart, server.Typed(siteapp.Restart))
 	srv.Register(agentproto.ActionSiteBuild, server.Typed(func(ctx context.Context, p agentproto.SiteAppParams) (any, error) { return siteapp.Build(ctx, d, p) }))
 	catalog := apps.New(d)
 	srv.Register(agentproto.ActionAppsList, server.Typed(func(ctx context.Context, p agentproto.AppListParams) (any, error) {

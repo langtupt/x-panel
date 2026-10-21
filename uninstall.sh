@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # X-Panel uninstaller. Run as root:
 # curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh | bash
-# Default: remove panel and customer data; retain hosting service packages.
+# Default: remove everything X-Panel installed - panel, customer data and the
+# hosting service packages (nginx, PHP, databases, mail, FTP, ClamAV...) with
+# their data and configuration.
 # Options (environment variables before bash):
-# XPANEL_KEEP_DATA=1       Remove panel while retaining customer data.
-# XPANEL_PURGE_PACKAGES=1  Also purge hosting packages and their data/configuration.
+# XPANEL_KEEP_PACKAGES=1   Remove panel and customer data; retain service packages.
+# XPANEL_KEEP_DATA=1       Remove panel while retaining customer data (and packages).
+# XPANEL_PURGE_PACKAGES=1  Accepted for compatibility (purging is the default).
 # XPANEL_CONFIRM=DELETE-ALL  Skip interactive confirmation for automation.
 # Legacy XOA-SACH / XOA SACH confirmations remain accepted for compatibility.
 set -euo pipefail
@@ -18,11 +21,18 @@ q()    { "$@" >/dev/null 2>&1 || true; }
 
 [ "$(id -u)" -eq 0 ] || die "Root access is required. Log in as root (or run sudo -i), then run the command again."
 KEEP="${XPANEL_KEEP_DATA:-0}"
-PURGE="${XPANEL_PURGE_PACKAGES:-0}"
-[ "$KEEP" != 1 ] || [ "$PURGE" != 1 ] \
-  || die "Data retention and package purge cannot be combined. Select one mode only."
+KEEP_PKGS="${XPANEL_KEEP_PACKAGES:-0}"
+FORCE_PURGE="${XPANEL_PURGE_PACKAGES:-}"
+[ "$FORCE_PURGE" = 0 ] && KEEP_PKGS=1
+[ "$FORCE_PURGE" != 1 ] || { [ "$KEEP" != 1 ] && [ "$KEEP_PKGS" != 1 ]; } \
+  || die "Retaining data or packages cannot be combined with XPANEL_PURGE_PACKAGES=1. Select one mode only."
+# Purging deletes the database directories, so retaining data retains packages.
+PURGE=1
+if [ "$KEEP" = 1 ] || [ "$KEEP_PKGS" = 1 ]; then PURGE=0; fi
 
-if [ "$PURGE" != 1 ] && [ ! -e /etc/xpanel ] && [ ! -e /opt/xpanel ] && ! systemctl cat xpanel-api >/dev/null 2>&1; then
+# Only an explicit XPANEL_PURGE_PACKAGES=1 cleans up a server without X-Panel
+# (leftovers of an interrupted uninstall): never purge a foreign server by default.
+if [ "$FORCE_PURGE" != 1 ] && [ ! -e /etc/xpanel ] && [ ! -e /opt/xpanel ] && ! systemctl cat xpanel-api >/dev/null 2>&1; then
   die "No X-Panel installation was found on this server."
 fi
 
@@ -54,7 +64,7 @@ if [ "$PURGE" = 1 ]; then
   echo "  Their data and configuration will also be deleted, including services installed outside X-Panel."
 else
   echo "  nginx, PHP, MariaDB, PostgreSQL and FTP/mail packages will be RETAINED."
-  echo "  To purge packages as well, cancel and run again with XPANEL_PURGE_PACKAGES=1."
+  echo "  To purge them as well, cancel and run again without XPANEL_KEEP_PACKAGES / XPANEL_KEEP_DATA."
 fi
 printf '\033[1;31m%s\033[0m\n' "======================================================"
 

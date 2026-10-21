@@ -818,6 +818,11 @@
   "Bộ máy quét": "Scanner",
   "ClamAV chưa cài (admin cài để quét sâu hơn)": "ClamAV not installed (an admin can install it for deeper scans)",
   "Cài ClamAV (cần ~1 GB RAM)": "Install ClamAV (needs ~1 GB RAM)",
+  "đang chạy (~1 GB RAM, quét nhanh)": "running (~1 GB RAM, fast scans)",
+  "đang khởi động": "starting",
+  "đã tắt (quét bằng clamscan, chậm hơn)": "off (scans use clamscan, slower)",
+  "Tắt clamd (tiết kiệm ~1 GB RAM)": "Turn off clamd (saves ~1 GB RAM)",
+  "Bật clamd": "Turn on clamd",
   "Mỗi tài khoản hosting tự đặt lịch quét và API key OpenAI của mình. Bạn xem, quét và xử lý được phát hiện của tài khoản mình quản lý; để cấu hình hộ, dùng \"Đăng nhập thay\".": "Each hosting account sets its own scan schedule and OpenAI API key. You can view, scan and handle findings of the accounts you manage; to configure for them, use \"Log in as\".",
   "Phát hiện": "Findings",
   "Cần xử lý": "Needs action",
@@ -887,5 +892,11 @@
   "… thì khóa đăng nhập (phút)": "… then lock login (minutes)",
   "Tài khoản tạm khóa đăng nhập": "Account login temporarily locked",
   "Lệnh triển khai (chạy sau mỗi lần Build, dưới quyền tài khoản)": "Deploy commands (run after every Build, as the account)",
-  "Ví dụ chạy migration, build tài nguyên. Lệnh php / composer dùng đúng phiên bản PHP của website; lệnh lỗi sẽ dừng Build.": "E.g. migrations or asset builds. php / composer use the site PHP version; a failing command stops the Build."
+  "Ví dụ chạy migration, build tài nguyên. Lệnh php / composer dùng đúng phiên bản PHP của website; lệnh lỗi sẽ dừng Build.": "E.g. migrations or asset builds. php / composer use the site PHP version; a failing command stops the Build.",
+  "Đang restart…": "Restarting…",
+  "Đã restart {0}": "Restarted {0}",
+  "Khởi động lại PHP-FPM của website (xóa OPcache, nạp lại biến môi trường)": "Restart the site's PHP-FPM (clears OPcache, reloads environment variables)",
+  "Khởi động lại PHP-FPM (xóa OPcache). Đổi .env hoặc config: dùng Build & restart để tạo lại cache": "Restart PHP-FPM (clears OPcache). After changing .env or config, use Build & restart to rebuild the cache",
+  "Khởi động lại ứng dụng để chạy mã mới (không cài lại package). Đổi package.json: dùng Build & restart": "Restart the app to run new code (packages are not reinstalled). After changing package.json, use Build & restart",
+  "Khởi động lại ứng dụng với bản build hiện có. Mã mới cần Build & restart": "Restart the app with its current build. New code needs Build & restart"
 }

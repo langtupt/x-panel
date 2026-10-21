@@ -52,11 +52,12 @@ curl -fSL --retry 3 -o /tmp/xpanel-uninstall.sh https://raw.githubusercontent.co
 
 | Action | Command |
 |---|---|
-| Remove panel and customer data; retain service packages | `bash /tmp/xpanel-uninstall.sh` |
-| Remove panel, customer data and hosting service packages | `XPANEL_PURGE_PACKAGES=1 bash /tmp/xpanel-uninstall.sh` |
+| **Remove everything**: panel, customer data and hosting service packages (default) | `bash /tmp/xpanel-uninstall.sh` |
+| Remove panel and customer data; retain service packages | `XPANEL_KEEP_PACKAGES=1 bash /tmp/xpanel-uninstall.sh` |
 | Remove panel while retaining website/database/email data | `XPANEL_KEEP_DATA=1 bash /tmp/xpanel-uninstall.sh` |
+| Clean up packages left by an earlier uninstall | `XPANEL_PURGE_PACKAGES=1 bash /tmp/xpanel-uninstall.sh` |
 
-Deletion requires interactive confirmation. **Full purge permanently removes hosting service packages and their data, including services installed outside X-Panel.** It can run after a previous panel removal. Do not combine purge with `XPANEL_KEEP_DATA=1`.
+Deletion requires interactive confirmation. **The default removal permanently purges nginx, PHP, MariaDB, PostgreSQL, mail, FTP, fail2ban, ClamAV, Redis and Memcached with their data, including services installed outside X-Panel.** Swap and disk quota settings are retained.
 
 Swap, quota settings, network configuration and downloaded files in `/root` remain. Uninstalling is not equivalent to reinstalling the operating system.
 

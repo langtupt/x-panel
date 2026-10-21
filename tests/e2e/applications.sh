@@ -89,6 +89,17 @@ web laravel.apps.example.com 'Laravel'
 for unit in $(systemctl list-units --type=service --no-legend 'xpanel-app-appcust-*' | awk '{print $1}'); do
  systemctl show "$unit" -p Slice --value | grep -qx xpanel-appcust.slice
 done
+# Restart without building: plain Node.js code changes go live, static sites have no service.
+sid() { curl -sk -b /tmp/apps-cookie "${H[@]}" "$B/api/sites" | jq --arg d "$1" '.[] | select(.domain==$d) | .id'; }
+ND=$(sid nodejs.apps.example.com)
+runuser -u appcust -- sed -i 's/Hello from X-Panel/Hello after restart/' /home/appcust/www/nodejs.apps.example.com/server.js
+req POST "/sites/$ND/restart" '' 200
+web nodejs.apps.example.com 'Hello after restart'; echo "PASS restart picks up Node.js code"
+runuser -u appcust -- sed -i 's/Hello after restart/Hello from X-Panel/' /home/appcust/www/nodejs.apps.example.com/server.js
+req POST "/sites/$(sid php.apps.example.com)/restart" '' 200
+web php.apps.example.com 'Hello from X-Panel'; echo "PASS restart PHP site"
+req POST "/sites/$(sid html.apps.example.com)/restart" '' 400; echo "PASS static site has no service to restart"
+req POST "/sites/$ND/restart" '' 200
 for engine in mariadb postgresql; do
  req POST /databases "{\"user_id\":$UID_APP,\"name\":\"$engine\",\"password\":\"Db-Pass_12345!\",\"engine\":\"$engine\"}" 201
  DB_ID=$(jq .id /tmp/apps-response)
@@ -99,6 +110,7 @@ for engine in mariadb postgresql; do
  echo "PASS database $engine"
 done
 req PATCH "/users/$UID_APP/status" '{"status":"suspended"}'
+req POST "/sites/$ND/restart" '' 409; echo "PASS suspended account cannot restart"
 [ "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: nodejs.apps.example.com' http://127.0.0.1)" = 503 ]
 if PGPASSWORD='New-Pass_12345!' psql -h 127.0.0.1 -p 5433 -U appcust_postgresql -d appcust_postgresql -Atc 'SELECT 1' >/dev/null 2>&1; then echo 'FAIL suspended PostgreSQL login'; exit 1; fi
 req PATCH "/users/$UID_APP/status" '{"status":"active"}'

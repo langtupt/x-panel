@@ -70,6 +70,18 @@ bị bỏ qua.
 Sau khi tải mã lên, vào **Websites** → *Sửa* → bấm **Nhận diện từ mã nguồn** để panel gợi ý loại app, rồi lưu.
 Với Laravel, Node.js, Next.js, Go: bấm **Build & restart** sau mỗi lần cập nhật mã và xem nhật ký ở trang Tasks.
 
+Không cần vào VPS gõ lệnh. Sau khi cập nhật mã, bấm nút tương ứng ở dòng website:
+
+| Thay đổi | Nút cần bấm |
+|----------|-------------|
+| Sửa file PHP (PHP thuần, WordPress) | Không cần; nếu vẫn thấy mã cũ, bấm **Restart** |
+| Laravel: sửa mã PHP, view | **Restart** |
+| Laravel: sửa `.env`, `config/`, `composer.json`, thêm migration | **Build & restart** |
+| Node.js: sửa mã `.js` | **Restart** |
+| Node.js: sửa `package.json`, mã TypeScript cần build | **Build & restart** |
+| Next.js, Go: mọi thay đổi mã | **Build & restart** |
+| Đổi biến môi trường trong form website | Lưu, rồi **Build & restart** |
+
 ### 3.1 HTML tĩnh
 
 - Đặt `index.html` ngay trong `www/<domain>`. Không cần build.

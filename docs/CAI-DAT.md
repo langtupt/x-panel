@@ -183,15 +183,15 @@ Tuỳ chọn (đặt trước `bash`):
 
 | Biến | Tác dụng |
 |---|---|
-| `XPANEL_KEEP_DATA=1` | chỉ gỡ panel, **giữ lại** website, database, email của khách |
-| `XPANEL_PURGE_PACKAGES=1` | gỡ luôn nginx, PHP, MariaDB, PostgreSQL, Postfix, Dovecot, FTP, fail2ban |
+| `XPANEL_KEEP_PACKAGES=1` | gỡ panel và dữ liệu khách nhưng **giữ** các gói nginx, PHP, database, mail, FTP |
+| `XPANEL_KEEP_DATA=1` | chỉ gỡ panel, **giữ lại** website, database, email của khách (và các gói) |
+| `XPANEL_PURGE_PACKAGES=1` | dọn các gói còn sót trên máy đã gỡ panel bằng bản cũ |
 | `XPANEL_CONFIRM=XOA-SACH` | không hỏi xác nhận (cho script tự động) |
 
-Ví dụ gỡ sạch hoàn toàn, kể cả phần mềm: `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh | XPANEL_PURGE_PACKAGES=1 bash`.
-
-Có thể chạy lệnh purge này sau khi đã gỡ panel bằng lệnh mặc định. Lệnh mặc định
-giữ các gói dịch vụ; purge xóa cả gói và dữ liệu dịch vụ, kể cả được cài ngoài panel.
-Không kết hợp purge với `XPANEL_KEEP_DATA=1`. Swap, quota, mạng và các file tự tải
+Lệnh mặc định **gỡ sạch**: ngoài panel và dữ liệu khách, nó purge luôn nginx, PHP, MariaDB,
+PostgreSQL, Postfix, Dovecot, OpenDKIM, Pure-FTPd, fail2ban, ClamAV, Redis, Memcached cùng dữ liệu
+và cấu hình của chúng, kể cả dịch vụ được cài ngoài panel. Máy đã gỡ bằng bản cũ (còn sót gói):
+chạy lại với `XPANEL_PURGE_PACKAGES=1`. Không kết hợp `XPANEL_PURGE_PACKAGES=1` với các biến KEEP. Swap, quota, mạng và các file tự tải
 trong `/root` vẫn được giữ; muốn VPS trở về trạng thái hệ điều hành mới, hãy cài lại OS.
 
 Cách "sạch" nhất vẫn là **cài lại hệ điều hành** từ trang quản lý của nhà cung cấp VPS.

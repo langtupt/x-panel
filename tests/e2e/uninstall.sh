@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Uninstall: removes the panel and every customer's data, leaves a working
-# system, and a fresh install works again afterwards. Run last.
+# system (XPANEL_KEEP_PACKAGES=1) or purges the hosting packages (default),
+# and a fresh install works again afterwards. Run last.
 set -u
 B=https://127.0.0.1:8888
 H=(-H X-XPanel:1 -H Content-Type:application/json)
@@ -23,7 +24,7 @@ echo "### refuses without confirmation"
 systemctl is-active -q xpanel-api && ok "nothing removed when not confirmed" || bad "removed without confirmation"
 
 echo "### uninstall"
-XPANEL_CONFIRM=XOA-SACH /usr/local/sbin/xpanel-uninstall >/tmp/uninstall.log 2>&1 && ok "uninstall finished" || { bad "uninstall failed"; tail -20 /tmp/uninstall.log; }
+XPANEL_KEEP_PACKAGES=1 XPANEL_CONFIRM=XOA-SACH /usr/local/sbin/xpanel-uninstall >/tmp/uninstall.log 2>&1 && ok "uninstall finished" || { bad "uninstall failed"; tail -20 /tmp/uninstall.log; }
 for s in xpanel-api xpanel-agent; do systemctl cat "$s" >/dev/null 2>&1 && bad "$s still installed" || ok "$s removed"; done
 [ -z "$(systemctl list-units --all --plain --no-legend 'xpanel-*' | grep -v not-found)" ] && ok "no xpanel units left" || bad "units left: $(systemctl list-units --all --plain --no-legend 'xpanel-*' | head -3)"
 for p in /opt/xpanel /etc/xpanel /var/lib/xpanel /etc/nginx/conf.d/xpanel /etc/nginx/conf.d/xpanel-panel.conf /home/ucust /usr/local/sbin/xpanel-uninstall; do
@@ -52,5 +53,21 @@ c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/nu
 groupadd ghost 2>/dev/null; gpasswd -a www-data ghost >/dev/null 2>&1
 [ "$(c admin POST /users '{"username":"ucust","password":"Client12345","role":"user"}')" = 201 ] && ok "same account name works after reinstall" || bad "cannot recreate ucust: $(cat /tmp/out)"
 [ "$(c admin POST /users '{"username":"ghost","password":"Client12345","role":"user"}')" = 201 ] && [ "$(id -gn ghost)" = ghost ] && ok "orphan group reused" || bad "orphan group blocks account: $(cat /tmp/out)"
+
+echo "### default uninstall purges everything"
+XPANEL_CONFIRM=DELETE-ALL /usr/local/sbin/xpanel-uninstall >/tmp/purge.log 2>&1 && ok "full uninstall finished" || { bad "full uninstall failed"; tail -20 /tmp/purge.log; }
+left=$(dpkg-query -W -f='${binary:Package} ${db:Status-Abbrev}\n' 'nginx*' 'php*' 'mariadb-*' 'postgresql*' 'pure-ftpd*' 'postfix*' 'dovecot-*' 'fail2ban' 'clamav*' 'redis-server' 2>/dev/null | awk '$2 ~ /^(ii|rc)/ {print $1}' | tr '\n' ' ')
+[ -z "$left" ] && ok "hosting packages purged" || bad "packages left: $left"
+for p in /etc/nginx /etc/php /var/lib/mysql /var/lib/postgresql /home/ucust /home/ghost /opt/xpanel; do
+  [ -e "$p" ] && bad "$p still exists" || ok "$p removed"
+done
+/root/rel/uninstall.sh </dev/null >/tmp/again.log 2>&1 && bad "ran on a server without X-Panel" || { grep -q "No X-Panel installation" /tmp/again.log && ok "refuses on a server without X-Panel" || bad "unexpected: $(tail -2 /tmp/again.log)"; }
+
+echo "### reinstall after a full purge"
+cd /root/rel && ADMIN_PASSWORD='Admin@123!' ./install.sh >/tmp/reinstall2.log 2>&1 && ok "reinstall finished" || { bad "reinstall failed"; tail -20 /tmp/reinstall2.log; }
+rm -f /tmp/admin
+for _ in $(seq 1 30); do [ "$(curl -sk -o /dev/null -w '%{http_code}' $B/api/health)" = 200 ] && break; sleep 1; done
+c admin POST /auth/login '{"username":"admin","password":"Admin@123!"}' >/dev/null
+[ "$(c admin GET /users)" = 200 ] && [ "$(jq '.users|length' /tmp/out)" = 1 ] && ok "fresh panel works after purge" || bad "panel after purge reinstall"
 
 [ "$FAIL" = 0 ] && echo "PASS uninstall" || { echo "FAIL uninstall"; exit 1; }
