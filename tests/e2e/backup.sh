@@ -138,4 +138,7 @@ fi
 expect "$(c cust DELETE /backups/drive)" 204 "disconnect drive"
 for id in $U $O; do c admin DELETE /users/$id >/dev/null; done
 pkill -f fakedrive
+# Back to the real Google endpoints (matters when run on a real server).
+sed -i '/XPANEL_GDRIVE_ENDPOINT/d' /etc/xpanel/agent.env /etc/xpanel/xpanel.env
+systemctl restart xpanel-agent xpanel-api; sleep 3
 [ "$FAIL" = 0 ] && echo "PASS backup" || { echo "FAIL backup"; exit 1; }
