@@ -70,7 +70,7 @@ Swap, quota settings, network configuration and downloaded files in `/root` rema
 | Applications | Live version discovery, background installation tasks, installed versions and supported uninstall actions |
 | PHP | Parallel versions, extensions, global FPM settings, site overrides and logs |
 | Databases | MariaDB and a separate customer PostgreSQL cluster, passwords and size reporting |
-| Files | Browser file manager, code editor, uploads, FTP and SFTP |
+| Files | Browser file manager, code editor, uploads, FTP and SFTP — upload guide per app type: [docs/TAI-MA-NGUON.md](docs/TAI-MA-NGUON.md) |
 | TLS | Let's Encrypt certificates |
 | Email | Postfix, Dovecot, DKIM and Roundcube webmail |
 | Backups | Encrypted backups to each account's Google Drive; restore or recreate an account on another server. Database and supported mailbox passwords are retained; FTP passwords must be reset — see [docs/SAO-LUU.md](docs/SAO-LUU.md) |

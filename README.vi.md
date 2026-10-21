@@ -398,6 +398,7 @@ API cũ /api/php và /api/phpmyadmin vẫn tương thích.
 - **Build & restart** chạy npm ci/install + build, go build, hoặc Composer + Laravel
   config/view cache bằng user Linux của khách trong slice của tài khoản (tối đa 30 phút).
   Node cần script start trong package.json.
+- Hướng dẫn tải mã nguồn từng loại (cách nén, SFTP, Laravel/Node/Next/Go, lỗi thường gặp): **[docs/TAI-MA-NGUON.md](docs/TAI-MA-NGUON.md)**
 - **Lệnh triển khai** (trong form sửa website): các lệnh chạy sau mỗi lần Build, cùng user và
   môi trường cách ly, ví dụ `php artisan migrate --force`, `php artisan storage:link`,
   `npx prisma migrate deploy`. `php`/`composer` dùng đúng phiên bản PHP của website;
