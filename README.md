@@ -44,27 +44,25 @@ Run the installation command again to update while retaining configuration and d
 
 ### Uninstalling
 
-Run as root. Removal takes two steps: the first command only **downloads** the uninstaller and changes nothing; the second runs it.
+Run as root. One command removes everything (panel, customer data and hosting service packages):
 
 ```bash
-# 1. Download the uninstaller (removes nothing)
-curl -fSL --retry 3 -o /tmp/xpanel-uninstall.sh https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh
-
-# 2. Run it: full removal (default)
-bash /tmp/xpanel-uninstall.sh
+curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh | bash
 ```
 
-The uninstaller lists the accounts, websites, databases and mailboxes it will delete, then asks for confirmation: type `DELETE ALL` and press Enter. Pressing Enter on its own cancels without changes.
+The uninstaller lists the accounts, websites, databases and mailboxes it will delete, then asks for confirmation: type `DELETE ALL` and press Enter. Pressing Enter on its own cancels without changes. On a server with X-Panel installed, `xpanel-uninstall` runs the same script.
 
-Choose the mode with an environment variable before `bash`:
+To read the script before running it, download it first: `curl -fSL --retry 3 -o /tmp/xpanel-uninstall.sh https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh`, then `bash /tmp/xpanel-uninstall.sh`.
+
+Choose the mode with an environment variable before `bash` (works the same with a downloaded script):
 
 | Mode | Command | X-Panel and customer data | Hosting service packages |
 |---|---|---|---|
-| **Remove everything** (default) | `bash /tmp/xpanel-uninstall.sh` | Removed | **Purged** with their data and configuration |
-| Keep service packages | `XPANEL_KEEP_PACKAGES=1 bash /tmp/xpanel-uninstall.sh` | Removed | Kept and left running |
-| Keep customer data | `XPANEL_KEEP_DATA=1 bash /tmp/xpanel-uninstall.sh` | Panel removed; websites, databases and email kept | Kept and left running |
-| Clean up after an older uninstall | `XPANEL_PURGE_PACKAGES=1 bash /tmp/xpanel-uninstall.sh` | Leftovers removed | **Purged** (works even when the panel is already gone) |
-| Non-interactive (scripts) | `XPANEL_CONFIRM=DELETE-ALL bash /tmp/xpanel-uninstall.sh` | As the selected mode, without the prompt | As the selected mode |
+| **Remove everything** (default) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| bash` | Removed | **Purged** with their data and configuration |
+| Keep service packages | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_KEEP_PACKAGES=1 bash` | Removed | Kept and left running |
+| Keep customer data | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_KEEP_DATA=1 bash` | Panel removed; websites, databases and email kept | Kept and left running |
+| Clean up after an older uninstall | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_PURGE_PACKAGES=1 bash` | Leftovers removed | **Purged** (works even when the panel is already gone) |
+| Non-interactive (scripts) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_CONFIRM=DELETE-ALL bash` | As the selected mode, without the prompt | As the selected mode |
 
 What each part covers:
 
