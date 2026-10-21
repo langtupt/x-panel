@@ -101,6 +101,10 @@ func main() {
 	if err := php.MigrateHostingDefaults(context.Background(), d); err != nil {
 		log.Error("php hosting defaults", "err", err)
 	}
+	// Adminer installed by older releases could connect to any host.
+	if err := apps.RefreshAdminer(); err != nil {
+		log.Error("adminer wrapper", "err", err)
+	}
 
 	srv := server.New(log)
 	srv.Register(agentproto.ActionSystemReboot, func(ctx context.Context, _ json.RawMessage) (any, error) { return nil, sysinfo.Reboot(ctx) })
