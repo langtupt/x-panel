@@ -239,8 +239,14 @@ if [ "$PURGE" = 1 ]; then
   export DEBIAN_FRONTEND=noninteractive
   # Include rc packages: a previous remove can leave configuration behind.
   pkgs=$( { dpkg-query -W -f='${binary:Package} ${db:Status-Abbrev}\n' 'nginx*' 'libnginx-mod-*' 'php*' 'mariadb-*' 'postgresql*' 'pure-ftpd*' 'postfix*' \
-         'dovecot-*' 'opendkim*' 'opendmarc*' 'dbconfig-no-thanks' 'fail2ban' 'clamav*' 'libclamav*' 'redis-server' 'redis-tools' 'memcached' \
+         'dovecot-*' 'opendkim*' 'opendmarc*' 'dbconfig-no-thanks' 'publicsuffix' 'fail2ban' 'clamav*' 'libclamav*' 'redis-server' 'redis-tools' 'memcached' \
          'python3-systemd' 'quota' 'nodejs' 'debsuryorg-archive-keyring' 2>/dev/null || true; } | awk '$2 ~ /^(ii|rc)/ {print $1}')
+  # opendmarc's pre-removal script tries to drop a dbconfig database (and
+  # fails, stopping dpkg) when it is purged together with MariaDB and
+  # dbconfig-no-thanks; purged on its own first, it does not.
+  if dpkg -s opendmarc >/dev/null 2>&1; then
+    apt-get purge -y -q opendmarc || die "APT purge of opendmarc failed. Resolve the errors above and rerun with XPANEL_PURGE_PACKAGES=1."
+  fi
   if [ -n "$pkgs" ]; then
     apt-get purge -y -q $pkgs || die "APT purge failed. Resolve the errors above and rerun with XPANEL_PURGE_PACKAGES=1. Database directories have not been deleted."
   fi
@@ -253,6 +259,11 @@ if [ "$PURGE" = 1 ]; then
   done
   rm -f /usr/local/bin/composer
   rm -f /etc/ssl/private/pure-ftpd.pem
+  # Services enabled with systemctl (not by the package) keep their
+  # *.wants links after the purge; drop the ones now pointing nowhere.
+  for svc in clamav opendmarc opendkim postfix dovecot mariadb mysql postgresql php nginx pure-ftpd fail2ban redis memcached; do
+    find /etc/systemd/system -xtype l -name "${svc}*" -delete 2>/dev/null || true
+  done
   # Purged packages leave their AppArmor profiles loaded until the next boot.
   if [ -w /sys/kernel/security/apparmor/.remove ]; then
     for p in /usr/sbin/clamd /usr/bin/freshclam /usr/sbin/clamonacc /usr/bin/clamscan; do
@@ -266,8 +277,8 @@ if [ "$PURGE" = 1 ]; then
   rm -f /var/www/html/index.nginx-debian.html
   rmdir /var/www/html /var/www 2>/dev/null || true
   # Package purges keep their system users; nothing owns files of theirs any more.
-  for u in mysql postgres opendkim clamav redis memcache postfix dovecot dovenull; do q userdel "$u"; done
-  for g in mysql postgres opendkim clamav redis memcache postfix postdrop dovecot dovenull; do q groupdel "$g"; done
+  for u in mysql _galera postgres opendkim opendmarc clamav redis memcache postfix dovecot dovenull; do q userdel "$u"; done
+  for g in mysql postgres opendkim opendmarc clamav redis memcache postfix postdrop dovecot dovenull; do q groupdel "$g"; done
   dpkg -s ssl-cert >/dev/null 2>&1 || q groupdel ssl-cert
   q systemctl stop system-postfix.slice system-postgresql.slice system-mariadb.slice
 else
@@ -279,6 +290,7 @@ else
   q systemctl restart fail2ban
 fi
 q systemctl daemon-reload
+q systemctl reset-failed
 q sysctl --system
 
 echo
