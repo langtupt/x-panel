@@ -43,7 +43,7 @@ Mở địa chỉ đó trên trình duyệt (cảnh báo chứng chỉ lần đ�
 | Việc cần làm | Lệnh (chạy bằng root) |
 |---|---|
 | Tự đặt mật khẩu admin khi cài | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| ADMIN_PASSWORD='MatKhau12345' bash` |
-| **Cập nhật** lên bản mới (giữ nguyên dữ liệu) | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| bash` |
+| **Cập nhật** lên bản mới (giữ nguyên dữ liệu) | Trong panel: **Hệ thống → Cập nhật** (từ v1.2.6), hoặc `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/install.sh \| bash` |
 | Quên mật khẩu admin | như dòng đầu, với mật khẩu mới |
 | **Gỡ sạch toàn bộ** (mặc định): panel, dữ liệu khách và các gói nginx/PHP/database/mail/FTP/ClamAV/Redis | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| bash` |
 | Gỡ panel và dữ liệu khách, giữ các gói dịch vụ | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_KEEP_PACKAGES=1 bash` |
@@ -361,6 +361,17 @@ Trang Email hiện mức đã dùng của từng hộp thư.
 
 Chi tiết: **[docs/BAO-MAT.md](docs/BAO-MAT.md)**
 
+## Phiên bản và cập nhật
+
+- Phiên bản đang cài hiện ở góc trên menu bên trái (ví dụ `Hosting workspace · v1.2.7`).
+- **Hệ thống → Cập nhật** (chỉ admin): xem bản đang dùng và bản mới nhất trên GitHub, bấm **Cập nhật lên vX.Y.Z**,
+  xem nhật ký cài ngay trên trang. Bật **Tự động cập nhật** thì mỗi đêm từ 3:00 đến 5:00 (giờ máy chủ), nếu có bản mới
+  panel tự cài.
+- Cập nhật chạy bộ cài của chính bản phát hành đó (kiểm tra SHA-256) trong unit systemd riêng `xpanel-update`
+  (nhật ký `/var/log/xpanel-update.log`), nên panel khởi động lại giữa chừng cũng không làm đứt. Website, email và dữ liệu
+  không bị ảnh hưởng; riêng panel tạm không vào được khoảng một phút.
+- Máy đang ở v1.2.5 trở về trước chưa có trang này: chạy lại lệnh cài một lần.
+
 ## Các lớp bảo mật chính
 
 - Mỗi tài khoản là một user Linux riêng: PHP-FPM, ứng dụng, cron chạy dưới user đó trong slice giới hạn CPU/RAM;
@@ -370,7 +381,14 @@ Chi tiết: **[docs/BAO-MAT.md](docs/BAO-MAT.md)**
   mã 2FA chỉ dùng được một lần.
 - phpMyAdmin/Adminer (cổng 8890) và Roundcube (cổng 2096) chạy ở origin riêng, tách khỏi phiên đăng nhập panel.
 - Mail: không relay cho tiến trình nội bộ, không mạo danh địa chỉ của tài khoản khác, `sendmail` chỉ cho root,
-  DKIM chỉ ký thư đã xác thực; fail2ban cho SSH, FTP, SMTP, IMAP/POP3.
+  DKIM chỉ ký thư đã xác thực; fail2ban cho SSH, FTP, SMTP, IMAP/POP3. Ở cổng 587/465 một hộp thư chỉ gửi được bằng
+  địa chỉ của mình hoặc alias chuyển về nó, kiểm tra cả người gửi khi kết nối lẫn dòng `From:`/`Sender:` trong thư
+  (milter của agent ở `127.0.0.1:8892`); webmail chỉ có một danh tính, không sửa được địa chỉ.
+- PostgreSQL của khách: mọi role phải đăng nhập bằng mật khẩu (không tin tên user Linux); Adminer chỉ kết nối được
+  `127.0.0.1:5433`.
+- Truy cập bằng IP hoặc tên miền không có trên máy: cổng 80 đóng kết nối, cổng 443 từ chối bắt tay TLS (không lộ
+  website hay chứng chỉ của khách).
+- ClamAV: admin có thể **Tắt clamd** ở trang Quét mã độc để giải phóng khoảng 1 GB RAM; khi đó quét dùng `clamscan`.
 - Bí mật trong database (token Google, passphrase backup, khóa 2FA) được mã hóa bằng khóa riêng của máy chủ.
 
 ## Applications và ứng dụng website
