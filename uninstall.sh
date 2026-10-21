@@ -253,6 +253,14 @@ if [ "$PURGE" = 1 ]; then
   done
   rm -f /usr/local/bin/composer
   rm -f /etc/ssl/private/pure-ftpd.pem
+  # Purged packages leave their AppArmor profiles loaded until the next boot.
+  if [ -w /sys/kernel/security/apparmor/.remove ]; then
+    for p in /usr/sbin/clamd /usr/bin/freshclam /usr/sbin/clamonacc /usr/bin/clamscan; do
+      if grep -q "^$p " /sys/kernel/security/apparmor/profiles 2>/dev/null; then
+        printf '%s' "$p" >/sys/kernel/security/apparmor/.remove 2>/dev/null || true
+      fi
+    done
+  fi
   rm -rf /run/clamav /run/redis /run/mysqld /run/postgresql /run/php /var/log/clamav /var/log/redis /var/log/mysql /var/log/postgresql
   # nginx's default page; anything else in /var/www is kept.
   rm -f /var/www/html/index.nginx-debian.html
