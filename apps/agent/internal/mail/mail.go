@@ -105,7 +105,14 @@ func Install(ctx context.Context, logf func(string, ...any)) error {
 	if err := configureDovecot(ctx, vmail); err != nil {
 		return err
 	}
-	if err := configureDKIM(); err != nil {
+	if err := configureDKIM(host); err != nil {
+		return err
+	}
+	if out, err := installDMARC(ctx); err != nil {
+		logf("%s", lastLine(out))
+		return err
+	}
+	if err := configureDMARC(ctx, host); err != nil {
 		return err
 	}
 	// Empty maps so Postfix starts before the first sync.
@@ -114,7 +121,7 @@ func Install(ctx context.Context, logf func(string, ...any)) error {
 	}
 	// Postfix creates /var/spool/postfix/private on its first start; Dovecot
 	// puts its LMTP and auth sockets there, so it must start afterwards.
-	for _, svc := range []string{"opendkim", "postfix", "dovecot"} {
+	for _, svc := range []string{"opendkim", "opendmarc", "postfix", "dovecot"} {
 		if err := step(run.Opts{}, "systemctl", "enable", svc); err != nil {
 			return err
 		}
@@ -183,7 +190,7 @@ func configurePostfix(ctx context.Context, host string) error {
 		"authorized_submit_users = root",
 		"milter_default_action = accept",
 		"milter_protocol = 6",
-		"smtpd_milters = inet:127.0.0.1:8891",
+		"smtpd_milters = " + portMilter,
 		"non_smtpd_milters = inet:127.0.0.1:8891",
 	}
 	if err := postconf(ctx, append([]string{"-e"}, settings...)...); err != nil {
@@ -370,7 +377,7 @@ plugin {
 	return run.Cmd(context.Background(), "chown", "root:dovecot", dovecotUsrs)
 }
 
-func configureDKIM() error {
+func configureDKIM(host string) error {
 	for _, d := range []string{dkimDir, dkimKeys} {
 		if err := os.MkdirAll(d, 0o750); err != nil {
 			return err
@@ -379,7 +386,9 @@ func configureDKIM() error {
 	conf := `# Managed by X-Panel.
 Syslog yes
 UMask 007
-Mode s
+# Sign authenticated mail, verify the rest (OpenDMARC reads the result).
+Mode sv
+AuthservID ` + host + `
 Canonicalization relaxed/simple
 OversignHeaders From
 KeyTable file:` + dkimDir + `/KeyTable

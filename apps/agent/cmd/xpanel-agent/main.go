@@ -377,6 +377,7 @@ func main() {
 	defer stop()
 	// Submission ports check the header From against the login.
 	go mail.ServeFromCheck(ctx, log)
+	go mail.MigrateDMARC(ctx, log)
 	if err := srv.Listen(ctx, *socket, *group); err != nil {
 		log.Error("listen", "err", err)
 		os.Exit(1)

@@ -384,6 +384,10 @@ Chi tiết: **[docs/BAO-MAT.md](docs/BAO-MAT.md)**
   DKIM chỉ ký thư đã xác thực; fail2ban cho SSH, FTP, SMTP, IMAP/POP3. Ở cổng 587/465 một hộp thư chỉ gửi được bằng
   địa chỉ của mình hoặc alias chuyển về nó, kiểm tra cả người gửi khi kết nối lẫn dòng `From:`/`Sender:` trong thư
   (milter của agent ở `127.0.0.1:8892`); webmail chỉ có một danh tính, không sửa được địa chỉ.
+- Thư đến (cổng 25) được OpenDKIM và OpenDMARC kiểm tra: thư không đạt DMARC của tên miền công bố `p=reject` bị
+  từ chối, thư khác được gắn header `Authentication-Results`. Bản ghi DNS gợi ý cho tên miền email là SPF `-all` và DMARC
+  `p=reject`, nên thư giả tên miền của khách bị máy chủ này và Gmail/Outlook… từ chối. Tên miền còn gửi qua dịch vụ khác
+  (công cụ gửi bản tin, Google Workspace…) phải thêm dịch vụ đó vào SPF và ký DKIM, hoặc dùng `p=quarantine`.
 - PostgreSQL của khách: mọi role phải đăng nhập bằng mật khẩu (không tin tên user Linux); Adminer chỉ kết nối được
   `127.0.0.1:5433`.
 - Truy cập bằng IP hoặc tên miền không có trên máy: cổng 80 đóng kết nối, cổng 443 từ chối bắt tay TLS (không lộ

@@ -187,6 +187,7 @@ be checked in task logs.
 - Databases listen locally by default. Backup credentials and two-factor secrets are encrypted using a server-specific key.
 - fail2ban protects supported authentication services. Mail configuration includes authenticated submission and DKIM controls.
 - Mail: on ports 587/465 a mailbox may only send as its own address or aliases that deliver to it — both the envelope sender and the `From:`/`Sender:` header lines are checked (a small milter in the agent on `127.0.0.1:8892`). Webmail keeps one identity per mailbox with a fixed address.
+- Inbound mail (port 25) is checked by OpenDKIM and OpenDMARC: messages failing DMARC for a domain that publishes `p=reject` are rejected, the others carry an `Authentication-Results` header. The DNS records suggested for hosted domains are SPF `-all` and DMARC `p=reject`, so mail forged with a hosted domain is refused by this server and by other providers. Domains that also send through another service (newsletter tools, Google Workspace…) must add it to SPF and sign with DKIM, or use `p=quarantine`.
 - Customer PostgreSQL roles always log in with their password (no peer login by Linux user name); Adminer can only reach the customer cluster at `127.0.0.1:5433`.
 - Requests for unknown host names (or the bare IP) are closed on port 80 and refused during the TLS handshake on 443.
 - Malware scanning can use ClamAV; administrators can stop the resident `clamd` (about 1 GB of RAM) from the Malware page, in which case scans use `clamscan`.

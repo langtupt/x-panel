@@ -186,8 +186,11 @@ func (s *Service) MailDomain(ctx context.Context, actor *users.User, id int64) (
 	}
 	out.DNS = []MailDNSRecord{
 		{Type: "MX", Name: d.Domain, Value: host, Priority: 10},
-		{Type: "TXT", Name: d.Domain, Value: "v=spf1 mx a:" + host + " ~all"},
-		{Type: "TXT", Name: "_dmarc." + d.Domain, Value: "v=DMARC1; p=none; rua=mailto:postmaster@" + d.Domain},
+		// Mail of hosted domains leaves only through this server (local
+		// processes cannot use them unauthenticated), DKIM-signed: receivers,
+		// this server included, can reject anything else.
+		{Type: "TXT", Name: d.Domain, Value: "v=spf1 mx a:" + host + " -all"},
+		{Type: "TXT", Name: "_dmarc." + d.Domain, Value: "v=DMARC1; p=reject; adkim=r; aspf=r; rua=mailto:postmaster@" + d.Domain},
 	}
 	if d.DKIMName != "" {
 		out.DNS = append(out.DNS, MailDNSRecord{Type: "TXT", Name: d.DKIMName, Value: d.DKIMValue})
