@@ -87,6 +87,8 @@ q systemctl daemon-reload
 q systemctl reset-failed
 q nft delete table inet xpanel_apps
 q nft delete table inet xpanel_fw
+# Parent of the per-account slices; transient, but stop it now.
+q systemctl stop xpanel.slice
 
 # ---------------------------------------------------------------- customer data
 if [ "$KEEP" != 1 ]; then
@@ -111,6 +113,12 @@ if [ "$KEEP" != 1 ]; then
     # nginx is a member of each account's group, so userdel leaves it behind.
     q groupdel "$u"
     rm -rf "/home/${u:?}"
+  done
+  # Groups of accounts removed by older versions: userdel keeps a group that
+  # nginx is a member of. Only groups nobody uses as primary group.
+  for g in $(awk -F: '$3>=1000 && $3<65534 && (","$4",") ~ /,www-data,/ {print $1":"$3}' /etc/group); do
+    awk -F: -v gid="${g#*:}" '$4==gid {found=1} END {exit !found}' /etc/passwd && continue
+    q groupdel "${g%%:*}"
   done
 
   say "Removing customer email data"
@@ -191,7 +199,7 @@ if [ "$PURGE" = 1 ]; then
   # Include rc packages: a previous remove can leave configuration behind.
   pkgs=$( { dpkg-query -W -f='${binary:Package} ${db:Status-Abbrev}\n' 'nginx*' 'libnginx-mod-*' 'php*' 'mariadb-*' 'postgresql*' 'pure-ftpd*' 'postfix*' \
          'dovecot-*' 'opendkim*' 'fail2ban' 'clamav*' 'libclamav*' 'redis-server' 'redis-tools' 'memcached' \
-         'debsuryorg-archive-keyring' 2>/dev/null || true; } | awk '$2 ~ /^(ii|rc)/ {print $1}')
+         'python3-systemd' 'debsuryorg-archive-keyring' 2>/dev/null || true; } | awk '$2 ~ /^(ii|rc)/ {print $1}')
   if [ -n "$pkgs" ]; then
     apt-get purge -y -q $pkgs || die "APT purge failed. Resolve the errors above and rerun with XPANEL_PURGE_PACKAGES=1. Database directories have not been deleted."
   fi
@@ -201,6 +209,15 @@ if [ "$PURGE" = 1 ]; then
   for f in /etc/apt/sources.list.d/*ondrej* /etc/apt/sources.list.d/*pgdg*; do [ -e "$f" ] && rm -f "$f"; done
   rm -f /usr/local/bin/composer
   rm -f /etc/ssl/private/pure-ftpd.pem
+  rm -rf /run/clamav /run/redis /run/mysqld /run/postgresql /run/php /var/log/clamav /var/log/redis /var/log/mysql /var/log/postgresql
+  # nginx's default page; anything else in /var/www is kept.
+  rm -f /var/www/html/index.nginx-debian.html
+  rmdir /var/www/html /var/www 2>/dev/null || true
+  # Package purges keep their system users; nothing owns files of theirs any more.
+  for u in mysql postgres opendkim clamav redis memcache postfix dovecot dovenull; do q userdel "$u"; done
+  for g in mysql postgres opendkim clamav redis memcache postfix postdrop dovecot dovenull; do q groupdel "$g"; done
+  dpkg -s ssl-cert >/dev/null 2>&1 || q groupdel ssl-cert
+  q systemctl stop system-postfix.slice system-postgresql.slice system-mariadb.slice
 else
   q nginx -t && q systemctl reload nginx
   q systemctl restart mariadb
