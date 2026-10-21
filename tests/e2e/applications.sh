@@ -106,6 +106,12 @@ for engine in mariadb postgresql; do
  req PATCH "/databases/$DB_ID/password" '{"password":"New-Pass_12345!"}' 204
  if [ "$engine" = postgresql ]; then
   PGPASSWORD='New-Pass_12345!' psql -h 127.0.0.1 -p 5433 -U appcust_postgresql -d appcust_postgresql -Atc 'SELECT current_database()' | grep -qx appcust_postgresql
+  # A Linux account named like the role must still give the password (no peer login).
+  useradd -M -s /usr/sbin/nologin appcust_postgresql
+  if runuser -u appcust_postgresql -- psql -h /var/run/postgresql -p 5433 -d appcust_postgresql -AtXc 'SELECT 1' </dev/null >/dev/null 2>&1; then
+   userdel appcust_postgresql; echo 'FAIL PostgreSQL peer login without password'; exit 1
+  fi
+  userdel appcust_postgresql; echo "PASS PostgreSQL customer roles need a password"
  fi
  echo "PASS database $engine"
 done

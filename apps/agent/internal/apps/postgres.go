@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +40,44 @@ func postgresInstalled() string {
 
 // PGVersion is the customer cluster's major version ("" if not installed).
 func PGVersion() string { return postgresInstalled() }
+
+// customerHBA makes every customer role log in with its password. Peer
+// authentication (Linux user = role name) must not apply to them: an
+// account could be named after another customer's role (alice_shop) and
+// open that database over the Unix socket without a password.
+const customerHBA = `# Managed by X-Panel: customer roles always authenticate with a password.
+local   all   postgres                 peer
+local   all   all                      scram-sha-256
+host    all   all      127.0.0.1/32    scram-sha-256
+host    all   all      ::1/128         scram-sha-256
+`
+
+// SecureCustomerCluster installs customerHBA (also on clusters created by
+// older releases, which used peer for every local login) and reloads.
+func SecureCustomerCluster(ctx context.Context) error {
+	major := postgresInstalled()
+	if major == "" {
+		return nil
+	}
+	path := filepath.Join("/etc/postgresql", major, PGCluster, "pg_hba.conf")
+	old, err := os.ReadFile(path)
+	if err != nil || string(old) == customerHBA {
+		return err
+	}
+	// Truncating keeps the file's owner (postgres) and mode.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString(customerHBA); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return run.Cmd(ctx, "pg_ctlcluster", major, PGCluster, "reload")
+}
 
 type pgVersion struct {
 	Major     string `json:"major"`
@@ -99,6 +138,9 @@ func installPostgres(ctx context.Context, d distro.Distro, major string, logf fu
 		return err
 	}
 	if err := step("systemctl", "enable", fmt.Sprintf("postgresql@%s-%s", major, PGCluster)); err != nil {
+		return err
+	}
+	if err := SecureCustomerCluster(ctx); err != nil {
 		return err
 	}
 	if _, err := os.Stat("/var/lib/xpanel/performance-profile.txt"); err == nil {
