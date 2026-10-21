@@ -54,6 +54,15 @@ const DEPLOY_HINT: Record<string, string> = {
   go: "go test ./...",
 };
 
+// What a plain restart (no build) picks up, per application type.
+const RESTART_HINT: Record<string, string> = {
+  php: "Khởi động lại PHP-FPM của website (xóa OPcache, nạp lại biến môi trường)",
+  laravel: "Khởi động lại PHP-FPM (xóa OPcache). Đổi .env hoặc config: dùng Build & restart để tạo lại cache",
+  nodejs: "Khởi động lại ứng dụng để chạy mã mới (không cài lại package). Đổi package.json: dùng Build & restart",
+  nextjs: "Khởi động lại ứng dụng với bản build hiện có. Mã mới cần Build & restart",
+  go: "Khởi động lại ứng dụng với bản build hiện có. Mã mới cần Build & restart",
+};
+
 function SiteForm({
   editing,
   owners,
@@ -419,6 +428,8 @@ export default function SitesPage() {
   const [deleting, setDeleting] = useState<Site | null>(null);
   const [tasks, setTasks] = useState<Record<number, Task>>({});
   const [notes, setNotes] = useState<string[]>([]);
+  const [restarting, setRestarting] = useState<number | null>(null);
+  const [done, setDone] = useState("");
   const [phpSite, setPHPSite] = useState<Site | null>(null);
   const [logs, setLogs] = useState<{ domain: string; log: string } | null>(
     null,
@@ -452,6 +463,20 @@ export default function SitesPage() {
     setNotes(r.warnings ?? []);
     if (r.task) setTasks((t) => ({ ...t, [r.id]: r.task! }));
     load();
+  }
+
+  async function restart(s: Site) {
+    setError("");
+    setDone("");
+    setRestarting(s.id);
+    try {
+      await api(`/sites/${s.id}/restart`, { method: "POST" });
+      setDone(translate("Đã restart {0}", [s.domain]));
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setRestarting(null);
+    }
   }
 
   async function issueSSL(s: Site) {
@@ -534,6 +559,11 @@ export default function SitesPage() {
         </Modal>
       )}
       <ErrorBox msg={error} />
+      {done && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {done}
+        </p>
+      )}
       {notes.map((n) => (
         <p
           key={n}
@@ -629,6 +659,16 @@ export default function SitesPage() {
                     >
                       Build &amp; restart
                     </button>
+                    {s.app_type && s.app_type !== "html" && (
+                      <button
+                        className="btn-ghost px-2.5 py-1 text-xs"
+                        disabled={restarting === s.id || !!tasks[s.id]}
+                        title={translate(RESTART_HINT[s.app_type] ?? "")}
+                        onClick={() => restart(s)}
+                      >
+                        {restarting === s.id ? translate("Đang restart…") : "Restart"}
+                      </button>
+                    )}
                     <button
                       className="btn-ghost px-2.5 py-1 text-xs"
                       onClick={async () => {

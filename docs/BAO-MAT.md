@@ -10,6 +10,8 @@ hướng và cấu hình `.htaccess`/`.user.ini` bị sửa trong thư mục hom
   biến (WSO, b374k, FilesMan…), file PHP trong `wp-content/uploads`, chuỗi mã hóa dài bất thường…
 - **ClamAV** (tùy chọn): admin bấm *Cài ClamAV* trên trang này để có thêm cơ sở dữ liệu chữ ký cập nhật hằng ngày.
   Dịch vụ `clamav-daemon` cần khoảng **1 GB RAM**.
+  VPS ít RAM: admin bấm **Tắt clamd** (trang Quét mã độc) để giải phóng khoảng 1 GB; các lần quét sau dùng
+  `clamscan`, chậm hơn và chỉ chiếm RAM trong lúc quét. Bấm **Bật clamd** để quét nhanh trở lại.
 
 **Cách ly giữa các tài khoản:** trình quét chạy trong một tiến trình đã `chroot` vào thư mục home và chạy dưới user
 Linux của chính tài khoản. Nó không đọc được file của tài khoản khác, kể cả khi đi theo symlink. ClamAV cũng chạy

@@ -57,6 +57,7 @@ func (s *Service) RegisterTasks(q *tasks.Queue) {
 	q.Handle(TaskBackupCreate, s.runBackupCreate)
 	q.Handle(TaskMalwareScan, s.runMalwareScan)
 	q.Handle(TaskMalwareInstall, s.runMalwareInstall)
+	q.Handle(TaskMalwareClamd, s.runMalwareClamd)
 	q.Handle(TaskBackupRestore, s.runBackupRestore)
 	q.Handle(TaskPHPInstall, s.runPHPInstall)
 	q.Handle("php.manage", s.runPHPManage)

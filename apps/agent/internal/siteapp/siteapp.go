@@ -435,6 +435,32 @@ func Build(ctx context.Context, d distro.Distro, p agentproto.SiteAppParams) (an
 	}
 	return agentproto.TaskLog{Log: out + "\nBuild & restart hoàn tất"}, nil
 }
+
+// Restart restarts the site's service without building. A Node.js/Next.js/Go
+// app must have been built once; Next.js and Go still need Build & restart
+// to pick up source changes.
+func Restart(ctx context.Context, p agentproto.SiteAppParams) (any, error) {
+	if _, err := root(p); err != nil {
+		return nil, err
+	}
+	if !Managed(p.Site.AppType) {
+		return nil, fmt.Errorf("website tĩnh không có service để restart")
+	}
+	if accounts.Locked(p.Username) {
+		return nil, fmt.Errorf("tài khoản đang bị khóa")
+	}
+	unit := Unit(p.Username, p.Site.Domain)
+	if _, err := os.Stat(filepath.Join(ConfigRoot, p.Username, unit+".built")); err != nil && Dynamic(p.Site.AppType) {
+		return nil, fmt.Errorf("ứng dụng chưa được build: bấm Build & restart")
+	}
+	if err := run.Cmd(ctx, "systemctl", "restart", unit); err != nil {
+		return nil, err
+	}
+	if err := ready(ctx, p.Username, p.Site); err != nil {
+		return nil, err
+	}
+	return agentproto.TaskLog{Log: "Đã restart " + p.Site.Domain}, nil
+}
 func Logs(ctx context.Context, p agentproto.SiteAppParams) (any, error) {
 	if _, err := root(p); err != nil {
 		return nil, err

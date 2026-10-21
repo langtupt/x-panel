@@ -129,6 +129,44 @@ func (s *Service) BuildSite(ctx context.Context, actor *users.User, id int64) (*
 	s.tasks.Notify()
 	return t, nil
 }
+
+// RestartSite restarts the site's service (no build). The account lock is
+// held so a concurrent suspend cannot be undone by the restart.
+func (s *Service) RestartSite(ctx context.Context, actor *users.User, id int64) (agentproto.TaskLog, error) {
+	var out agentproto.TaskLog
+	site, _, err := s.accessibleSite(ctx, s.sites, actor, id)
+	if err != nil {
+		return out, err
+	}
+	if site.AppType == "" || site.AppType == "html" {
+		return out, apperr.Invalid("website tĩnh không có service để restart")
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return out, err
+	}
+	defer tx.Rollback(context.WithoutCancel(ctx))
+	if err := s.users.WithTx(tx).LockForUpdate(ctx, site.UserID); err != nil {
+		return out, err
+	}
+	owner, err := s.users.WithTx(tx).ByID(ctx, site.UserID)
+	if err != nil {
+		return out, err
+	}
+	if owner.Status != users.StatusActive {
+		return out, apperr.Conflict("tài khoản đang bị khóa")
+	}
+	var building bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM tasks WHERE type=$1 AND target=$2 AND status IN ('pending','running'))`, TaskSiteBuild, site.Domain).Scan(&building); err != nil {
+		return out, err
+	} else if building {
+		return out, apperr.Conflict("đang build website; build xong sẽ tự restart")
+	}
+	callCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
+	err = s.agent.Call(callCtx, agentproto.ActionSiteRestart, agentproto.SiteAppParams{Username: owner.Username, Site: appSite(site)}, &out)
+	return out, err
+}
 func (s *Service) SiteAppInfo(ctx context.Context, actor *users.User, id int64, action string) (any, error) {
 	site, owner, err := s.accessibleSite(ctx, s.sites, actor, id)
 	if err != nil {
