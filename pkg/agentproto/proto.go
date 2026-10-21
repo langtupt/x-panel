@@ -18,6 +18,8 @@ const (
 	ActionPing         = "ping"
 	ActionSystemInfo   = "system.info"
 	ActionSystemReboot = "system.reboot"
+	ActionUpdateStart  = "update.start"  // UpdateParams: install a release in the background
+	ActionUpdateStatus = "update.status" // -> UpdateStatus
 	ActionUserCreate   = "user.create"   // UserParams -> UserCreateResult
 	ActionUserDelete   = "user.delete"   // UserParams
 	ActionUserLock     = "user.lock"     // UserLockParams
@@ -675,4 +677,15 @@ func DefaultFirewall() FirewallConfig {
 	return FirewallConfig{Enabled: true, SynRate: 100, ConnLimit: 300, HTTPRate: 30, HTTPBurst: 100, HTTPConn: 100,
 		MaxRetry: 6, FindMin: 10, BanMin: 60, Increment: true, FloodBan: true,
 		PanelIPFails: 10, PanelBanMin: 60, AccountFails: 10, AccountLockMin: 15, Allow: []string{}, Block: []string{}}
+}
+
+// UpdateParams selects the release tag to install (e.g. v1.2.6).
+type UpdateParams struct {
+	Version string `json:"version"`
+}
+
+// UpdateStatus describes a self-update started with ActionUpdateStart.
+type UpdateStatus struct {
+	Running bool   `json:"running"`
+	Log     string `json:"log"`
 }

@@ -338,6 +338,7 @@ export function joinPath(...parts: string[]) {
 /** /api/me: the user plus who is impersonating them, if anyone. */
 export interface Me extends User {
   impersonator: { id: number; username: string } | null;
+  panel_version?: string;
 }
 
 export interface CronJob {

@@ -136,7 +136,11 @@ say "Removing panel files, configuration and panel database"
 (cd /tmp && runuser -u postgres -- psql -c "DROP ROLE IF EXISTS xpanel" >/dev/null 2>&1) || true
 
 rm -f /etc/nginx/conf.d/xpanel-panel.conf /etc/nginx/conf.d/xpanel-webmail.conf /etc/nginx/conf.d/xpanel-dbtools.conf \
-      /etc/nginx/conf.d/00-xpanel-tuning.conf /etc/nginx/conf.d/xpanel-ratelimit.conf
+      /etc/nginx/conf.d/00-xpanel-tuning.conf /etc/nginx/conf.d/xpanel-ratelimit.conf /etc/nginx/conf.d/xpanel-default.conf
+# Give the package its default site back when nginx stays installed.
+if [ -f /etc/nginx/sites-available/default ] && [ ! -e /etc/nginx/sites-enabled/default ]; then
+  ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+fi
 rm -rf /etc/nginx/conf.d/xpanel /var/log/nginx/xpanel
 for pool in /etc/php/*/fpm/pool.d/xpanel-*.conf; do [ -e "$pool" ] && rm -f "$pool"; done
 rm -f /etc/php/*/fpm/conf.d/99-xpanel.ini
@@ -160,7 +164,7 @@ rm -f /usr/local/sbin/xpanel-uninstall /etc/logrotate.d/xpanel-nginx /etc/sysctl
       /etc/mysql/mariadb.conf.d/90-xpanel.cnf /etc/fail2ban/jail.d/xpanel.conf /etc/fail2ban/jail.d/xpanel-mail.conf \
       /etc/fail2ban/jail.d/xpanel-firewall.local /etc/fail2ban/action.d/xpanel.conf \
       /etc/dovecot/conf.d/99-xpanel.conf /etc/systemd/system/opendkim.service.d/xpanel.conf /etc/apt/sources.list.d/xpanel-php.list \
-      /var/log/xpanel-install.log
+      /var/log/xpanel-install.log /var/log/xpanel-update.log
 rm -f /etc/logrotate.d/xpanel-php
 rm -f /etc/logrotate.d/xpanel-mariadb
 rm -rf /var/log/mysql/xpanel

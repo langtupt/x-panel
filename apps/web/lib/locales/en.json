@@ -898,5 +898,21 @@
   "Khởi động lại PHP-FPM của website (xóa OPcache, nạp lại biến môi trường)": "Restart the site's PHP-FPM (clears OPcache, reloads environment variables)",
   "Khởi động lại PHP-FPM (xóa OPcache). Đổi .env hoặc config: dùng Build & restart để tạo lại cache": "Restart PHP-FPM (clears OPcache). After changing .env or config, use Build & restart to rebuild the cache",
   "Khởi động lại ứng dụng để chạy mã mới (không cài lại package). Đổi package.json: dùng Build & restart": "Restart the app to run new code (packages are not reinstalled). After changing package.json, use Build & restart",
-  "Khởi động lại ứng dụng với bản build hiện có. Mã mới cần Build & restart": "Restart the app with its current build. New code needs Build & restart"
+  "Khởi động lại ứng dụng với bản build hiện có. Mã mới cần Build & restart": "Restart the app with its current build. New code needs Build & restart",
+  "Cập nhật X-Panel": "Update X-Panel",
+  "Cài bản phát hành mới nhất từ GitHub (kiểm tra SHA-256). Dữ liệu, website và cấu hình được giữ nguyên.": "Installs the latest release from GitHub (SHA-256 verified). Data, websites and settings are kept.",
+  "Phiên bản đang dùng": "Current version",
+  "Bản mới nhất": "Latest release",
+  "Không kiểm tra được: {0}": "Could not check: {0}",
+  "Kiểm tra lúc {0}": "Checked at {0}",
+  "Cập nhật lên {0}": "Update to {0}",
+  "Đang dùng bản mới nhất": "Up to date",
+  "Kiểm tra bản mới": "Check for updates",
+  "Tự động cập nhật": "Automatic updates",
+  "Mỗi đêm từ 3:00 đến 5:00 (giờ máy chủ), nếu có bản mới thì tự cài. Panel khởi động lại vài phút; website và email không bị gián đoạn.": "Every night between 03:00 and 05:00 (server time) a newer release is installed. The panel restarts for a few minutes; websites and email keep running.",
+  "Đang cập nhật…": "Updating…",
+  "Cập nhật xong": "Update finished",
+  "Lần cập nhật gần nhất": "Last update",
+  "Cập nhật lỗi (mã {0}); panel vẫn chạy bản cũ. Xem nhật ký bên dưới.": "Update failed (code {0}); the panel still runs the previous version. See the log below.",
+  "Cập nhật X-Panel lên {0}? Panel sẽ khởi động lại trong vài phút; website và email vẫn chạy.": "Update X-Panel to {0}? The panel restarts for a few minutes; websites and email keep running."
 }

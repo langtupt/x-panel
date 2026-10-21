@@ -34,6 +34,7 @@ import {
   Mail,
   Menu,
   Package,
+  RefreshCw,
   ScrollText,
   Server,
   Settings2,
@@ -175,6 +176,13 @@ const NAV: NavItem[] = [
     group: "Hệ thống",
   },
   {
+    href: "/update/",
+    label: "Cập nhật",
+    roles: ["admin"],
+    icon: RefreshCw,
+    group: "Hệ thống",
+  },
+  {
     href: "/account/",
     label: "Cài đặt tài khoản",
     roles: ALL,
@@ -228,7 +236,9 @@ export default function PanelLayout({
         </div>
         <div>
           <span className="font-semibold tracking-tight">X-Panel</span>
-          <p className="text-[11px] text-muted-foreground">Hosting workspace</p>
+          <p className="text-[11px] text-muted-foreground">
+            Hosting workspace{user.panel_version ? ` · ${user.panel_version}` : ""}
+          </p>
         </div>
       </Link>
       <nav

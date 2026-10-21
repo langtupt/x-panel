@@ -6,14 +6,16 @@ set -euo pipefail
 ARCH="${1:-amd64}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/dist/xpanel-linux-$ARCH"
+# Release tag shown in the panel and used by the updater (XPANEL_BUILD_VERSION=v1.2.6).
+VERSION="${XPANEL_BUILD_VERSION:-$(git -C "$ROOT" describe --tags --exact-match 2>/dev/null || echo dev)}"
 
 rm -rf "$OUT" && mkdir -p "$OUT/bin"
 
-echo "==> Go binaries ($ARCH)"
+echo "==> Go binaries ($ARCH, $VERSION)"
 cd "$ROOT"
 for cmd in xpanel-api xpanel-agent; do
   app="${cmd#xpanel-}"
-  GOOS=linux GOARCH="$ARCH" CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" \
+  GOOS=linux GOARCH="$ARCH" CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X xpanel/pkg/version.Version=$VERSION" \
     -o "$OUT/bin/$cmd" "./apps/$app/cmd/$cmd"
 done
 

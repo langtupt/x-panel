@@ -170,6 +170,9 @@ systemctl restart pure-ftpd
 # ---------------------------------------------------------------- nginx
 install -d -m 0755 /etc/nginx/conf.d/xpanel /var/lib/xpanel/acme /var/log/nginx/xpanel
 install -m 0644 "$SRC/deploy/nginx/xpanel-panel.conf" /etc/nginx/conf.d/xpanel-panel.conf
+# Unknown host names get nothing (the package's default site would clash).
+install -m 0644 "$SRC/deploy/nginx/xpanel-default.conf" /etc/nginx/conf.d/xpanel-default.conf
+[ -L /etc/nginx/sites-enabled/default ] && rm -f /etc/nginx/sites-enabled/default
 # Website logs live outside /var/log/nginx/*.log, which the distribution
 # rotates; without this they grow until the disk is full.
 install -m 0644 /dev/stdin /etc/logrotate.d/xpanel-nginx <<'EOF'

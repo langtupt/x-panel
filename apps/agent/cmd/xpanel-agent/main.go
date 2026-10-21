@@ -29,6 +29,7 @@ import (
 	"xpanel/apps/agent/internal/php"
 	"xpanel/apps/agent/internal/pma"
 	"xpanel/apps/agent/internal/quota"
+	"xpanel/apps/agent/internal/selfupdate"
 	"xpanel/apps/agent/internal/server"
 	"xpanel/apps/agent/internal/siteapp"
 	"xpanel/apps/agent/internal/stats"
@@ -112,6 +113,12 @@ func main() {
 
 	srv := server.New(log)
 	srv.Register(agentproto.ActionSystemReboot, func(ctx context.Context, _ json.RawMessage) (any, error) { return nil, sysinfo.Reboot(ctx) })
+	srv.Register(agentproto.ActionUpdateStart, server.Typed(func(ctx context.Context, p agentproto.UpdateParams) (any, error) {
+		return nil, selfupdate.Start(ctx, p.Version)
+	}))
+	srv.Register(agentproto.ActionUpdateStatus, func(ctx context.Context, _ json.RawMessage) (any, error) {
+		return selfupdate.Status(ctx), nil
+	})
 	srv.Register(agentproto.ActionPing, func(context.Context, json.RawMessage) (any, error) {
 		return map[string]string{"pong": "ok"}, nil
 	})
