@@ -51,6 +51,7 @@ if [ "$MEM_MB" -lt 4096 ] && [ "$(swapon --noheadings 2>/dev/null | wc -l)" = 0 
   if fallocate -l "${SWAP_MB}M" /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count="$SWAP_MB" status=none; then
     chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile \
       && echo "/swapfile none swap sw 0 0" >>/etc/fstab && log "Created ${SWAP_MB} MB of swap" \
+      && install -d -m 0750 /etc/xpanel && echo "swap /swapfile" >>/etc/xpanel/host-changes \
       || { warn "Unable to create swap"; rm -f /swapfile; }
   fi
 fi

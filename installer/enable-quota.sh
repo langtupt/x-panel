@@ -35,6 +35,8 @@ fstab_add_opt() {
     $1 !~ /^#/ && $2 == mp && ("," $4 ",") !~ ("," opt ",") { $4 = $4 "," opt }
     { print }' /etc/fstab >/etc/fstab.xpanel
   mv /etc/fstab.xpanel /etc/fstab
+  # The full uninstall reverts what is recorded here.
+  [ ! -d /etc/xpanel ] || echo "quota $MP $opt" >>/etc/xpanel/host-changes
   log "Added '$opt' to /etc/fstab for $MP (backup: /etc/fstab.bak.*)."
 }
 
@@ -57,7 +59,8 @@ case "$FSTYPE" in
       # XFS root quotas must be enabled at mount time via the kernel command line.
       if [ -f /etc/default/grub ]; then
         grep -q 'rootflags=uquota' /etc/default/grub \
-          || sed -i 's/^GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="rootflags=uquota /' /etc/default/grub
+          || { sed -i 's/^GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="rootflags=uquota /' /etc/default/grub
+               [ ! -d /etc/xpanel ] || echo "grub rootflags=uquota" >>/etc/xpanel/host-changes; }
         update-grub
       else
         die "Cannot add rootflags=uquota: /etc/default/grub was not found."

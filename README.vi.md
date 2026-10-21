@@ -50,8 +50,9 @@ Mở địa chỉ đó trên trình duyệt (cảnh báo chứng chỉ lần đ�
 | Gỡ panel nhưng giữ website/database/email | `curl -fsSL https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh \| XPANEL_KEEP_DATA=1 bash` |
 
 Lệnh gỡ mặc định purge toàn bộ gói và dữ liệu của các dịch vụ hosting kể trên, kể cả cài
-ngoài X-Panel. Máy đã gỡ panel bằng bản cũ còn sót gói: chạy lại với `XPANEL_PURGE_PACKAGES=1`. Swap, quota, cấu hình mạng và file do bạn tự tải trong
-`/root` được giữ nguyên; gỡ phần mềm không tương đương cài lại hệ điều hành.
+ngoài X-Panel. Máy đã gỡ panel bằng bản cũ còn sót gói: chạy lại với `XPANEL_PURGE_PACKAGES=1`. Lệnh gỡ sạch còn gỡ Node.js (kể cả repo NodeSource), gói quota,
+file `/swapfile` và tùy chọn quota mà bộ cài đã thêm vào `/etc/fstab` (swap/quota có từ trước X-Panel thì giữ).
+Cấu hình mạng, SSH, ufw và file bạn tự để trong `/root` được giữ nguyên; gỡ phần mềm không tương đương cài lại hệ điều hành.
 
 📘 **Hướng dẫn chi tiết từ A đến Z** (chuẩn bị VPS, mở cổng, đăng nhập SSH từ Windows, các bước sau khi cài,
 email, sao lưu, xử lý lỗi): **[docs/CAI-DAT.md](docs/CAI-DAT.md)**

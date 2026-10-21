@@ -68,8 +68,9 @@ What each part covers:
 
 - **X-Panel**: the `xpanel-api` and `xpanel-agent` services, `/opt/xpanel`, `/etc/xpanel`, `/var/lib/xpanel`, the panel database, its nginx, PHP-FPM, fail2ban and firewall (nftables) rules, the SFTP block in `sshd_config` and the `xpanel-uninstall` shortcut.
 - **Customer data**: hosting accounts (Linux users and `/home/<user>`), websites and their app services, MariaDB and PostgreSQL customer databases, mailboxes (`/var/mail/vhosts`), DKIM keys, FTP accounts, cron jobs and quarantined files. Backups already uploaded to Google Drive are not touched.
-- **Hosting service packages**: nginx, PHP (all versions, including the Ondřej PPA / Sury repository), MariaDB, PostgreSQL, Postfix, Dovecot, OpenDKIM, Pure-FTPd, fail2ban, ClamAV, Redis and Memcached, with `/etc/nginx`, `/etc/php`, `/var/lib/mysql`, `/var/lib/postgresql`, `/etc/clamav`, `/var/lib/redis` and similar directories. **This includes services installed outside X-Panel.**
-- **Always kept**: the swap file, disk quota settings, network configuration, SSH access and files you placed in `/root`. Node.js and Go runtimes installed by X-Panel live in `/opt/xpanel` and are removed with it unless `XPANEL_KEEP_DATA=1` is set.
+- **Hosting service packages**: nginx, PHP (all versions, including the Ondřej PPA / Sury repository), MariaDB, PostgreSQL, Postfix, Dovecot, OpenDKIM, Pure-FTPd, fail2ban, ClamAV, Redis, Memcached, Node.js (including the NodeSource repository) and the quota tools, with `/etc/nginx`, `/etc/php`, `/var/lib/mysql`, `/var/lib/postgresql`, `/etc/clamav`, `/var/lib/redis` and similar directories. **This includes services installed outside X-Panel.**
+- **Host changes made by the installer** (full removal only): the `/swapfile` it created and its `/etc/fstab` line, and the `usrquota`/`uquota` option it added to `/etc/fstab` (with `aquota.user`, and `rootflags=uquota` in GRUB on XFS). Quotas stay active until the next reboot. A swap file or quota setting that existed before X-Panel is not touched.
+- **Always kept**: network configuration, SSH access, the firewall of the operating system (ufw) and files you placed in `/root`. Node.js and Go runtimes installed by X-Panel live in `/opt/xpanel` and are removed with it unless `XPANEL_KEEP_DATA=1` is set.
 
 Notes:
 
