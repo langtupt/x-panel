@@ -44,22 +44,41 @@ Run the installation command again to update while retaining configuration and d
 
 ### Uninstalling
 
-Download the uninstaller:
+Run as root. Removal takes two steps: the first command only **downloads** the uninstaller and changes nothing; the second runs it.
 
 ```bash
+# 1. Download the uninstaller (removes nothing)
 curl -fSL --retry 3 -o /tmp/xpanel-uninstall.sh https://raw.githubusercontent.com/langtupt/x-panel/main/uninstall.sh
+
+# 2. Run it: full removal (default)
+bash /tmp/xpanel-uninstall.sh
 ```
 
-| Action | Command |
-|---|---|
-| **Remove everything**: panel, customer data and hosting service packages (default) | `bash /tmp/xpanel-uninstall.sh` |
-| Remove panel and customer data; retain service packages | `XPANEL_KEEP_PACKAGES=1 bash /tmp/xpanel-uninstall.sh` |
-| Remove panel while retaining website/database/email data | `XPANEL_KEEP_DATA=1 bash /tmp/xpanel-uninstall.sh` |
-| Clean up packages left by an earlier uninstall | `XPANEL_PURGE_PACKAGES=1 bash /tmp/xpanel-uninstall.sh` |
+The uninstaller lists the accounts, websites, databases and mailboxes it will delete, then asks for confirmation: type `DELETE ALL` and press Enter. Pressing Enter on its own cancels without changes.
 
-Deletion requires interactive confirmation. **The default removal permanently purges nginx, PHP, MariaDB, PostgreSQL, mail, FTP, fail2ban, ClamAV, Redis and Memcached with their data, including services installed outside X-Panel.** Swap and disk quota settings are retained.
+Choose the mode with an environment variable before `bash`:
 
-Swap, quota settings, network configuration and downloaded files in `/root` remain. Uninstalling is not equivalent to reinstalling the operating system.
+| Mode | Command | X-Panel and customer data | Hosting service packages |
+|---|---|---|---|
+| **Remove everything** (default) | `bash /tmp/xpanel-uninstall.sh` | Removed | **Purged** with their data and configuration |
+| Keep service packages | `XPANEL_KEEP_PACKAGES=1 bash /tmp/xpanel-uninstall.sh` | Removed | Kept and left running |
+| Keep customer data | `XPANEL_KEEP_DATA=1 bash /tmp/xpanel-uninstall.sh` | Panel removed; websites, databases and email kept | Kept and left running |
+| Clean up after an older uninstall | `XPANEL_PURGE_PACKAGES=1 bash /tmp/xpanel-uninstall.sh` | Leftovers removed | **Purged** (works even when the panel is already gone) |
+| Non-interactive (scripts) | `XPANEL_CONFIRM=DELETE-ALL bash /tmp/xpanel-uninstall.sh` | As the selected mode, without the prompt | As the selected mode |
+
+What each part covers:
+
+- **X-Panel**: the `xpanel-api` and `xpanel-agent` services, `/opt/xpanel`, `/etc/xpanel`, `/var/lib/xpanel`, the panel database, its nginx, PHP-FPM, fail2ban and firewall (nftables) rules, the SFTP block in `sshd_config` and the `xpanel-uninstall` shortcut.
+- **Customer data**: hosting accounts (Linux users and `/home/<user>`), websites and their app services, MariaDB and PostgreSQL customer databases, mailboxes (`/var/mail/vhosts`), DKIM keys, FTP accounts, cron jobs and quarantined files. Backups already uploaded to Google Drive are not touched.
+- **Hosting service packages**: nginx, PHP (all versions, including the Ondřej PPA / Sury repository), MariaDB, PostgreSQL, Postfix, Dovecot, OpenDKIM, Pure-FTPd, fail2ban, ClamAV, Redis and Memcached, with `/etc/nginx`, `/etc/php`, `/var/lib/mysql`, `/var/lib/postgresql`, `/etc/clamav`, `/var/lib/redis` and similar directories. **This includes services installed outside X-Panel.**
+- **Always kept**: the swap file, disk quota settings, network configuration, SSH access and files you placed in `/root`. Node.js and Go runtimes installed by X-Panel live in `/opt/xpanel` and are removed with it unless `XPANEL_KEEP_DATA=1` is set.
+
+Notes:
+
+- `XPANEL_PURGE_PACKAGES=1` cannot be combined with `XPANEL_KEEP_DATA=1` or `XPANEL_KEEP_PACKAGES=1`.
+- Without `XPANEL_PURGE_PACKAGES=1`, the uninstaller stops on a server where no X-Panel installation is found, so it never purges packages on an unrelated server.
+- Download backups (for example to Google Drive) before removing customer data: it cannot be recovered.
+- Uninstalling is not equivalent to reinstalling the operating system.
 
 ## Features
 
