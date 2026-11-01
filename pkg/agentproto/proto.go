@@ -662,7 +662,8 @@ const (
 	ActionFirewallApply = "firewall.apply" // FirewallConfig
 	ActionFirewallBans  = "firewall.bans"  // -> FirewallBans
 	ActionFirewallBan   = "firewall.ban"   // FirewallBanParams
-	ActionFirewallUnban = "firewall.unban" // FirewallBanParams
+	ActionFirewallUnban = "firewall.unban" // FirewallBanParams -> FirewallCheck
+	ActionFirewallCheck = "firewall.check" // FirewallBanParams -> FirewallCheck
 )
 
 // FirewallConfig is the whole server firewall; 0 turns a limit off.
@@ -688,6 +689,19 @@ type FirewallConfig struct {
 	AccountLockMin int      `json:"account_lock_min"` //
 	Allow          []string `json:"allow"`            // IPs/CIDRs never limited or banned
 	Block          []string `json:"block"`            // IPs/CIDRs always dropped
+}
+
+// FirewallCheck tells what blocks (or exempts) one address on the server.
+type FirewallCheck struct {
+	IP             string   `json:"ip"`
+	FirewallActive bool     `json:"firewall_active"`
+	Banned         bool     `json:"banned"`       // in the X-Panel ban list
+	BanReason      string   `json:"ban_reason"`   //
+	DenyMatch      string   `json:"deny_match"`   // "always block" entry covering it
+	AllowMatch     string   `json:"allow_match"`  // "always allow" entry covering it
+	Fail2ban       []string `json:"fail2ban"`     // jails banning it
+	OtherTables    []string `json:"other_tables"` // other nftables tables naming it
+	PanelLocked    bool     `json:"panel_locked"` // panel login lock (set by the API)
 }
 
 type FirewallBan struct {

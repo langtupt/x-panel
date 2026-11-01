@@ -143,6 +143,7 @@ func (s *Server) Handler() http.Handler {
 			r.Put("/firewall", s.handleSaveFirewall)
 			r.Post("/firewall/ban", s.handleFirewallBan)
 			r.Post("/firewall/unban", s.handleFirewallUnban)
+			r.Get("/firewall/check", s.handleFirewallCheck)
 			r.Post("/firewall/unlock", s.handleFirewallUnlock)
 			r.Get("/malware/status", s.handleMalwareStatus)
 			r.Post("/malware/install", s.handleMalwareInstall)
