@@ -959,5 +959,13 @@
   "Xóa {0}": "Delete {0}",
   "File tải lên được đổi tên theo database. Có thể chép file .sql/.sql.gz vào thư mục trên bằng Quản lý file hoặc FTP, đặt tên bắt đầu bằng “{0}-”.": "Uploaded files are renamed after the database. You can also copy .sql/.sql.gz files into that folder with the file manager or FTP, named starting with “{0}-”.",
   "Khôi phục database": "Database restore",
-  "Sao lưu database": "Database backup"
+  "Sao lưu database": "Database backup",
+  "Tác vụ gần đây": "Recent tasks",
+  "Thu gọn": "Collapse",
+  "Xem nhật ký": "View log",
+  "Ẩn": "Hide",
+  "Ẩn mục đã xong": "Hide finished",
+  "Tất cả tác vụ →": "All tasks →",
+  "{0} tác vụ thất bại": "{0} task(s) failed",
+  "Đã hoàn tất": "Done"
 }
