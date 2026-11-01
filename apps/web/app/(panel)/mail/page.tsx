@@ -1095,7 +1095,7 @@ export default function MailPage() {
             {translate(
               me.role === "admin"
                 ? translate(
-                    'Vào trang Applications cài "Mail server" (Postfix, Dovecot, DKIM) và "Roundcube Webmail", sau đó quay lại đây để tạo hộp thư.',
+                    'Vào trang Ứng dụng cài "Mail server" (Postfix, Dovecot, DKIM) và "Roundcube Webmail", sau đó quay lại đây để tạo hộp thư.',
                   )
                 : translate(
                     "Quản trị viên máy chủ cần cài Mail server trước. Hãy liên hệ quản trị viên.",
@@ -1104,7 +1104,7 @@ export default function MailPage() {
           </p>
           {me.role === "admin" && (
             <a className="btn-primary mt-4 inline-block" href="/applications/">
-              {translate("Đến trang Applications")}
+              {translate("Đến trang Ứng dụng")}
             </a>
           )}
         </div>

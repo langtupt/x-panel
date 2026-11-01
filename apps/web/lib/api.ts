@@ -266,10 +266,17 @@ export interface PHPList {
 export const taskLabel: Record<string, string> = {
   "site.build": "Build website",
   "app.install": "Cài ứng dụng",
+  "app.remove": "Gỡ ứng dụng",
   "ssl.issue": "Cấp SSL",
+  "panel.ssl": "SSL cho panel",
   "php.install": "Cài PHP",
   "php.manage": "Quản lý PHP",
   "pma.install": "Cài phpMyAdmin",
+  "backup.create": "Tạo bản sao lưu",
+  "backup.restore": "Khôi phục sao lưu",
+  "malware.install": "Cài ClamAV",
+  "malware.clamd": "Bật/tắt clamd",
+  "malware.scan": "Quét mã độc",
 };
 
 export const isOpen = (t: Task) =>

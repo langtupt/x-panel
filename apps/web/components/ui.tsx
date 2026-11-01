@@ -7,6 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useEffect, useState } from "react";
+import { Check, Copy } from "lucide-react";
 
 export function Modal({
   title,
@@ -77,5 +79,65 @@ export function UsageBar({
         </div>
       )}
     </div>
+  );
+}
+
+async function writeClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Older browsers / non-secure origins: fall back to a hidden textarea.
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  }
+}
+
+/** Small button that copies text (logs, commands…) to the clipboard. */
+export function CopyButton({
+  text,
+  label = "Sao chép",
+  className = "",
+  tone = "light",
+}: {
+  text: string;
+  label?: string;
+  className?: string;
+  tone?: "light" | "dark";
+}) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const id = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(id);
+  }, [copied]);
+  const colors =
+    tone === "dark"
+      ? "text-neutral-400 hover:bg-white/10 hover:text-white"
+      : "text-muted-foreground hover:bg-muted hover:text-foreground";
+  return (
+    <button
+      type="button"
+      disabled={!text}
+      onClick={async () => setCopied(await writeClipboard(text))}
+      title={translate(label)}
+      aria-label={translate(label)}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${colors} ${className}`}
+    >
+      {copied ? (
+        <Check className="size-3.5 text-emerald-500" />
+      ) : (
+        <Copy className="size-3.5" />
+      )}
+      {translate(copied ? "Đã sao chép" : label)}
+    </button>
   );
 }

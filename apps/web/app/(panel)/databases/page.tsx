@@ -78,7 +78,7 @@ function CreateForm({
   return (
     <form onSubmit={submit} className="card space-y-4 p-5">
       <h2 className="font-semibold">{translate("Tạo database")}</h2>
-      <label className="label">Engine</label>
+      <label className="label">{translate("Loại database")}</label>
       <select
         className="input"
         value={engine}
@@ -86,7 +86,7 @@ function CreateForm({
       >
         <option value="mariadb">MariaDB</option>
         <option value="postgresql">
-          {translate("PostgreSQL (cần cài từ Applications)")}
+          {translate("PostgreSQL (cần cài từ trang Ứng dụng)")}
         </option>
       </select>
       <div className="modal-grid">
@@ -412,7 +412,7 @@ export default function DatabasesPage() {
             <dt className="font-sans text-slate-500">Database</dt>
             <dd>{translate(created.db.name)}</dd>
             <Copy value={created.db.name} />
-            <dt className="font-sans text-slate-500">User</dt>
+            <dt className="font-sans text-slate-500">{translate("Người dùng")}</dt>
             <dd>{translate(created.db.db_user)}</dd>
             <Copy value={created.db.db_user} />
             <dt className="font-sans text-slate-500">
@@ -436,7 +436,7 @@ export default function DatabasesPage() {
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3">Database</th>
-              <th className="px-4 py-3">User</th>
+              <th className="px-4 py-3">{translate("Người dùng")}</th>
               {manager && (
                 <th className="px-4 py-3">{translate("Tài khoản")}</th>
               )}

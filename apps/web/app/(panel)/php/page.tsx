@@ -511,8 +511,8 @@ export default function PHPPage() {
                                 disabled={busy || resets.includes(s.name)}
                                 onChange={(e) => edit(s, e.target.value)}
                               >
-                                <option value="1">On (1)</option>
-                                <option value="0">Off (0)</option>
+                                <option value="1">{t("Bật (1)")}</option>
+                                <option value="0">{t("Tắt (0)")}</option>
                               </select>
                             ) : (
                               <input

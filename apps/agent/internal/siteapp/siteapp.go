@@ -146,7 +146,7 @@ func runtimePath(s agentproto.WebSite) (string, error) {
 		v = installed[0]
 	}
 	if !slices.Contains(installed, v) {
-		return "", fmt.Errorf("runtime chưa cài; cài từ Applications trước")
+		return "", fmt.Errorf("runtime chưa cài; cài từ trang Ứng dụng trước")
 	}
 	return filepath.Join(base, v, "bin") + ":/usr/local/bin:/usr/bin:/bin", nil
 }

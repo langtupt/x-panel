@@ -651,7 +651,7 @@ export default function FilesPage() {
           className="btn-ghost px-2.5 py-1 text-xs"
           onClick={() => setDialog({ kind: "newfile" })}
         >
-          + File
+          {translate("+ Tệp")}
         </button>
         <button
           className="btn-primary px-2.5 py-1 text-xs"

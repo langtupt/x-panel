@@ -308,7 +308,7 @@ export default function ApplicationsPage() {
         <div>
           <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
             <Blocks className="size-3.5" />
-            Application catalog
+            {translate("Danh mục ứng dụng")}
           </div>
           <h1>{translate("Ứng dụng")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -333,7 +333,7 @@ export default function ApplicationsPage() {
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          ["Trong catalog", apps.length, Blocks],
+          ["Trong danh mục", apps.length, Blocks],
           [
             translate("Ứng dụng đã cài"),
             apps.filter((a) => a.installed.length).length,

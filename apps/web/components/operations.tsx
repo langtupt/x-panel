@@ -20,6 +20,7 @@ import {
   Minimize2,
 } from "lucide-react";
 import { TaskStatusBadge } from "@/components/task";
+import { CopyButton } from "@/components/ui";
 
 type Operation = {
   id: number;
@@ -34,7 +35,7 @@ type Operation = {
 
 function title(op: Operation) {
   if (op.task)
-    return `${taskLabel[op.task.type] ?? op.task.type} · ${op.task.target}`;
+    return `${translate(taskLabel[op.task.type] ?? op.task.type)} · ${op.task.target}`;
   if (op.path.includes("/files/upload"))
     return translate("Tải tệp lên máy chủ");
   if (op.path.includes("/install")) return translate("Cài đặt ứng dụng");
@@ -125,32 +126,40 @@ export function Operations() {
   return (
     <>
       {!open && (
-        <Button
+        <button
+          type="button"
           onClick={() => setOpen(true)}
-          className="fixed right-6 bottom-6 z-40 shadow-lg"
-          size="lg"
+          title={translate("Xem tác vụ gần nhất")}
+          className="fixed right-4 bottom-4 z-40 inline-flex h-9 items-center gap-2 rounded-full border bg-background/95 px-3 text-xs font-medium shadow-md backdrop-blur transition hover:bg-muted"
         >
-          <Activity className={active.length ? "animate-pulse" : ""} />
-          {translate(
-            active.length
-              ? translate("{0} tác vụ đang chạy", [active.length])
-              : translate("Xem tác vụ gần nhất"),
+          {active.length ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : failed ? (
+            <CircleAlert className="size-3.5 text-destructive" />
+          ) : (
+            <Activity className="size-3.5" />
           )}
-        </Button>
+          {active.length
+            ? translate("{0} tác vụ đang chạy", [active.length])
+            : translate("Tác vụ")}
+        </button>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-2xl" showCloseButton={false}>
           <DialogHeader>
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex size-11 items-center justify-center rounded-xl border bg-muted">
+            <div className="flex items-start gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted">
                 {running ? (
-                  <Loader2 className="size-5 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                 ) : failed ? (
-                  <CircleAlert className="size-5 text-destructive" />
+                  <CircleAlert className="size-4 text-destructive" />
                 ) : (
-                  <CheckCircle2 className="size-5 text-emerald-600" />
+                  <CheckCircle2 className="size-4 text-emerald-600" />
                 )}
               </div>
+              <DialogTitle className="min-w-0 flex-1 pt-1.5 leading-snug">
+                {title(current)}
+              </DialogTitle>
               <Button
                 size="icon"
                 variant="ghost"
@@ -160,7 +169,6 @@ export function Operations() {
                 <Minimize2 />
               </Button>
             </div>
-            <DialogTitle>{translate(title(current))}</DialogTitle>
             <DialogDescription>
               {translate(
                 running
@@ -223,13 +231,17 @@ export function Operations() {
             </div>
           )}
           <div className="overflow-hidden rounded-lg border bg-neutral-950 text-neutral-200">
-            <div className="flex items-center gap-2 border-b border-white/10 px-4 py-2.5 text-xs text-neutral-400">
+            <div className="flex items-center gap-2 border-b border-white/10 py-1.5 pr-2 pl-4 text-xs text-neutral-400">
               <Terminal className="size-3.5" />
-              {translate("Nhật ký thực hiện")}
+              <span className="flex-1">{translate("Nhật ký thực hiện")}</span>
+              <CopyButton
+                tone="dark"
+                text={current.error || current.task?.log || ""}
+              />
             </div>
             <pre
               aria-live="polite"
-              className="max-h-[45dvh] min-h-28 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-6"
+              className="max-h-[45dvh] min-h-24 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-6"
             >
               {current.error ||
                 current.task?.log ||
