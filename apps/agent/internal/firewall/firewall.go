@@ -296,6 +296,9 @@ func apply(ctx context.Context, c agentproto.FirewallConfig) error {
 	if _, err := run.With(ctx, run.Opts{Stdin: ruleset(c)}, "nft", "-f", "-"); err != nil {
 		return fmt.Errorf("nftables: %w", err)
 	}
+	if err := restoreBans(ctx); err != nil {
+		return fmt.Errorf("nftables (khôi phục danh sách chặn): %w", err)
+	}
 	if changed, err := writeIfChanged(nginxConf, nginxRateConf(c), 0o644); err != nil {
 		return err
 	} else if changed {
@@ -351,22 +354,92 @@ func Ban(ctx context.Context, p agentproto.FirewallBanParams) error {
 	if a.IsLoopback() {
 		return errors.New("không chặn địa chỉ loopback")
 	}
-	reason := p.Reason
-	if len(reason) > 80 || strings.ContainsAny(reason, "\n\r") {
-		reason = reason[:min(len(reason), 80)]
+	reason := strings.NewReplacer("\n", " ", "\r", " ").Replace(strings.ToValidUTF8(p.Reason, ""))
+	if len(reason) > 80 {
+		reason = strings.ToValidUTF8(reason[:80], "")
 	}
-	elem := a.String()
+	rec := banRecord{Reason: reason}
 	if p.Seconds > 0 {
-		elem += " timeout " + strconv.Itoa(p.Seconds) + "s"
+		rec.Until = time.Now().Add(time.Duration(p.Seconds) * time.Second).Unix()
+	}
+	// Recorded first: the nftables sets live in memory only, so bans are
+	// put back from these records at boot or when the firewall is re-enabled
+	// (and a fail2ban ban that arrives before the table exists is kept).
+	if err := writeBan(a, rec); err != nil {
+		return err
 	}
 	// Replace an existing ban (new timeout).
 	_, _ = run.With(ctx, run.Opts{}, "nft", "delete", "element", "inet", table, setFor(a), "{ "+a.String()+" }")
-	if _, err := run.With(ctx, run.Opts{}, "nft", "add", "element", "inet", table, setFor(a), "{ "+elem+" }"); err != nil {
+	if _, err := run.With(ctx, run.Opts{}, "nft", "add", "element", "inet", table, setFor(a), "{ "+banElem(a, rec, time.Now())+" }"); err != nil {
 		return fmt.Errorf("tường lửa chưa bật: %w", err)
 	}
-	_ = os.MkdirAll(reasonsDir, 0o700)
-	_ = os.WriteFile(filepath.Join(reasonsDir, a.String()), []byte(strings.ToValidUTF8(reason, "")), 0o600)
 	return nil
+}
+
+// banRecord is stored per banned address in reasonsDir.
+type banRecord struct {
+	Reason string `json:"reason"`
+	Until  int64  `json:"until,omitempty"` // unix seconds; 0 = until unbanned
+}
+
+func writeBan(a netip.Addr, rec banRecord) error {
+	if err := os.MkdirAll(reasonsDir, 0o700); err != nil {
+		return err
+	}
+	b, _ := json.Marshal(rec)
+	return os.WriteFile(filepath.Join(reasonsDir, a.String()), b, 0o600)
+}
+
+// readBan reads a record; files of older versions hold only the reason.
+func readBan(name string) banRecord {
+	b, err := os.ReadFile(filepath.Join(reasonsDir, filepath.Base(name)))
+	if err != nil {
+		return banRecord{}
+	}
+	var rec banRecord
+	if json.Unmarshal(b, &rec) != nil {
+		rec = banRecord{Reason: string(b)}
+	}
+	return rec
+}
+
+func banElem(a netip.Addr, rec banRecord, now time.Time) string {
+	if rec.Until == 0 {
+		return a.String()
+	}
+	return a.String() + " timeout " + strconv.FormatInt(max(rec.Until-now.Unix(), 1), 10) + "s"
+}
+
+// restoreBans puts the recorded, unexpired bans back into the sets in one
+// nft transaction and deletes expired records.
+func restoreBans(ctx context.Context) error {
+	entries, err := os.ReadDir(reasonsDir)
+	if err != nil {
+		return nil
+	}
+	now := time.Now()
+	var adds, dels strings.Builder
+	for _, e := range entries {
+		a, err := netip.ParseAddr(e.Name())
+		if err != nil {
+			continue
+		}
+		rec := readBan(e.Name())
+		if rec.Until > 0 && rec.Until <= now.Unix() {
+			_ = os.Remove(filepath.Join(reasonsDir, e.Name()))
+			continue
+		}
+		fmt.Fprintf(&dels, "add element inet %s %s { %s }\n", table, setFor(a), a)
+		fmt.Fprintf(&dels, "delete element inet %s %s { %s }\n", table, setFor(a), a)
+		fmt.Fprintf(&adds, "add element inet %s %s { %s }\n", table, setFor(a), banElem(a, rec, now))
+	}
+	if adds.Len() == 0 {
+		return nil
+	}
+	// add-then-delete makes each delete valid (absent elements would abort
+	// the batch), so the final add sets the remaining timeout.
+	_, err = run.With(ctx, run.Opts{Stdin: dels.String() + adds.String()}, "nft", "-f", "-")
+	return err
 }
 
 func Unban(ctx context.Context, p agentproto.FirewallBanParams) error {
@@ -426,8 +499,7 @@ func Bans(ctx context.Context) (agentproto.FirewallBans, error) {
 						ex = &t
 					}
 				}
-				reason, _ := os.ReadFile(filepath.Join(reasonsDir, filepath.Base(ip)))
-				out.Bans = append(out.Bans, agentproto.FirewallBan{IP: ip, Reason: string(reason), ExpiresAt: ex})
+				out.Bans = append(out.Bans, agentproto.FirewallBan{IP: ip, Reason: readBan(ip).Reason, ExpiresAt: ex})
 			}
 		}
 	}

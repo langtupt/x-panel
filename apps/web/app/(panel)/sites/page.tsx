@@ -67,6 +67,12 @@ const RESTART_HINT: Record<string, string> = {
   go: "Khởi động lại ứng dụng với bản build hiện có. Mã mới cần Build & khởi động lại",
 };
 
+function runtimeOf(appType: string) {
+  if (appType === "go") return "Go";
+  if (appType === "nodejs" || appType === "nextjs") return "Node.js";
+  return "";
+}
+
 function SiteForm({
   editing,
   owners,
@@ -115,6 +121,15 @@ function SiteForm({
   );
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  // Node.js / Next.js sites pick an installed Node.js line, Go sites an
+  // installed Go version; other types have no runtime.
+  const runtimeName = runtimeOf(f.app_type);
+  const runtimes =
+    runtimeName === "Go"
+      ? (php?.go ?? [])
+      : runtimeName
+        ? (php?.node ?? [])
+        : null;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -136,7 +151,7 @@ function SiteForm({
     );
     const body = {
       app_type: f.app_type,
-      runtime: f.runtime,
+      runtime: runtimes ? f.runtime : "",
       env,
       deploy_script: f.deploy,
       sample: f.sample,
@@ -228,7 +243,17 @@ function SiteForm({
           <select
             className="input"
             value={f.app_type}
-            onChange={(e) => setF({ ...f, app_type: e.target.value })}
+            onChange={(e) =>
+              setF({
+                ...f,
+                app_type: e.target.value,
+                // A Node.js line means nothing for Go and vice versa.
+                runtime:
+                  runtimeOf(e.target.value) === runtimeOf(f.app_type)
+                    ? f.runtime
+                    : "",
+              })
+            }
           >
             {["html", "php", "laravel", "nodejs", "nextjs", "go"].map((t) => (
               <option key={t} value={t}>
@@ -245,7 +270,14 @@ function SiteForm({
                   const r = await api<{ app_type: string }>(
                     `/sites/${editing.id}/detect`,
                   );
-                  setF((cur) => ({ ...cur, app_type: r.app_type }));
+                  setF((cur) => ({
+                    ...cur,
+                    app_type: r.app_type,
+                    runtime:
+                      runtimeOf(r.app_type) === runtimeOf(cur.app_type)
+                        ? cur.runtime
+                        : "",
+                  }));
                 } catch (e) {
                   setError(errMsg(e));
                 }
@@ -295,16 +327,48 @@ function SiteForm({
           </p>
         </div>
       </div>
-      <div>
-        <label className="label">
-          {translate("Phiên bản Node.js / Go (trống: mới nhất đã cài)")}
-        </label>
-        <input
-          className="input"
-          value={f.runtime}
-          onChange={(e) => setF({ ...f, runtime: e.target.value })}
-        />
-      </div>
+      {runtimes && (
+        <div>
+          <label className="label" htmlFor="site-runtime">
+            {translate(
+              runtimeName === "Go" ? "Phiên bản Go" : "Phiên bản Node.js",
+            )}
+          </label>
+          <select
+            id="site-runtime"
+            className="input"
+            value={f.runtime}
+            onChange={(e) => setF({ ...f, runtime: e.target.value })}
+          >
+            <option value="">
+              {runtimes.length
+                ? translate("Mới nhất đã cài ({0})", [runtimes[0]])
+                : translate("Chưa cài {0}", [runtimeName])}
+            </option>
+            {runtimes.map((v) => (
+              <option key={v} value={v}>
+                {runtimeName} {v}
+              </option>
+            ))}
+            {f.runtime && !runtimes.includes(f.runtime) && (
+              <option value={f.runtime}>
+                {translate("{0} {1} (chưa cài trên máy chủ)", [
+                  runtimeName,
+                  f.runtime,
+                ])}
+              </option>
+            )}
+          </select>
+          {!runtimes.length && (
+            <p className="mt-1 text-xs text-amber-700">
+              {translate(
+                "Máy chủ chưa cài {0}: quản trị viên cài ở trang Ứng dụng trước khi Build.",
+                [runtimeName],
+              )}
+            </p>
+          )}
+        </div>
+      )}
       <div>
         <label className="label">
           {translate("Biến môi trường (KEY=value, mỗi dòng một biến)")}

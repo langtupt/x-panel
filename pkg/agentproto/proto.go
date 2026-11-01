@@ -204,6 +204,10 @@ type WebSyncResult struct {
 type PHPList struct {
 	Supported []string `json:"supported"`
 	Installed []string `json:"installed"`
+	// Installed Node.js lines ("22") and Go versions ("1.25.3"), newest
+	// first, for the website form's runtime choice.
+	Node []string `json:"node"`
+	Go   []string `json:"go"`
 }
 
 type PHPInstallParams struct {

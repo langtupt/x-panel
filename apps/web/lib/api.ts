@@ -261,6 +261,9 @@ export interface Task {
 export interface PHPList {
   supported: string[];
   installed: string[];
+  /** installed Node.js lines and Go versions, newest first */
+  node?: string[];
+  go?: string[];
 }
 
 export const taskLabel: Record<string, string> = {
