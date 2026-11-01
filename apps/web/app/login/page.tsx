@@ -7,10 +7,10 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   ArrowRight,
-  Box,
-  Check,
+  Database,
+  Globe,
   LockKeyhole,
-  Server,
+  Mail,
   ShieldCheck,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
@@ -54,57 +54,76 @@ export default function LoginPage() {
       <div className="absolute right-4 top-4 z-10">
         <LanguageSwitcher />
       </div>
-      <section className="relative hidden flex-col justify-between overflow-hidden border-r bg-neutral-950 p-12 text-neutral-100 lg:flex">
-        <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-white font-bold text-neutral-950">
+      <section className="relative hidden flex-col justify-between overflow-hidden bg-neutral-950 p-12 text-neutral-100 lg:flex xl:p-16">
+        {/* Background: fine grid fading out, soft light at the top. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
+            backgroundSize: "44px 44px",
+            maskImage:
+              "radial-gradient(ellipse 80% 70% at 30% 20%, #000 30%, transparent 80%)",
+            WebkitMaskImage:
+              "radial-gradient(ellipse 80% 70% at 30% 20%, #000 30%, transparent 80%)",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-32 -top-40 size-[520px] rounded-full bg-white/[0.06] blur-3xl"
+        />
+
+        <div className="relative flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-white text-lg font-bold text-neutral-950 shadow-[0_0_40px_rgba(255,255,255,0.15)]">
             X
           </div>
-          <span className="font-semibold tracking-tight">X-Panel</span>
-          <span className="ml-1 rounded-full border border-white/20 px-2 py-0.5 text-[10px] text-neutral-400">
-            {translate("Bảng điều khiển hosting")}
-          </span>
+          <span className="text-lg font-semibold tracking-tight">X-Panel</span>
         </div>
-        <div className="relative z-10 max-w-md py-16">
-          <div className="mb-8 flex size-14 items-center justify-center rounded-2xl border border-white/15 bg-white/5">
-            <Server className="size-7" strokeWidth={1.3} />
-          </div>
-          <p className="mb-4 text-xs tracking-[0.2em] text-neutral-500 uppercase">
-            {translate("Xây dựng cho hạ tầng của bạn")}
-          </p>
-          <h2 className="text-4xl font-medium leading-tight tracking-tight xl:text-5xl">
-            {translate("Một workspace.")} <br />
-            <span className="text-neutral-500">
-              {translate("Toàn bộ hạ tầng.")}
+
+        <div className="relative max-w-lg py-12">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-neutral-300">
+            <span className="size-1.5 rounded-full bg-white" />
+            {translate("Hosting control panel")}
+          </span>
+          <h2 className="mt-6 text-4xl font-semibold leading-[1.1] tracking-tight xl:text-[3.25rem]">
+            {translate("Quản lý hosting")}
+            <br />
+            <span className="bg-gradient-to-r from-white to-neutral-500 bg-clip-text text-transparent">
+              {translate("đơn giản, an toàn.")}
             </span>
           </h2>
-          <p className="mt-6 max-w-sm text-sm leading-7 text-neutral-400">
+          <p className="mt-5 max-w-md text-sm leading-7 text-neutral-400">
             {translate(
-              "Quản lý website, ứng dụng và tài nguyên máy chủ trong một giao diện thống nhất.",
+              "Website, database, email, SSL, sao lưu và bảo mật máy chủ trong một giao diện duy nhất.",
             )}
           </p>
-          <div className="mt-10 grid gap-4 text-xs text-neutral-300">
+
+          <div className="mt-10 grid grid-cols-2 gap-3">
             {[
-              translate("Website & runtime đa nền tảng"),
-              translate("Database & tài khoản tập trung"),
-              translate("Theo dõi và vận hành máy chủ"),
-            ].map((label) => (
-              <div key={label} className="flex items-center gap-3">
-                <Check className="size-3.5 text-neutral-500" />
-                {translate(label)}
+              { icon: Globe, t: translate("Website & SSL"), d: translate("PHP, Node.js, Go, chứng chỉ tự động") },
+              { icon: Database, t: "Database", d: "MariaDB · PostgreSQL" },
+              { icon: Mail, t: "Email", d: translate("Hộp thư, DKIM, webmail") },
+              { icon: ShieldCheck, t: translate("Bảo mật"), d: translate("Tường lửa, quét mã độc, 2FA") },
+            ].map((f) => (
+              <div
+                key={f.t}
+                className="rounded-xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-sm transition-colors hover:bg-white/[0.06]"
+              >
+                <f.icon className="mb-3 size-5 text-white" strokeWidth={1.5} />
+                <div className="text-sm font-medium">{f.t}</div>
+                <div className="mt-0.5 text-xs text-neutral-500">{f.d}</div>
               </div>
             ))}
           </div>
         </div>
-        <p className="text-[10px] text-neutral-500">
-          X-Panel · {translate("Hosting của bạn, trong tầm kiểm soát.")}
-        </p>
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-40 -bottom-40 size-[500px] rounded-full border border-white/5 p-14"
-        >
-          <div className="size-full rounded-full border border-white/5 p-14">
-            <div className="size-full rounded-full border border-white/5" />
-          </div>
+
+        <div className="relative flex items-center justify-between text-[11px] text-neutral-500">
+          <span>© {new Date().getFullYear()} SOC MART</span>
+          <span className="flex items-center gap-1.5">
+            <LockKeyhole className="size-3" />
+            {translate("Kết nối được mã hóa")}
+          </span>
         </div>
       </section>
       <section className="flex flex-col items-center justify-center bg-background px-6 py-12">

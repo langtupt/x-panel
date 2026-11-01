@@ -196,13 +196,6 @@ const NAV: NavItem[] = [
     icon: SlidersHorizontal,
     group: "Hệ thống",
   },
-  {
-    href: "/account/",
-    label: "Cài đặt tài khoản",
-    roles: ALL,
-    icon: Settings2,
-    group: "Hệ thống",
-  },
 ];
 
 const COLLAPSE_KEY = "xpanel.sidebar.collapsed";
@@ -432,7 +425,18 @@ export default function PanelLayout({
       </div>
     );
   const nav = NAV.filter((n) => n.roles.includes(user.role));
-  const current = nav.find((n) => samePath(pathname, n.href));
+  const current =
+    nav.find((n) => samePath(pathname, n.href)) ??
+    // Reached from the user card at the bottom of the sidebar.
+    (samePath(pathname, "/account/")
+      ? {
+          href: "/account/",
+          label: "Cài đặt tài khoản",
+          roles: ALL,
+          icon: Settings2,
+          group: "Hệ thống" as Group,
+        }
+      : undefined);
   return (
     <SessionContext.Provider value={user}>
       <TooltipProvider>
