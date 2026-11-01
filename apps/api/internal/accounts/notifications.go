@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"xpanel/apps/api/internal/users"
-	"xpanel/pkg/agentproto"
 )
 
 type Notification struct {
@@ -40,8 +39,7 @@ func (s *Service) notify(ctx context.Context, u *users.User, kind, title, body, 
 			return
 		}
 	}
-	if err := s.agent.Call(ctx, agentproto.ActionNotifyEmail, agentproto.NotifyEmailParams{
-		To: u.Email, Subject: "[X-Panel] " + title, Body: body}, nil); err != nil {
+	if err := s.sendEmail(ctx, u.Email, "[X-Panel] "+title, body); err != nil {
 		s.log.Warn("notification email", "user", u.Username, "err", err)
 	}
 }

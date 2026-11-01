@@ -16,6 +16,7 @@ type vhostData struct {
 	CertFile      string
 	KeyFile       string
 	Suspended     bool
+	Expired       bool // suspended because the hosting expired
 	OverBandwidth bool
 	ACMERoot      string
 	LogDir        string
@@ -32,7 +33,13 @@ var vhostTmpl = template.Must(template.New("vhost").Parse(`# Managed by X-Panel 
     disable_symlinks if_not_owner from=$document_root;
     access_log {{.LogDir}}/{{.Domain}}.access.log;
     error_log  {{.LogDir}}/{{.Domain}}.error.log;
-{{if .Suspended}}
+{{if .Expired}}
+    location / {
+        default_type text/html;
+        add_header Cache-Control "no-store" always;
+        return 503 "<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Hosting đã hết hạn</title><style>body{font-family:system-ui,sans-serif;background:#f6f7f9;color:#111;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}main{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:40px;max-width:520px;text-align:center}h1{font-size:22px;margin:0 0 12px}p{color:#555;line-height:1.6;margin:8px 0}</style><main><h1>Website tạm ngưng do hosting đã hết hạn</h1><p>Gói hosting của website này đã hết hạn sử dụng.</p><p>Vui lòng liên hệ quản trị viên để gia hạn và mở lại website.</p><p style='color:#999;font-size:13px'>This website's hosting has expired. Please contact the administrator to renew it.</p></main></html>";
+    }
+{{else if .Suspended}}
     location / {
         default_type text/html;
         return 503 "<!doctype html><meta charset=utf-8><title>Tạm ngưng</title><h1>Website tạm ngưng hoạt động</h1>";

@@ -45,10 +45,20 @@ type User struct {
 	RecoveryCodeUsed bool      `json:"-"`
 	Status           Status    `json:"status"`
 	CreatedAt        time.Time `json:"created_at"`
+	// Hosting expiry (date, server local time); nil = never expires.
+	ExpiresAt *time.Time `json:"expires_at"`
+	// Why a suspended account is suspended: SuspendExpired or SuspendManual.
+	SuspendReason string `json:"suspend_reason"`
+	ExpiryNotice  string `json:"-"`
 
 	// Filled from the agent's quota report, not stored.
 	DiskUsedMB *int `json:"disk_used_mb"`
 }
+
+const (
+	SuspendManual  = "manual"
+	SuspendExpired = "expired"
+)
 
 var (
 	ErrNotFound = errors.New("user not found")
@@ -63,7 +73,8 @@ func NewRepo(q db.Querier) *Repo       { return &Repo{q: q} }
 func (r *Repo) WithTx(tx pgx.Tx) *Repo { return &Repo{q: tx} }
 
 const selectCols = `SELECT u.id, u.username, u.email, u.password_hash, u.role, u.parent_id, par.username,
-	u.package_id, p.name, p.disk_mb, u.linux_uid, u.totp_secret, u.status, u.created_at
+	u.package_id, p.name, p.disk_mb, u.linux_uid, u.totp_secret, u.status, u.created_at,
+	u.expires_at, u.suspend_reason, u.expiry_notice
 	FROM users u
 	LEFT JOIN users par ON par.id = u.parent_id
 	LEFT JOIN packages p ON p.id = u.package_id`
@@ -71,7 +82,8 @@ const selectCols = `SELECT u.id, u.username, u.email, u.password_hash, u.role, u
 func scan(row pgx.Row) (*User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.ParentID, &u.ParentName,
-		&u.PackageID, &u.PackageName, &u.DiskLimitMB, &u.LinuxUID, &u.TOTPSecret, &u.Status, &u.CreatedAt)
+		&u.PackageID, &u.PackageName, &u.DiskLimitMB, &u.LinuxUID, &u.TOTPSecret, &u.Status, &u.CreatedAt,
+		&u.ExpiresAt, &u.SuspendReason, &u.ExpiryNotice)
 	u.TOTPEnabled = u.TOTPSecret != nil
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -134,6 +146,41 @@ func (r *Repo) LockForUpdate(ctx context.Context, id int64) error {
 func (r *Repo) SetStatus(ctx context.Context, id int64, s Status) error {
 	_, err := r.q.Exec(ctx, `UPDATE users SET status=$2, updated_at=now() WHERE id=$1`, id, s)
 	return err
+}
+
+// SetSuspension sets the status together with its reason ("" when active).
+func (r *Repo) SetSuspension(ctx context.Context, id int64, s Status, reason string) error {
+	_, err := r.q.Exec(ctx, `UPDATE users SET status=$2, suspend_reason=$3, updated_at=now() WHERE id=$1`, id, s, reason)
+	return err
+}
+
+// SetExpiry changes the expiry date and forgets the reminders already sent.
+func (r *Repo) SetExpiry(ctx context.Context, id int64, at *time.Time) error {
+	_, err := r.q.Exec(ctx, `UPDATE users SET expires_at=$2, expiry_notice='', updated_at=now() WHERE id=$1`, id, at)
+	return err
+}
+
+func (r *Repo) SetExpiryNotice(ctx context.Context, id int64, notice string) error {
+	_, err := r.q.Exec(ctx, `UPDATE users SET expiry_notice=$2 WHERE id=$1`, id, notice)
+	return err
+}
+
+// Expiring lists hosting accounts with an expiry date on or before until.
+func (r *Repo) Expiring(ctx context.Context, until time.Time) ([]User, error) {
+	rows, err := r.q.Query(ctx, selectCols+` WHERE u.role='user' AND u.expires_at IS NOT NULL AND u.expires_at <= $1 ORDER BY u.id`, until)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []User{}
+	for rows.Next() {
+		u, err := scan(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *u)
+	}
+	return out, rows.Err()
 }
 
 func (r *Repo) SetPackage(ctx context.Context, id int64, pkgID *int64) error {

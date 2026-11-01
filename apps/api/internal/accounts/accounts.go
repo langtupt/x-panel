@@ -9,6 +9,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -53,6 +55,7 @@ type CreateInput struct {
 	Email     string     `json:"email"`
 	Role      users.Role `json:"role"`
 	PackageID *int64     `json:"package_id"`
+	ExpiresAt *string    `json:"expires_at"` // YYYY-MM-DD, hosting accounts only
 }
 
 func (s *Service) Create(ctx context.Context, actor *users.User, in CreateInput) (*users.User, error) {
@@ -84,12 +87,25 @@ func (s *Service) Create(ctx context.Context, actor *users.User, in CreateInput)
 		}
 	}
 
+	var expires *time.Time
+	if in.Role == users.RoleUser && in.ExpiresAt != nil && strings.TrimSpace(*in.ExpiresAt) != "" {
+		d, err := time.Parse("2006-01-02", strings.TrimSpace(*in.ExpiresAt))
+		if err != nil || d.Before(today()) {
+			return nil, apperr.Invalid("ngày hết hạn không hợp lệ (phải từ hôm nay trở đi)")
+		}
+		expires = &d
+	}
 	u := &users.User{Username: in.Username, Email: in.Email, PasswordHash: hash, Role: in.Role,
 		ParentID: &actor.ID, PackageID: in.PackageID}
 	if err := ur.Create(ctx, u); errors.Is(err, users.ErrTaken) {
 		return nil, apperr.Conflict("%s", err.Error())
 	} else if err != nil {
 		return nil, err
+	}
+	if expires != nil {
+		if err := ur.SetExpiry(ctx, u.ID, expires); err != nil {
+			return nil, err
+		}
 	}
 
 	committed := false
@@ -138,19 +154,38 @@ func (s *Service) SetStatus(ctx context.Context, actor *users.User, id int64, st
 	if status != users.StatusActive && status != users.StatusSuspended {
 		return nil, apperr.Invalid("status phải là active hoặc suspended")
 	}
+	if _, err := s.managed(ctx, s.users, actor, id); err != nil {
+		return nil, err
+	}
+	reason := ""
+	if status == users.StatusSuspended {
+		reason = users.SuspendManual
+	} else if t, _ := s.users.ByID(ctx, id); t != nil && t.ExpiresAt != nil && t.ExpiresAt.Before(today()) {
+		return nil, apperr.Conflict("tài khoản đã hết hạn ngày %s: gia hạn (đổi ngày hết hạn) để mở lại", fmtDate(*t.ExpiresAt))
+	}
+	return s.setSuspension(ctx, id, status, reason)
+}
+
+// setSuspension suspends (or re-activates) an account everywhere: logins,
+// websites (which then show why), databases, FTP and mail.
+func (s *Service) setSuspension(ctx context.Context, id int64, status users.Status, reason string) (*users.User, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
 	ur := s.users.WithTx(tx)
-	t, err := s.managed(ctx, ur, actor, id)
+	if err := ur.LockForUpdate(ctx, id); err != nil {
+		return nil, err
+	}
+	t, err := ur.ByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if err := ur.SetStatus(ctx, id, status); err != nil {
+	if err := ur.SetSuspension(ctx, id, status, reason); err != nil {
 		return nil, err
 	}
+	t.SuspendReason = reason
 	if t.LinuxUID != nil {
 		p := agentproto.UserLockParams{Username: t.Username, Locked: status == users.StatusSuspended}
 		if err := s.agent.Call(ctx, agentproto.ActionUserLock, p, nil); err != nil {

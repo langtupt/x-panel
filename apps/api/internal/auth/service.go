@@ -20,6 +20,7 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("sai tên đăng nhập hoặc mật khẩu")
 	ErrSuspended          = errors.New("tài khoản đã bị khóa")
+	ErrExpired            = errors.New("tài khoản hosting đã hết hạn, vui lòng liên hệ quản trị viên để gia hạn")
 	ErrTooManyAttempts    = errors.New("đăng nhập sai quá nhiều lần, thử lại sau 15 phút")
 	ErrInvalidSession     = errors.New("phiên đăng nhập không hợp lệ")
 	ErrTOTPRequired       = errors.New("cần mã xác thực 2 lớp")
@@ -160,6 +161,10 @@ func (s *Service) Login(ctx context.Context, username, password, code, ip, ua st
 		return nil, Tokens{}, ErrInvalidCredentials
 	}
 	if u.Status != users.StatusActive {
+		// Told only after the right password.
+		if u.SuspendReason == users.SuspendExpired {
+			return nil, Tokens{}, ErrExpired
+		}
 		return nil, Tokens{}, ErrSuspended
 	}
 	if err := s.checkTOTP(u, code); err != nil {

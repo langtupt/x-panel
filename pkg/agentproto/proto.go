@@ -155,6 +155,8 @@ func ValidPHPVersion(v string) bool {
 type WebSyncParams struct {
 	Username  string `json:"username"`
 	Suspended bool   `json:"suspended"`
+	// "expired": the sites say the hosting has expired instead of "suspended".
+	SuspendReason string `json:"suspend_reason,omitempty"`
 	// The month's bandwidth allowance is used up: sites answer 503 until
 	// the next month or a bigger package (cron and apps keep running).
 	OverBandwidth bool      `json:"over_bandwidth,omitempty"`
@@ -672,9 +674,11 @@ type MalwareWriteParams struct {
 const ActionNotifyEmail = "notify.email" // NotifyEmailParams
 
 type NotifyEmailParams struct {
-	To      string `json:"to"`
-	Subject string `json:"subject"`
-	Body    string `json:"body"`
+	To       string `json:"to"`
+	Subject  string `json:"subject"`
+	Body     string `json:"body"`
+	From     string `json:"from,omitempty"` // "" = noreply@<mail server name>
+	FromName string `json:"from_name,omitempty"`
 }
 
 // Firewall (see apps/agent/internal/firewall).

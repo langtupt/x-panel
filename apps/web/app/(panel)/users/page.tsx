@@ -55,6 +55,97 @@ function PackageSelect({
   );
 }
 
+// Dates are handled as "YYYY-MM-DD" in the server's calendar.
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const todayYMD = () => ymd(new Date());
+function addMonths(from: string, months: number) {
+  const [y, m, d] = from.split("-").map(Number);
+  const t = new Date(y, m - 1 + months, d);
+  return ymd(t);
+}
+const fmtDate = (s: string) => s.slice(0, 10).split("-").reverse().join("/");
+// Days left until the expiry date (negative = expired).
+function daysLeft(s: string) {
+  const [y, m, d] = s.slice(0, 10).split("-").map(Number);
+  const now = new Date();
+  const a = Date.UTC(y, m - 1, d);
+  const b = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((a - b) / 86400000);
+}
+
+// ExpiryPicker: a date with quick "+N months" buttons; "" = never expires.
+function ExpiryPicker({
+  value,
+  base,
+  onChange,
+}: {
+  value: string;
+  base?: string; // extend from this date (current expiry) when later than today
+  onChange: (v: string) => void;
+}) {
+  const from = base && base > todayYMD() ? base : todayYMD();
+  return (
+    <div className="space-y-2">
+      <input
+        className="input"
+        type="date"
+        min={todayYMD()}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <div className="flex flex-wrap gap-1.5">
+        {[1, 3, 6, 12, 24].map((n) => (
+          <button
+            type="button"
+            key={n}
+            className="rounded-md border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-50"
+            onClick={() => onChange(addMonths(from, n))}
+          >
+            +{n < 12 ? translate("{0} tháng", [n]) : translate("{0} năm", [n / 12])}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={`rounded-md border px-2 py-0.5 text-xs ${value === "" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-300 hover:bg-slate-50"}`}
+          onClick={() => onChange("")}
+        >
+          {translate("Không thời hạn")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ExpiryCell({ u }: { u: User }) {
+  if (u.role !== "user") return <span className="text-slate-400">—</span>;
+  if (!u.expires_at)
+    return <span className="text-slate-400">{translate("Không thời hạn")}</span>;
+  const left = daysLeft(u.expires_at);
+  return (
+    <div className="whitespace-nowrap">
+      <div
+        className={
+          left < 0
+            ? "font-medium text-red-600"
+            : left <= 7
+              ? "font-medium text-amber-600"
+              : ""
+        }
+      >
+        {fmtDate(u.expires_at)}
+      </div>
+      <div className="text-xs text-slate-500">
+        {left < 0
+          ? translate("Đã hết hạn {0} ngày", [-left])
+          : left === 0
+            ? translate("Hết hạn hôm nay")
+            : translate("Còn {0} ngày", [left])}
+      </div>
+    </div>
+  );
+}
+
 function CreateUserForm({
   creatable,
   packages,
@@ -72,6 +163,7 @@ function CreateUserForm({
     email: "",
     role: creatable[0],
     package_id: null as number | null,
+    expires_at: "",
   };
   const [form, setForm] = useState(empty);
   const [error, setError] = useState("");
@@ -82,7 +174,14 @@ function CreateUserForm({
     setError("");
     setSaving(true);
     try {
-      await api("/users", { method: "POST", body: form });
+      await api("/users", {
+        method: "POST",
+        body: {
+          ...form,
+          expires_at:
+            form.role === "user" && form.expires_at ? form.expires_at : null,
+        },
+      });
       setForm(empty);
       onCreated();
     } catch (err) {
@@ -152,6 +251,20 @@ function CreateUserForm({
           onChange={(package_id) => setForm({ ...form, package_id })}
         />
       </div>
+      {form.role === "user" && (
+        <div className="sm:col-span-2">
+          <label className="label">{translate("Ngày hết hạn hosting")}</label>
+          <ExpiryPicker
+            value={form.expires_at}
+            onChange={(expires_at) => setForm({ ...form, expires_at })}
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            {translate(
+              "Khi hết hạn, tài khoản tự tạm ngưng và website hiện thông báo hết hạn. Khách được nhắc qua email trước 7, 3 và 1 ngày.",
+            )}
+          </p>
+        </div>
+      )}
       <button className="btn-primary" disabled={saving}>
         {translate(
           saving ? translate("Đang tạo…") : translate("Tạo tài khoản"),
@@ -166,6 +279,7 @@ function CreateUserForm({
 
 type Dialog =
   | { kind: "package"; user: User }
+  | { kind: "expiry"; user: User }
   | { kind: "password"; user: User }
   | { kind: "delete"; user: User };
 
@@ -184,6 +298,7 @@ function UserDialog({
 }) {
   const u = dialog.user;
   const [pkg, setPkg] = useState<number | null>(u.package_id);
+  const [expiry, setExpiry] = useState(u.expires_at?.slice(0, 10) ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -197,6 +312,11 @@ function UserDialog({
         await api(`/users/${u.id}/package`, {
           method: "PATCH",
           body: { package_id: pkg },
+        });
+      if (dialog.kind === "expiry")
+        await api(`/users/${u.id}/expiry`, {
+          method: "PATCH",
+          body: { expires_at: expiry || null },
         });
       if (dialog.kind === "password")
         await api(`/users/${u.id}/password`, {
@@ -214,6 +334,7 @@ function UserDialog({
 
   const titles = {
     package: translate("Đổi gói dịch vụ"),
+    expiry: translate("Hạn sử dụng hosting"),
     password: translate("Đặt lại mật khẩu"),
     delete: translate("Xóa tài khoản"),
   };
@@ -231,6 +352,24 @@ function UserDialog({
             onChange={setPkg}
             required={requirePackage}
           />
+        )}
+        {dialog.kind === "expiry" && (
+          <>
+            <ExpiryPicker
+              value={expiry}
+              base={u.expires_at?.slice(0, 10)}
+              onChange={setExpiry}
+            />
+            <p className="text-xs text-slate-500">
+              {u.suspend_reason === "expired"
+                ? translate(
+                    "Tài khoản đang tạm ngưng vì hết hạn: đặt ngày mới (từ hôm nay trở đi) sẽ mở lại tài khoản và website ngay.",
+                  )
+                : translate(
+                    "Khi hết hạn, tài khoản tự tạm ngưng và website hiện thông báo hết hạn. Khách được nhắc qua email trước 7, 3 và 1 ngày.",
+                  )}
+            </p>
+          </>
         )}
         {dialog.kind === "password" && (
           <>
@@ -392,6 +531,7 @@ export default function UsersPage() {
               {isAdmin && <th className="px-4 py-3">{translate("Thuộc")}</th>}
               <th className="px-4 py-3">{translate("Gói")}</th>
               <th className="px-4 py-3">{translate("Dung lượng")}</th>
+              <th className="px-4 py-3">{translate("Hết hạn")}</th>
               <th className="px-4 py-3">{translate("Trạng thái")}</th>
               <th className="px-4 py-3" />
             </tr>
@@ -440,6 +580,9 @@ export default function UsersPage() {
                       />
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    <ExpiryCell u={u} />
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {u.status === "active" ? (
                       <span className="text-emerald-600">
@@ -447,7 +590,9 @@ export default function UsersPage() {
                       </span>
                     ) : (
                       <span className="text-red-600">
-                        {translate("● Đã khóa")}
+                        {u.suspend_reason === "expired"
+                          ? translate("● Hết hạn")
+                          : translate("● Đã khóa")}
                       </span>
                     )}
                   </td>
@@ -462,6 +607,18 @@ export default function UsersPage() {
                             className="btn-ghost px-2.5 py-1 text-xs"
                           >
                             {translate("Đổi gói")}
+                          </button>
+                        )}
+                        {u.role === "user" && (
+                          <button
+                            onClick={() =>
+                              setDialog({ kind: "expiry", user: u })
+                            }
+                            className={`btn-ghost px-2.5 py-1 text-xs ${u.suspend_reason === "expired" ? "text-red-600" : ""}`}
+                          >
+                            {u.suspend_reason === "expired"
+                              ? translate("Gia hạn")
+                              : translate("Hạn dùng")}
                           </button>
                         )}
                         {u.status === "active" && !me.impersonator && (
@@ -508,7 +665,7 @@ export default function UsersPage() {
             {list.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-4 py-8 text-center text-slate-500"
                 >
                   {translate("Chưa có tài khoản nào.")}
