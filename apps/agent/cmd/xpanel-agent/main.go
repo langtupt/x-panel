@@ -345,6 +345,18 @@ func main() {
 	srv.Register(agentproto.ActionPanelSSLIssue, server.Typed(func(ctx context.Context, p agentproto.PanelSSLParams) (any, error) {
 		return issuer.IssuePanel(ctx, p)
 	}))
+	srv.Register(agentproto.ActionDBDumpCreate, server.Typed(func(ctx context.Context, p agentproto.DBDumpParams) (any, error) {
+		return backup.CreateDBDump(ctx, p)
+	}))
+	srv.Register(agentproto.ActionDBDumpList, server.Typed(func(ctx context.Context, p agentproto.DBDumpParams) (any, error) {
+		return backup.ListDBDumps(ctx, p)
+	}))
+	srv.Register(agentproto.ActionDBDumpRestore, server.Typed(func(ctx context.Context, p agentproto.DBDumpParams) (any, error) {
+		return backup.RestoreDBDump(ctx, p)
+	}))
+	srv.Register(agentproto.ActionDBDumpDelete, server.Typed(func(ctx context.Context, p agentproto.DBDumpParams) (any, error) {
+		return nil, backup.DeleteDBDump(ctx, p)
+	}))
 	srv.Register(agentproto.ActionBackupCreate, server.Typed(func(ctx context.Context, p agentproto.BackupCreateParams) (any, error) {
 		return backup.Create(ctx, p)
 	}))

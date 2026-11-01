@@ -171,7 +171,7 @@
   }
 }
 .panel-main {
-  @apply mx-auto w-full max-w-[1600px] p-5 md:p-8;
+  @apply w-full min-w-0 p-5 md:p-8;
 }
 .panel-main h1 {
   @apply text-2xl font-semibold tracking-tight;

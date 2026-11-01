@@ -947,5 +947,17 @@
   "Build website": "Build website",
   "Đã sao chép": "Copied",
   "Xây dựng cho hạ tầng của bạn": "Built for your infrastructure",
-  "Hosting của bạn, trong tầm kiểm soát.": "Your hosting, under control."
+  "Hosting của bạn, trong tầm kiểm soát.": "Your hosting, under control.",
+  "Sao lưu & khôi phục {0}": "Backup & restore {0}",
+  "sao lưu bằng {0}, khôi phục bằng {1}": "backed up with {0}, restored with {1}",
+  "File lưu trong thư mục {0} của tài khoản {1}.": "Files are kept in {0} of account {1}.",
+  "Tải lên .sql": "Upload .sql",
+  "Chỉ nhận file .sql hoặc .sql.gz": "Only .sql or .sql.gz files are accepted",
+  "Tải lên thất bại": "Upload failed",
+  "Khôi phục {0} từ {1}? Dữ liệu hiện tại sẽ bị ghi đè; panel tự sao lưu dữ liệu hiện tại trước (file …-pre-restore).": "Restore {0} from {1}? Current data will be overwritten; the panel backs it up first (file …-pre-restore).",
+  "Chưa có bản sao lưu nào cho database này.": "No backups for this database yet.",
+  "Xóa {0}": "Delete {0}",
+  "File tải lên được đổi tên theo database. Có thể chép file .sql/.sql.gz vào thư mục trên bằng Quản lý file hoặc FTP, đặt tên bắt đầu bằng “{0}-”.": "Uploaded files are renamed after the database. You can also copy .sql/.sql.gz files into that folder with the file manager or FTP, named starting with “{0}-”.",
+  "Khôi phục database": "Database restore",
+  "Sao lưu database": "Database backup"
 }

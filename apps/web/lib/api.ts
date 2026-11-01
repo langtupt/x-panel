@@ -274,6 +274,8 @@ export const taskLabel: Record<string, string> = {
   "pma.install": "Cài phpMyAdmin",
   "backup.create": "Tạo bản sao lưu",
   "backup.restore": "Khôi phục sao lưu",
+  "db.backup": "Sao lưu database",
+  "db.restore": "Khôi phục database",
   "malware.install": "Cài ClamAV",
   "malware.clamd": "Bật/tắt clamd",
   "malware.scan": "Quét mã độc",
