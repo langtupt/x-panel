@@ -292,25 +292,15 @@ function Sidebar({
               <span className="block text-sm font-semibold tracking-tight">
                 X-Panel
               </span>
-              <span className="block truncate text-[11px] text-muted-foreground">
-                {translate("Bảng điều khiển hosting")}
-                {user.panel_version ? ` · ${user.panel_version}` : ""}
+              <span
+                className="block truncate text-[11px] font-semibold tracking-[0.18em] text-muted-foreground"
+                title={user.panel_version}
+              >
+                SOC MART
               </span>
             </div>
           )}
         </Link>
-        {onToggle && !collapsed && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-8 shrink-0 text-muted-foreground"
-            aria-label={translate("Thu gọn menu")}
-            title={translate("Thu gọn menu")}
-            onClick={onToggle}
-          >
-            <PanelLeftClose className="size-4" />
-          </Button>
-        )}
       </div>
       <nav
         className={`flex-1 overflow-y-auto py-3 ${collapsed ? "px-2" : "px-3"}`}
@@ -342,17 +332,30 @@ function Sidebar({
           );
         })}
       </nav>
-      {onToggle && collapsed && (
-        <div className="flex justify-center border-t py-2">
+      {onToggle && (
+        <div
+          className={`flex shrink-0 border-t py-2 ${collapsed ? "justify-center px-2" : "px-3"}`}
+        >
           <Button
-            size="icon"
+            size={collapsed ? "icon" : "sm"}
             variant="ghost"
-            className="size-8 text-muted-foreground"
-            aria-label={translate("Mở rộng menu")}
-            title={translate("Mở rộng menu")}
+            className={
+              collapsed
+                ? "size-8 text-muted-foreground"
+                : "w-full justify-start gap-3 px-3 text-[13px] font-normal text-muted-foreground"
+            }
+            aria-label={translate(collapsed ? "Mở rộng menu" : "Thu gọn menu")}
+            title={translate(collapsed ? "Mở rộng menu" : "Thu gọn menu")}
             onClick={onToggle}
           >
-            <PanelLeftOpen className="size-4" />
+            {collapsed ? (
+              <PanelLeftOpen className="size-4" />
+            ) : (
+              <>
+                <PanelLeftClose className="size-4" strokeWidth={1.7} />
+                {translate("Thu gọn menu")}
+              </>
+            )}
           </Button>
         </div>
       )}
