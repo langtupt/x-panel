@@ -18,6 +18,18 @@ var reserved = map[string]bool{
 
 const MinPasswordLen = 10
 
+// ValidateEmail accepts "" or a bare address (no display name).
+func ValidateEmail(email string) error {
+	if email == "" {
+		return nil
+	}
+	a, err := mail.ParseAddress(email)
+	if err != nil || a.Address != email || len(email) > 254 {
+		return errors.New("email không hợp lệ")
+	}
+	return nil
+}
+
 func ValidateNew(username, password, email string) error {
 	if !usernameRe.MatchString(username) {
 		return errors.New("username: 3-32 ký tự, bắt đầu bằng chữ thường, chỉ gồm a-z, 0-9, _")

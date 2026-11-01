@@ -278,6 +278,7 @@ function CreateUserForm({
 }
 
 type Dialog =
+  | { kind: "edit"; user: User; canPackage: boolean }
   | { kind: "package"; user: User }
   | { kind: "expiry"; user: User }
   | { kind: "password"; user: User }
@@ -299,6 +300,7 @@ function UserDialog({
   const u = dialog.user;
   const [pkg, setPkg] = useState<number | null>(u.package_id);
   const [expiry, setExpiry] = useState(u.expires_at?.slice(0, 10) ?? "");
+  const [email, setEmail] = useState(u.email ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -308,6 +310,29 @@ function UserDialog({
     setBusy(true);
     setError("");
     try {
+      if (dialog.kind === "edit") {
+        // Only what changed is sent; each part is checked by the server.
+        if (email.trim() !== (u.email ?? ""))
+          await api(`/users/${u.id}/email`, {
+            method: "PATCH",
+            body: { email: email.trim() },
+          });
+        if (dialog.canPackage && pkg !== u.package_id)
+          await api(`/users/${u.id}/package`, {
+            method: "PATCH",
+            body: { package_id: pkg },
+          });
+        if (u.role === "user" && expiry !== (u.expires_at?.slice(0, 10) ?? ""))
+          await api(`/users/${u.id}/expiry`, {
+            method: "PATCH",
+            body: { expires_at: expiry || null },
+          });
+        if (password)
+          await api(`/users/${u.id}/password`, {
+            method: "PATCH",
+            body: { password },
+          });
+      }
       if (dialog.kind === "package")
         await api(`/users/${u.id}/package`, {
           method: "PATCH",
@@ -333,6 +358,7 @@ function UserDialog({
   }
 
   const titles = {
+    edit: translate("Sửa tài khoản"),
     package: translate("Đổi gói dịch vụ"),
     expiry: translate("Hạn sử dụng hosting"),
     password: translate("Đặt lại mật khẩu"),
@@ -344,6 +370,74 @@ function UserDialog({
       onClose={onClose}
     >
       <form onSubmit={run} className="space-y-4">
+        {dialog.kind === "edit" && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label">{translate("Tên đăng nhập")}</label>
+                <input className="input bg-slate-50" value={u.username} disabled />
+                <p className="mt-1 text-xs text-slate-500">
+                  {translate("Không đổi được (là tên user Linux và tiền tố database/FTP).")}
+                </p>
+              </div>
+              <div>
+                <label className="label">Email</label>
+                <input
+                  className="input"
+                  type="email"
+                  autoFocus
+                  placeholder="khach@congty.vn"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {translate("Nhận email nhắc hạn và cảnh báo.")}
+                </p>
+              </div>
+            </div>
+            {dialog.canPackage && u.role !== "admin" && (
+              <div>
+                <label className="label">{translate("Gói dịch vụ")}</label>
+                <PackageSelect
+                  packages={packages}
+                  role={u.role}
+                  value={pkg}
+                  onChange={setPkg}
+                  required={requirePackage}
+                />
+              </div>
+            )}
+            {u.role === "user" && (
+              <div>
+                <label className="label">{translate("Ngày hết hạn hosting")}</label>
+                <ExpiryPicker
+                  value={expiry}
+                  base={u.expires_at?.slice(0, 10)}
+                  onChange={setExpiry}
+                />
+                {u.suspend_reason === "expired" && (
+                  <p className="mt-1 text-xs text-red-600">
+                    {translate(
+                      "Tài khoản đang tạm ngưng vì hết hạn: đặt ngày mới sẽ mở lại tài khoản và website ngay.",
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
+            <div>
+              <label className="label">{translate("Mật khẩu mới")}</label>
+              <input
+                className="input"
+                type="password"
+                minLength={10}
+                autoComplete="new-password"
+                placeholder={translate("Để trống nếu không đổi")}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          </>
+        )}
         {dialog.kind === "package" && (
           <PackageSelect
             packages={packages}
@@ -599,26 +693,14 @@ export default function UsersPage() {
                   <td className="px-4 py-3">
                     {manageable && (
                       <div className="flex flex-wrap justify-end gap-1.5">
-                        {isChild && (
-                          <button
-                            onClick={() =>
-                              setDialog({ kind: "package", user: u })
-                            }
-                            className="btn-ghost px-2.5 py-1 text-xs"
-                          >
-                            {translate("Đổi gói")}
-                          </button>
-                        )}
-                        {u.role === "user" && (
+                        {u.suspend_reason === "expired" && (
                           <button
                             onClick={() =>
                               setDialog({ kind: "expiry", user: u })
                             }
-                            className={`btn-ghost px-2.5 py-1 text-xs ${u.suspend_reason === "expired" ? "text-red-600" : ""}`}
+                            className="btn-ghost px-2.5 py-1 text-xs text-red-600"
                           >
-                            {u.suspend_reason === "expired"
-                              ? translate("Gia hạn")
-                              : translate("Hạn dùng")}
+                            {translate("Gia hạn")}
                           </button>
                         )}
                         {u.status === "active" && !me.impersonator && (
@@ -633,14 +715,6 @@ export default function UsersPage() {
                           </button>
                         )}
                         <button
-                          onClick={() =>
-                            setDialog({ kind: "password", user: u })
-                          }
-                          className="btn-ghost px-2.5 py-1 text-xs"
-                        >
-                          {translate("Mật khẩu")}
-                        </button>
-                        <button
                           onClick={() => toggle(u)}
                           className="btn-ghost px-2.5 py-1 text-xs"
                         >
@@ -649,6 +723,14 @@ export default function UsersPage() {
                               ? translate("Khóa")
                               : translate("Mở khóa"),
                           )}
+                        </button>
+                        <button
+                          onClick={() =>
+                            setDialog({ kind: "edit", user: u, canPackage: isChild })
+                          }
+                          className="btn-ghost px-2.5 py-1 text-xs"
+                        >
+                          {translate("Sửa")}
                         </button>
                         <button
                           onClick={() => setDialog({ kind: "delete", user: u })}

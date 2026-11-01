@@ -96,6 +96,24 @@ func (s *Server) handleSetUserExpiry(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, u)
 }
 
+// PATCH /api/users/{id}/email {"email": "..."}
+func (s *Server) handleSetUserEmail(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	var in struct {
+		Email string `json:"email"`
+	}
+	if !ok || !decode(w, r, &in) {
+		return
+	}
+	u, err := s.accounts.SetEmail(r.Context(), currentUser(r), id, in.Email)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.auditUser(r, "user.email", u, map[string]any{"email": in.Email})
+	writeJSON(w, http.StatusOK, u)
+}
+
 // GET /api/settings/smtp (admin)
 func (s *Server) handleSMTPSettings(w http.ResponseWriter, r *http.Request) {
 	st, err := s.accounts.SMTPSettings(r.Context(), currentUser(r))

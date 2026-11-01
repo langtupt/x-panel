@@ -193,6 +193,7 @@ func (s *Server) Handler() http.Handler {
 				r.Patch("/users/{id}/status", s.handleSetUserStatus)
 				r.Patch("/users/{id}/package", s.handleSetUserPackage)
 				r.Patch("/users/{id}/expiry", s.handleSetUserExpiry)
+				r.Patch("/users/{id}/email", s.handleSetUserEmail)
 				r.Patch("/users/{id}/password", s.handleResetPassword)
 				r.Delete("/users/{id}", s.handleDeleteUser)
 

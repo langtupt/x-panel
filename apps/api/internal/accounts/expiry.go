@@ -187,12 +187,28 @@ func (s *Service) SetExpiry(ctx context.Context, actor *users.User, id int64, da
 			return nil, err
 		}
 		s.notify(ctx, t, "expiry", "Hosting đã được gia hạn",
-			s.renewedBody(t, at), "/dashboard/")
+			s.renewedBody(t, at), "")
 	} else if stillExpired && t.Status == users.StatusActive {
 		// A date in the past takes effect now.
 		if err := s.expire(ctx, t); err != nil {
 			return nil, err
 		}
+	}
+	return s.users.ByID(ctx, id)
+}
+
+// SetEmail changes the contact address of an account the actor manages
+// (reminders and alerts go there).
+func (s *Service) SetEmail(ctx context.Context, actor *users.User, id int64, email string) (*users.User, error) {
+	if _, err := s.managed(ctx, s.users, actor, id); err != nil {
+		return nil, err
+	}
+	email = strings.TrimSpace(email)
+	if err := users.ValidateEmail(email); err != nil {
+		return nil, apperr.Invalid("%s", err.Error())
+	}
+	if err := s.users.SetEmail(ctx, id, email); err != nil {
+		return nil, err
 	}
 	return s.users.ByID(ctx, id)
 }
@@ -242,7 +258,7 @@ func (s *Service) checkExpiry(ctx context.Context) error {
 			return err
 		}
 		title := fmt.Sprintf("Hosting sắp hết hạn (%s)", fmtDate(exp))
-		s.notify(ctx, u, "expiry", title, s.reminderBody(u, exp, left), "/dashboard/")
+		s.notify(ctx, u, "expiry", title, s.reminderBody(u, exp, left), "")
 	}
 	return nil
 }

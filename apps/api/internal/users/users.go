@@ -183,6 +183,11 @@ func (r *Repo) Expiring(ctx context.Context, until time.Time) ([]User, error) {
 	return out, rows.Err()
 }
 
+func (r *Repo) SetEmail(ctx context.Context, id int64, email string) error {
+	_, err := r.q.Exec(ctx, `UPDATE users SET email=$2, updated_at=now() WHERE id=$1`, id, email)
+	return err
+}
+
 func (r *Repo) SetPackage(ctx context.Context, id int64, pkgID *int64) error {
 	_, err := r.q.Exec(ctx, `UPDATE users SET package_id=$2, updated_at=now() WHERE id=$1`, id, pkgID)
 	return err
