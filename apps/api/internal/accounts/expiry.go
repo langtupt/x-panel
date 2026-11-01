@@ -234,13 +234,7 @@ func (s *Service) checkExpiry(ctx context.Context) error {
 			continue
 		}
 		left := int(exp.Sub(now).Hours() / 24)
-		// The smallest threshold reached that was not mailed yet.
-		notice := ""
-		for _, d := range reminderDays {
-			if left <= d {
-				notice = fmt.Sprint(d)
-			}
-		}
+		notice := reminderFor(left)
 		if notice == "" || notice == u.ExpiryNotice || u.Status != users.StatusActive {
 			continue
 		}
@@ -311,4 +305,16 @@ func (s *Service) renewedBody(u *users.User, at *time.Time) string {
 	}
 	return fmt.Sprintf("Xin chào %s,\n\nGói hosting của tài khoản %s đã được gia hạn %s. Website và các dịch vụ đã hoạt động trở lại.\n",
 		u.Username, u.Username, until)
+}
+
+// reminderFor is the reminder due with left days to go: the smallest
+// threshold reached ("7", "3", "1"), "" when none is.
+func reminderFor(left int) string {
+	notice := ""
+	for _, d := range reminderDays {
+		if left <= d {
+			notice = fmt.Sprint(d)
+		}
+	}
+	return notice
 }
