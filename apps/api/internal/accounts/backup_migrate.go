@@ -268,10 +268,10 @@ func (s *Service) recreateFromManifest(ctx context.Context, u *users.User, raw j
 }
 
 // readBackupManifest fetches the manifest of a backup through the agent.
-func (s *Service) readBackupManifest(ctx context.Context, u *users.User, creds gdrive.Creds, fileID, pass string) (json.RawMessage, error) {
+func (s *Service) readBackupManifest(ctx context.Context, u *users.User, dest backupDest, fileID, pass string) (json.RawMessage, error) {
 	var res agentproto.BackupManifest
 	if err := s.agent.Call(ctx, agentproto.ActionBackupManifest, agentproto.BackupManifestParams{
-		Username: u.Username, Drive: creds, FileID: fileID, Passphrase: pass}, &res); err != nil {
+		Username: u.Username, Drive: dest.Drive, FTP: dest.FTP, FileID: fileID, Passphrase: pass}, &res); err != nil {
 		return nil, err
 	}
 	return res.Manifest, nil

@@ -15,7 +15,6 @@ import (
 	"xpanel/apps/api/internal/tasks"
 	"xpanel/apps/api/internal/users"
 	"xpanel/pkg/agentproto"
-	"xpanel/pkg/gdrive"
 )
 
 const (
@@ -33,6 +32,7 @@ type Backup struct {
 	Kind      string         `json:"kind"`
 	Contents  BackupContents `json:"contents"`
 	CreatedAt time.Time      `json:"created_at"`
+	Dest      string         `json:"destination"` // drive | ftp
 	fileID    string
 }
 
@@ -41,7 +41,7 @@ type BackupContents struct {
 	MailDomains []string              `json:"mail_domains"`
 }
 
-const backupCols = `SELECT b.id, b.user_id, b.username, b.file_name, b.size_bytes, b.kind, b.contents, b.created_at, b.file_id
+const backupCols = `SELECT b.id, b.user_id, b.username, b.file_name, b.size_bytes, b.kind, b.contents, b.created_at, b.file_id, b.destination
 	FROM backups b LEFT JOIN users u ON u.id=b.user_id`
 
 func scanBackups(rows pgx.Rows, err error) ([]Backup, error) {
@@ -52,7 +52,7 @@ func scanBackups(rows pgx.Rows, err error) ([]Backup, error) {
 	out := []Backup{}
 	for rows.Next() {
 		var b Backup
-		if err := rows.Scan(&b.ID, &b.UserID, &b.Username, &b.FileName, &b.SizeBytes, &b.Kind, &b.Contents, &b.CreatedAt, &b.fileID); err != nil {
+		if err := rows.Scan(&b.ID, &b.UserID, &b.Username, &b.FileName, &b.SizeBytes, &b.Kind, &b.Contents, &b.CreatedAt, &b.fileID, &b.Dest); err != nil {
 			return nil, err
 		}
 		out = append(out, b)
@@ -113,7 +113,7 @@ func (s *Service) CreateBackup(ctx context.Context, actor *users.User, userID in
 	if err != nil {
 		return nil, err
 	}
-	_, cfg, err := s.driveCreds(ctx, u.ID)
+	_, cfg, err := s.destFor(ctx, u.ID, "")
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func (s *Service) runBackupCreate(ctx context.Context, t *tasks.Task, logf func(
 	if err != nil {
 		return err
 	}
-	creds, cfg, err := s.driveCreds(ctx, u.ID)
+	dest, cfg, err := s.destFor(ctx, u.ID, "")
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func (s *Service) runBackupCreate(ctx context.Context, t *tasks.Task, logf func(
 	var res agentproto.BackupCreateResult
 	err = s.agent.Call(callCtx, agentproto.ActionBackupCreate, agentproto.BackupCreateParams{
 		Username: u.Username, Databases: contents.Databases, MailDomains: contents.MailDomains,
-		Drive: creds, FolderID: cfg.Folder, FileName: name, Passphrase: pass, Manifest: manifest,
+		Drive: dest.Drive, FolderID: cfg.Folder, FTP: dest.FTP, FileName: name, Passphrase: pass, Manifest: manifest,
 	}, &res)
 	if res.Log != "" {
 		logf("%s", strings.TrimSpace(res.Log))
@@ -232,8 +232,8 @@ func (s *Service) runBackupCreate(ctx context.Context, t *tasks.Task, logf func(
 		return err
 	}
 	cj, _ := json.Marshal(contents)
-	if _, err := s.pool.Exec(ctx, `INSERT INTO backups (user_id, username, file_id, file_name, size_bytes, kind, contents, created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, u.ID, u.Username, res.FileID, name, res.Size, job.Kind, cj, t.UserID); err != nil {
+	if _, err := s.pool.Exec(ctx, `INSERT INTO backups (user_id, username, file_id, file_name, size_bytes, kind, contents, created_by, destination)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, u.ID, u.Username, res.FileID, name, res.Size, job.Kind, cj, t.UserID, dest.Kind); err != nil {
 		return err
 	}
 	return s.pruneBackups(ctx, u, logf)
@@ -241,7 +241,7 @@ func (s *Service) runBackupCreate(ctx context.Context, t *tasks.Task, logf func(
 
 // pruneBackups keeps the newest N backups of an account.
 func (s *Service) pruneBackups(ctx context.Context, u *users.User, logf func(string, ...any)) error {
-	creds, cfg, err := s.driveCreds(ctx, u.ID)
+	cfg, err := s.backupConfig(ctx, u.ID)
 	if err != nil {
 		return err
 	}
@@ -250,9 +250,12 @@ func (s *Service) pruneBackups(ctx context.Context, u *users.User, logf func(str
 	if err != nil || len(old) == 0 {
 		return err
 	}
-	c := gdrive.New(creds)
 	for _, b := range old {
-		if err := c.Delete(ctx, b.fileID); err != nil {
+		dest, _, err := s.destFor(ctx, u.ID, b.Dest)
+		if err == nil {
+			err = s.deleteBackupFile(ctx, dest, b.fileID)
+		}
+		if err != nil {
 			logf("Không xóa được bản cũ %s: %v", b.FileName, err)
 			continue
 		}
@@ -272,11 +275,11 @@ func (s *Service) DeleteBackup(ctx context.Context, actor *users.User, id int64)
 	// The file lives in the account's own Drive; a deleted account's Drive
 	// is no longer reachable, so only the record goes.
 	if b.UserID != nil {
-		creds, _, err := s.driveCreds(ctx, *b.UserID)
+		dest, _, err := s.destFor(ctx, *b.UserID, b.Dest)
 		if err != nil {
 			return nil, err
 		}
-		if err := gdrive.New(creds).Delete(ctx, b.fileID); err != nil {
+		if err := s.deleteBackupFile(ctx, dest, b.fileID); err != nil {
 			return nil, apperr.Agent(err)
 		}
 	}
@@ -355,7 +358,7 @@ func (s *Service) runBackupRestore(ctx context.Context, t *tasks.Task, logf func
 	if err != nil || u.Role != users.RoleUser {
 		return errors.New("tài khoản không còn tồn tại")
 	}
-	creds, cfg, err := s.driveCreds(ctx, u.ID)
+	dest, cfg, err := s.destFor(ctx, u.ID, b.Dest)
 	if err != nil {
 		return err
 	}
@@ -370,7 +373,7 @@ func (s *Service) runBackupRestore(ctx context.Context, t *tasks.Task, logf func
 	}
 	if job.Recreate {
 		logf("Đọc manifest của %s", b.FileName)
-		manifest, err := s.readBackupManifest(ctx, u, creds, b.fileID, pass)
+		manifest, err := s.readBackupManifest(ctx, u, dest, b.fileID, pass)
 		if err != nil {
 			return err
 		}
@@ -378,7 +381,7 @@ func (s *Service) runBackupRestore(ctx context.Context, t *tasks.Task, logf func
 			return err
 		}
 	}
-	p := agentproto.BackupRestoreParams{Username: u.Username, Drive: creds, FileID: b.fileID, Passphrase: pass, Files: job.Files}
+	p := agentproto.BackupRestoreParams{Username: u.Username, Drive: dest.Drive, FTP: dest.FTP, FileID: b.fileID, Passphrase: pass, Files: job.Files}
 	// Only databases and mail domains the account owns now are written.
 	if job.Databases {
 		current, err := s.dbs.ByUser(ctx, u.ID)

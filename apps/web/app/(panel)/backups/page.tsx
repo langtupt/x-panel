@@ -18,6 +18,16 @@ type Settings = {
   hour: number;
   keep: number;
   passphrase_set: boolean;
+  destination: "drive" | "ftp";
+  ftp: {
+    host: string;
+    port: number;
+    user: string;
+    dir: string;
+    tls: boolean;
+    insecure: boolean;
+    password_set: boolean;
+  };
   pending?: {
     user_code: string;
     verification_url: string;
@@ -38,7 +48,210 @@ type Backup = {
     mail_domains: string[] | null;
   };
   created_at: string;
+  destination: "drive" | "ftp";
 };
+
+// DestinationCard chooses where new backups go: Google Drive or FTP/FTPS.
+function DestinationCard({ st, reload }: { st: Settings; reload: () => void }) {
+  const [tab, setTab] = useState<"drive" | "ftp">(st.destination);
+  const [f, setF] = useState({ ...st.ftp, port: st.ftp.port || 21 });
+  const [password, setPassword] = useState("");
+  const [changePw, setChangePw] = useState(!st.ftp.password_set);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function save(destination: "drive" | "ftp", e?: FormEvent) {
+    e?.preventDefault();
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await api("/backups/destination", {
+        method: "PUT",
+        body: {
+          destination,
+          ...f,
+          ...(destination === "ftp" && changePw ? { password } : {}),
+        },
+      });
+      setNotice(
+        destination === "ftp"
+          ? translate("Đã kiểm tra và lưu FTP: bản backup mới sẽ lưu lên máy chủ FTP.")
+          : translate("Bản backup mới sẽ lưu lên Google Drive."),
+      );
+      setPassword("");
+      reload();
+    } catch (err) {
+      setError(errMsg(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card space-y-4 p-5">
+      <div>
+        <h2 className="font-semibold">{translate("Nơi lưu backup")}</h2>
+        <p className="text-sm text-slate-500">
+          {translate("Đang dùng:")}{" "}
+          <b>
+            {st.destination === "ftp"
+              ? `${st.ftp.tls ? "FTPS" : "FTP"} ${st.ftp.host}`
+              : "Google Drive"}
+          </b>
+          {". "}
+          {translate("Backup luôn được mã hóa bằng passphrase của bạn trước khi gửi đi.")}
+        </p>
+      </div>
+      <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm">
+        {(["drive", "ftp"] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setTab(k)}
+            className={`flex-1 rounded-md px-3 py-1.5 ${tab === k ? "bg-white font-medium shadow-sm" : "text-slate-600"}`}
+          >
+            {k === "drive" ? "Google Drive" : translate("Máy chủ FTP / FTPS")}
+            {st.destination === k && " ✓"}
+          </button>
+        ))}
+      </div>
+      {tab === "drive" && (
+        <>
+          <DriveCard st={st} reload={reload} />
+          {st.connected && st.destination !== "drive" && (
+            <button className="btn-primary" disabled={busy} onClick={() => save("drive")}>
+              {translate("Dùng Google Drive cho backup mới")}
+            </button>
+          )}
+        </>
+      )}
+      {tab === "ftp" && (
+        <form onSubmit={(e) => save("ftp", e)} className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-[1fr_110px]">
+            <div>
+              <label className="label">{translate("Máy chủ FTP")}</label>
+              <input
+                className="input font-mono"
+                required
+                placeholder="ftp.example.com"
+                value={f.host}
+                onChange={(e) => setF({ ...f, host: e.target.value.trim() })}
+              />
+            </div>
+            <div>
+              <label className="label">{translate("Cổng")}</label>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                max={65535}
+                value={f.port}
+                onChange={(e) => setF({ ...f, port: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <label className="label">{translate("Tên đăng nhập")}</label>
+              <input
+                className="input"
+                required
+                autoComplete="off"
+                value={f.user}
+                onChange={(e) => setF({ ...f, user: e.target.value })}
+              />
+            </div>
+            <div className="md:col-span-1" />
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="label mb-0">{translate("Mật khẩu")}</label>
+                {st.ftp.password_set && (
+                  <label className="flex items-center gap-1.5 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={changePw}
+                      onChange={(e) => setChangePw(e.target.checked)}
+                    />
+                    {translate("Đổi mật khẩu")}
+                  </label>
+                )}
+              </div>
+              {changePw ? (
+                <input
+                  className="input"
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              ) : (
+                <p className="py-2 text-sm text-slate-500">{translate("Đã lưu (giữ nguyên).")}</p>
+              )}
+            </div>
+            <div className="md:col-span-1" />
+            <div>
+              <label className="label">{translate("Thư mục lưu")}</label>
+              <input
+                className="input font-mono"
+                placeholder="backups/xpanel"
+                value={f.dir}
+                onChange={(e) => setF({ ...f, dir: e.target.value })}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                {translate("Tính từ thư mục gốc của tài khoản FTP; tự tạo nếu chưa có.")}
+              </p>
+            </div>
+          </div>
+          <div className="space-y-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={f.tls}
+                onChange={(e) => setF({ ...f, tls: e.target.checked, insecure: e.target.checked && f.insecure })}
+              />
+              {translate("Mã hóa kết nối (FTPS, AUTH TLS) - khuyến nghị")}
+            </label>
+            {f.tls && (
+              <label className="flex items-center gap-2 pl-6 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={f.insecure}
+                  onChange={(e) => setF({ ...f, insecure: e.target.checked })}
+                />
+                {translate("Chấp nhận chứng chỉ tự ký (máy chủ FTP không có chứng chỉ hợp lệ)")}
+              </label>
+            )}
+            {!f.tls && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {translate(
+                  "FTP thường gửi mật khẩu dạng chữ rõ trên mạng. Nội dung backup vẫn được mã hóa, nhưng nên dùng FTPS nếu máy chủ hỗ trợ.",
+                )}
+              </p>
+            )}
+          </div>
+          <ErrorBox msg={error} />
+          {notice && (
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{notice}</p>
+          )}
+          <button className="btn-primary" disabled={busy}>
+            {busy
+              ? translate("Đang kiểm tra kết nối…")
+              : translate("Kiểm tra & dùng FTP cho backup mới")}
+          </button>
+        </form>
+      )}
+      {tab === "drive" && (
+        <>
+          <ErrorBox msg={error} />
+          {notice && (
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{notice}</p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
 
 function DriveCard({ st, reload }: { st: Settings; reload: () => void }) {
   const [clientId, setClientId] = useState(st.client_id);
@@ -511,7 +724,7 @@ export default function BackupsPage() {
         <h1 className="text-xl font-semibold">{translate("Sao lưu")}</h1>
         <p className="text-sm text-slate-500">
           {translate(
-            "Backup mã hóa từng tài khoản (file, database, email) lên Google Drive và khôi phục khi cần.",
+            "Backup mã hóa từng tài khoản (file, database, email) lên Google Drive hoặc máy chủ FTP và khôi phục khi cần.",
           )}
         </p>
       </div>
@@ -519,12 +732,12 @@ export default function BackupsPage() {
       {!hosting && (
         <div className="card p-5 text-sm text-slate-600">
           {translate(
-            "Mỗi tài khoản hosting tự kết nối Google Drive (OAuth client của chính họ), tự đặt passphrase và lịch backup. Bạn xem và khôi phục được backup của các tài khoản mình quản lý; để cấu hình hộ, dùng",
+            "Mỗi tài khoản hosting tự chọn nơi lưu (Google Drive của họ hoặc máy chủ FTP), tự đặt passphrase và lịch backup. Bạn xem và khôi phục được backup của các tài khoản mình quản lý; để cấu hình hộ, dùng",
           )}{" "}
           <b>{translate("Đăng nhập thay")}</b>.
         </div>
       )}
-      {hosting && st && <DriveCard st={st} reload={loadSettings} />}
+      {hosting && st && <DestinationCard st={st} reload={loadSettings} />}
       {hosting && st && <ScheduleCard st={st} reload={loadSettings} />}
 
       <section className="card space-y-4 p-5">
@@ -610,7 +823,12 @@ export default function BackupsPage() {
                     </>
                   )}
                 </td>
-                <td className="py-2">{translate(fmtBytes(b.size_bytes))}</td>
+                <td className="py-2">
+                  {translate(fmtBytes(b.size_bytes))}
+                  <div className="text-xs text-slate-500">
+                    {b.destination === "ftp" ? "FTP" : "Google Drive"}
+                  </div>
+                </td>
                 <td className="py-2 text-right">
                   <div className="flex justify-end gap-1.5">
                     <button
@@ -624,8 +842,9 @@ export default function BackupsPage() {
                       onClick={() => {
                         if (
                           confirm(
-                            translate("Xóa bản backup {0} khỏi Google Drive?", [
+                            translate("Xóa bản backup {0} khỏi {1}?", [
                               b.file_name,
+                              b.destination === "ftp" ? translate("máy chủ FTP") : "Google Drive",
                             ]),
                           )
                         )

@@ -33,13 +33,18 @@ type backupConfig struct {
 	Hour         int
 	Keep         int
 	LastRun      *time.Time
+	// Where new backups go: "drive" or "ftp".
+	Destination string
+	FTP         agentproto.FTPDest // Password sealed
 }
 
 func (s *Service) backupConfig(ctx context.Context, userID int64) (*backupConfig, error) {
-	c := &backupConfig{Schedule: "off", Hour: 2, Keep: 7}
+	c := &backupConfig{Schedule: "off", Hour: 2, Keep: 7, Destination: "drive", FTP: agentproto.FTPDest{Port: 21, TLS: true}}
 	err := s.pool.QueryRow(ctx, `SELECT client_id, client_secret, refresh_token, email, folder, passphrase,
-		schedule, hour, keep, last_run FROM backup_configs WHERE user_id=$1`, userID).
-		Scan(&c.ClientID, &c.ClientSecret, &c.Refresh, &c.Email, &c.Folder, &c.Passphrase, &c.Schedule, &c.Hour, &c.Keep, &c.LastRun)
+		schedule, hour, keep, last_run, destination, ftp_host, ftp_port, ftp_user, ftp_password, ftp_dir, ftp_tls, ftp_insecure
+		FROM backup_configs WHERE user_id=$1`, userID).
+		Scan(&c.ClientID, &c.ClientSecret, &c.Refresh, &c.Email, &c.Folder, &c.Passphrase, &c.Schedule, &c.Hour, &c.Keep, &c.LastRun,
+			&c.Destination, &c.FTP.Host, &c.FTP.Port, &c.FTP.User, &c.FTP.Password, &c.FTP.Dir, &c.FTP.TLS, &c.FTP.Insecure)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return c, nil
 	}
@@ -48,10 +53,13 @@ func (s *Service) backupConfig(ctx context.Context, userID int64) (*backupConfig
 
 func (s *Service) saveBackupConfig(ctx context.Context, userID int64, c *backupConfig) error {
 	_, err := s.pool.Exec(ctx, `INSERT INTO backup_configs (user_id, client_id, client_secret, refresh_token, email,
-		folder, passphrase, schedule, hour, keep, last_run) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		folder, passphrase, schedule, hour, keep, last_run, destination, ftp_host, ftp_port, ftp_user, ftp_password,
+		ftp_dir, ftp_tls, ftp_insecure) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 		ON CONFLICT (user_id) DO UPDATE SET client_id=$2, client_secret=$3, refresh_token=$4, email=$5, folder=$6,
-		passphrase=$7, schedule=$8, hour=$9, keep=$10, last_run=$11, updated_at=now()`,
-		userID, c.ClientID, c.ClientSecret, c.Refresh, c.Email, c.Folder, c.Passphrase, c.Schedule, c.Hour, c.Keep, c.LastRun)
+		passphrase=$7, schedule=$8, hour=$9, keep=$10, last_run=$11, destination=$12, ftp_host=$13, ftp_port=$14,
+		ftp_user=$15, ftp_password=$16, ftp_dir=$17, ftp_tls=$18, ftp_insecure=$19, updated_at=now()`,
+		userID, c.ClientID, c.ClientSecret, c.Refresh, c.Email, c.Folder, c.Passphrase, c.Schedule, c.Hour, c.Keep, c.LastRun,
+		c.Destination, c.FTP.Host, c.FTP.Port, c.FTP.User, c.FTP.Password, c.FTP.Dir, c.FTP.TLS, c.FTP.Insecure)
 	return err
 }
 
@@ -81,6 +89,100 @@ func (s *Service) driveCreds(ctx context.Context, userID int64) (gdrive.Creds, *
 	return creds, c, nil
 }
 
+// backupDest is where one backup lives (or a new one goes).
+type backupDest struct {
+	Kind  string // drive | ftp
+	Drive gdrive.Creds
+	FTP   *agentproto.FTPDest // password opened
+}
+
+// destFor returns the account's destination of the given kind ("" = the one
+// new backups use), checking it is set up.
+func (s *Service) destFor(ctx context.Context, userID int64, kind string) (backupDest, *backupConfig, error) {
+	c, err := s.backupConfig(ctx, userID)
+	if err != nil {
+		return backupDest{}, nil, err
+	}
+	if kind == "" {
+		kind = c.Destination
+	}
+	if kind == "ftp" {
+		if c.FTP.Host == "" {
+			return backupDest{Kind: kind}, c, apperr.Conflict("tài khoản chưa cấu hình FTP sao lưu (trang Sao lưu)")
+		}
+		d := c.FTP
+		if d.Password, err = s.secrets.Open(c.FTP.Password); err != nil {
+			return backupDest{Kind: kind}, c, err
+		}
+		return backupDest{Kind: kind, FTP: &d}, c, nil
+	}
+	creds, c, err := s.driveCreds(ctx, userID)
+	return backupDest{Kind: "drive", Drive: creds}, c, err
+}
+
+// deleteBackupFile removes a stored backup file.
+func (s *Service) deleteBackupFile(ctx context.Context, d backupDest, fileID string) error {
+	if d.Kind == "ftp" {
+		return s.agent.Call(ctx, agentproto.ActionBackupFTP, agentproto.BackupFTPParams{Op: "delete", FTP: *d.FTP, Name: fileID}, nil)
+	}
+	return gdrive.New(d.Drive).Delete(ctx, fileID)
+}
+
+// BackupFTPInput sets the FTP destination; a nil Password keeps the stored one.
+type BackupFTPInput struct {
+	Destination string  `json:"destination"` // drive | ftp
+	Host        string  `json:"host"`
+	Port        int     `json:"port"`
+	User        string  `json:"user"`
+	Password    *string `json:"password"`
+	Dir         string  `json:"dir"`
+	TLS         bool    `json:"tls"`
+	Insecure    bool    `json:"insecure"`
+}
+
+// SaveBackupDestination chooses where new backups go and, for FTP, checks the
+// server accepts a file before saving.
+func (s *Service) SaveBackupDestination(ctx context.Context, actor *users.User, in BackupFTPInput) (*BackupSettings, error) {
+	if err := backupOwner(actor); err != nil {
+		return nil, err
+	}
+	c, err := s.backupConfig(ctx, actor.ID)
+	if err != nil {
+		return nil, err
+	}
+	switch in.Destination {
+	case "drive":
+		if c.Refresh == "" {
+			return nil, apperr.Invalid("kết nối Google Drive trước")
+		}
+		c.Destination = "drive"
+	case "ftp":
+		d := agentproto.FTPDest{Host: strings.TrimSpace(in.Host), Port: in.Port, User: strings.TrimSpace(in.User),
+			Dir: strings.Trim(strings.TrimSpace(in.Dir), "/"), TLS: in.TLS, Insecure: in.TLS && in.Insecure}
+		if d.Port == 0 {
+			d.Port = 21
+		}
+		if in.Password != nil {
+			d.Password = *in.Password
+		} else if d.Password, err = s.secrets.Open(c.FTP.Password); err != nil {
+			return nil, err
+		}
+		if err := s.agent.Call(ctx, agentproto.ActionBackupFTP, agentproto.BackupFTPParams{Op: "test", FTP: d}, nil); err != nil {
+			return nil, apperr.Invalid("không dùng được FTP: %s", strings.TrimPrefix(err.Error(), "agent: "))
+		}
+		if d.Password, err = s.seal(d.Password); err != nil {
+			return nil, err
+		}
+		c.FTP, c.Destination = d, "ftp"
+	default:
+		return nil, apperr.Invalid("nơi lưu phải là drive hoặc ftp")
+	}
+	if err := s.saveBackupConfig(ctx, actor.ID, c); err != nil {
+		return nil, err
+	}
+	return s.BackupSettings(ctx, actor)
+}
+
 func (s *Service) backupPassphrase(c *backupConfig) (string, error) {
 	p, err := s.secrets.Open(c.Passphrase)
 	if err == nil && p == "" {
@@ -107,6 +209,18 @@ type BackupSettings struct {
 	Keep          int           `json:"keep"`
 	PassphraseSet bool          `json:"passphrase_set"`
 	Pending       *DriveConnect `json:"pending,omitempty"`
+	Destination   string        `json:"destination"` // drive | ftp
+	FTP           BackupFTPView `json:"ftp"`
+}
+
+type BackupFTPView struct {
+	Host        string `json:"host"`
+	Port        int    `json:"port"`
+	User        string `json:"user"`
+	Dir         string `json:"dir"`
+	TLS         bool   `json:"tls"`
+	Insecure    bool   `json:"insecure"`
+	PasswordSet bool   `json:"password_set"`
 }
 
 // DriveConnect is an OAuth device authorization in progress.
@@ -132,7 +246,9 @@ func (s *Service) BackupSettings(ctx context.Context, actor *users.User) (*Backu
 		return nil, err
 	}
 	st := &BackupSettings{ClientID: c.ClientID, Email: c.Email, Schedule: c.Schedule, Hour: c.Hour, Keep: c.Keep,
-		Connected: c.Refresh != "" && c.Folder != "", PassphraseSet: c.Passphrase != ""}
+		Connected: c.Refresh != "" && c.Folder != "", PassphraseSet: c.Passphrase != "", Destination: c.Destination,
+		FTP: BackupFTPView{Host: c.FTP.Host, Port: c.FTP.Port, User: c.FTP.User, Dir: c.FTP.Dir, TLS: c.FTP.TLS,
+			Insecure: c.FTP.Insecure, PasswordSet: c.FTP.Password != ""}}
 	driveMu.Lock()
 	if p := drivePending[actor.ID]; p != nil {
 		cp := *p
@@ -293,7 +409,10 @@ func (s *Service) DisconnectDrive(ctx context.Context, actor *users.User) error 
 	driveMu.Lock()
 	delete(drivePending, actor.ID)
 	driveMu.Unlock()
-	c.Refresh, c.Email, c.Folder, c.ClientSecret, c.Schedule = "", "", "", "", "off"
+	c.Refresh, c.Email, c.Folder, c.ClientSecret = "", "", "", ""
+	if c.Destination != "ftp" {
+		c.Schedule = "off"
+	}
 	return s.saveBackupConfig(ctx, actor.ID, c)
 }
 
@@ -318,7 +437,7 @@ func (s *Service) scheduledBackups(ctx context.Context) error {
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	rows, err := s.pool.Query(ctx, `SELECT user_id FROM backup_configs
-		WHERE refresh_token<>'' AND passphrase<>'' AND hour=$1
+		WHERE ((destination='drive' AND refresh_token<>'') OR (destination='ftp' AND ftp_host<>'')) AND passphrase<>'' AND hour=$1
 		  AND (schedule='daily' OR (schedule='weekly' AND $2))
 		  AND (last_run IS NULL OR last_run < $3)`, now.Hour(), now.Weekday() == time.Sunday, today)
 	if err != nil {

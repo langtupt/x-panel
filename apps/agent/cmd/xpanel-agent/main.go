@@ -302,6 +302,9 @@ func main() {
 		}
 		return agentproto.TaskLog{Log: out}, nil
 	})
+	srv.Register(agentproto.ActionBackupFTP, server.Typed(func(ctx context.Context, p agentproto.BackupFTPParams) (any, error) {
+		return nil, backup.FTPOp(ctx, p)
+	}))
 	srv.Register(agentproto.ActionCronSync, server.Typed(func(ctx context.Context, p agentproto.CronSyncParams) (any, error) {
 		return nil, cron.Sync(ctx, p)
 	}))

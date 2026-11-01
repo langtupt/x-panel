@@ -162,6 +162,7 @@ func (s *Server) Handler() http.Handler {
 			r.Put("/backups/settings", s.handleSaveBackupSettings)
 			r.Post("/backups/drive", s.handleConnectDrive)
 			r.Delete("/backups/drive", s.handleDisconnectDrive)
+			r.Put("/backups/destination", s.handleSaveBackupDestination)
 			r.Get("/backups", s.handleListBackups)
 			r.Post("/backups", s.handleCreateBackup)
 			r.Post("/backups/import", s.handleImportBackups)

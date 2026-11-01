@@ -498,7 +498,27 @@ const (
 	ActionBackupCreate   = "backup.create"   // BackupCreateParams -> BackupCreateResult
 	ActionBackupRestore  = "backup.restore"  // BackupRestoreParams -> TaskLog
 	ActionBackupManifest = "backup.manifest" // BackupManifestParams -> BackupManifest
+	ActionBackupFTP      = "backup.ftp"      // BackupFTPParams
 )
+
+// FTPDest is an FTP/FTPS server that stores an account's backups (instead
+// of Google Drive). TLS = explicit FTPS (AUTH TLS).
+type FTPDest struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	Dir      string `json:"dir"` // relative to the FTP login's folder; "" = that folder
+	TLS      bool   `json:"tls"`
+	Insecure bool   `json:"insecure"` // accept a self-signed certificate
+}
+
+// BackupFTPParams: Op "test" (log in and write a file) or "delete" (Name).
+type BackupFTPParams struct {
+	Op   string  `json:"op"`
+	FTP  FTPDest `json:"ftp"`
+	Name string  `json:"name,omitempty"`
+}
 
 // BackupDB is a customer database inside a backup.
 type BackupDB struct {
@@ -542,6 +562,7 @@ type BackupCreateParams struct {
 	MailDomains []string        `json:"mail_domains"`
 	Drive       gdrive.Creds    `json:"drive"`
 	FolderID    string          `json:"folder_id"`
+	FTP         *FTPDest        `json:"ftp,omitempty"` // set: store on FTP instead of Drive
 	FileName    string          `json:"file_name"`
 	Passphrase  string          `json:"passphrase"`
 	Manifest    json.RawMessage `json:"manifest"` // panel records of the account, stored as manifest.json
@@ -559,6 +580,7 @@ type BackupCreateResult struct {
 type BackupRestoreParams struct {
 	Username    string       `json:"username"`
 	Drive       gdrive.Creds `json:"drive"`
+	FTP         *FTPDest     `json:"ftp,omitempty"`
 	FileID      string       `json:"file_id"`
 	Passphrase  string       `json:"passphrase"`
 	Files       bool         `json:"files"`
@@ -580,6 +602,7 @@ type MailUsage struct {
 type BackupManifestParams struct {
 	Username   string       `json:"username"`
 	Drive      gdrive.Creds `json:"drive"`
+	FTP        *FTPDest     `json:"ftp,omitempty"`
 	FileID     string       `json:"file_id"`
 	Passphrase string       `json:"passphrase"`
 }

@@ -14,4 +14,5 @@ ALTER TABLE backup_configs ADD COLUMN ftp_user TEXT NOT NULL DEFAULT '';
 ALTER TABLE backup_configs ADD COLUMN ftp_password TEXT NOT NULL DEFAULT ''; -- sealed
 ALTER TABLE backup_configs ADD COLUMN ftp_dir TEXT NOT NULL DEFAULT '';
 ALTER TABLE backup_configs ADD COLUMN ftp_tls BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE backup_configs ADD COLUMN ftp_insecure BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE backups ADD COLUMN destination TEXT NOT NULL DEFAULT 'drive';
