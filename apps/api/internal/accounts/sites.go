@@ -75,6 +75,9 @@ func (s *Service) syncWeb(ctx context.Context, tx pgx.Tx, owner *users.User) ([]
 	}
 	p := agentproto.WebSyncParams{Username: owner.Username, Suspended: owner.Status == users.StatusSuspended,
 		Sites: []agentproto.WebSite{}}
+	if p.Suspended {
+		p.SuspendReason = owner.SuspendReason
+	}
 	if owner.PackageID != nil {
 		pkg, err := s.pkgs.WithTx(tx).ByID(ctx, *owner.PackageID)
 		if err != nil {

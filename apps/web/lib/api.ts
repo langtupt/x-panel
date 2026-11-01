@@ -17,6 +17,8 @@ export interface User {
   totp_enabled: boolean;
   status: Status;
   created_at: string;
+  expires_at: string | null; // hosting expiry (date)
+  suspend_reason: "" | "manual" | "expired";
 }
 
 export interface Limits {
@@ -393,6 +395,15 @@ export interface CronJob {
   command: string;
   enabled: boolean;
   created_at: string;
+}
+
+export interface CronStatus {
+  running: boolean;
+  last_run: string;
+  finished: string;
+  result: "success" | "failed" | "";
+  exit_code: number;
+  log: string;
 }
 
 export interface AuditRow {

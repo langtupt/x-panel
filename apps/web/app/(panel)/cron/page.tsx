@@ -2,7 +2,8 @@
 import { t as translate } from "@/lib/i18n";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { api, errMsg, type CronJob } from "@/lib/api";
+import { api, errMsg, type CronJob, type CronStatus } from "@/lib/api";
+import { localeTag } from "@/lib/i18n";
 import { ErrorBox, Modal } from "@/components/ui";
 import { OwnerSelect, useHostingAccounts } from "@/components/owner";
 import { useSession } from "../session";
@@ -18,6 +19,69 @@ const PRESETS: { label: string; value: string }[] = [
 
 function describe(s: string) {
   return PRESETS.find((p) => p.value === s)?.label ?? s;
+}
+
+const when = (iso: string) =>
+  iso ? new Date(iso).toLocaleString(localeTag()) : "";
+
+// LastRun shows the job's latest run; it refreshes while the job runs.
+function LastRun({
+  job,
+  tick,
+  onLog,
+}: {
+  job: CronJob;
+  tick: number;
+  onLog: (st: CronStatus) => void;
+}) {
+  const [st, setSt] = useState<CronStatus | null>(null);
+  useEffect(() => {
+    if (!job.enabled) {
+      setSt(null);
+      return;
+    }
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = () =>
+      api<CronStatus>(`/cron/${job.id}/status`)
+        .then((s) => {
+          if (stop) return;
+          setSt(s);
+          if (s.running) timer = setTimeout(poll, 3000);
+        })
+        .catch(() => !stop && setSt(null));
+    poll();
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+  }, [job.id, job.enabled, job.schedule, job.command, tick]);
+
+  if (!job.enabled) return <span className="text-xs text-slate-400">—</span>;
+  if (!st) return <span className="text-xs text-slate-400">…</span>;
+  return (
+    <button
+      type="button"
+      className="text-left text-xs hover:underline"
+      onClick={() => onLog(st)}
+      title={translate("Xem nhật ký")}
+    >
+      {st.running ? (
+        <span className="text-blue-600">{translate("● Đang chạy…")}</span>
+      ) : !st.last_run ? (
+        <span className="text-slate-500">{translate("Chưa chạy lần nào")}</span>
+      ) : st.result === "success" ? (
+        <span className="text-emerald-600">{translate("✓ Thành công")}</span>
+      ) : (
+        <span className="text-red-600">
+          {translate("✗ Lỗi (mã {0})", [st.exit_code])}
+        </span>
+      )}
+      {st.last_run && (
+        <span className="block text-slate-500">{when(st.last_run)}</span>
+      )}
+    </button>
+  );
 }
 
 function CronForm({
@@ -153,6 +217,11 @@ export default function CronPage() {
   const [list, setList] = useState<CronJob[]>([]);
   const [form, setForm] = useState<{ editing: CronJob | null } | null>(null);
   const [deleting, setDeleting] = useState<CronJob | null>(null);
+  const [log, setLog] = useState<{ job: CronJob; st: CronStatus } | null>(
+    null,
+  );
+  const [tick, setTick] = useState(0);
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(() => {
@@ -169,6 +238,18 @@ export default function CronPage() {
         body: { schedule: j.schedule, command: j.command, enabled: !j.enabled },
       });
       load();
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
+
+  async function runNow(j: CronJob) {
+    setError("");
+    setNotice("");
+    try {
+      await api(`/cron/${j.id}/run`, { method: "POST" });
+      setNotice(translate("Đã chạy: {0}", [j.command]));
+      setTimeout(() => setTick((t) => t + 1), 1000);
     } catch (e) {
       setError(errMsg(e));
     }
@@ -222,6 +303,11 @@ export default function CronPage() {
         </Modal>
       )}
       <ErrorBox msg={error} />
+      {notice && (
+        <div className="break-all rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+          {notice}
+        </div>
+      )}
 
       <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -233,6 +319,7 @@ export default function CronPage() {
                 <th className="px-4 py-3">{translate("Tài khoản")}</th>
               )}
               <th className="px-4 py-3">{translate("Trạng thái")}</th>
+              <th className="px-4 py-3">{translate("Lần chạy cuối")}</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -264,8 +351,27 @@ export default function CronPage() {
                     )}
                   </button>
                 </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <LastRun
+                    job={j}
+                    tick={tick}
+                    onLog={(st) => setLog({ job: j, st })}
+                  />
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-1.5">
+                    <button
+                      className="btn-ghost px-2.5 py-1 text-xs"
+                      disabled={!j.enabled}
+                      title={
+                        j.enabled
+                          ? translate("Chạy ngay một lần")
+                          : translate("Bật cron job trước khi chạy")
+                      }
+                      onClick={() => runNow(j)}
+                    >
+                      {translate("Chạy ngay")}
+                    </button>
                     <button
                       className="btn-ghost px-2.5 py-1 text-xs"
                       onClick={() => setForm({ editing: j })}
@@ -285,7 +391,7 @@ export default function CronPage() {
             {list.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-4 py-8 text-center text-slate-500"
                 >
                   {translate("Chưa có cron job nào.")}
@@ -295,6 +401,52 @@ export default function CronPage() {
           </tbody>
         </table>
       </div>
+
+      {log && (
+        <Modal
+          size="wide"
+          title={translate("Nhật ký cron job")}
+          onClose={() => setLog(null)}
+        >
+          <p className="mb-2 break-all font-mono text-xs text-slate-600">
+            {log.job.schedule} {log.job.command}
+          </p>
+          <p className="mb-3 text-sm">
+            {log.st.running
+              ? translate("Đang chạy…")
+              : !log.st.last_run
+                ? translate("Chưa chạy lần nào.")
+                : translate("Lần cuối: {0} → {1}, mã thoát {2}", [
+                    when(log.st.last_run),
+                    when(log.st.finished),
+                    log.st.exit_code,
+                  ])}
+          </p>
+          <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-950 p-3 font-mono text-xs text-slate-100">
+            {log.st.log.trim() || translate("(chưa có đầu ra)")}
+          </pre>
+          <p className="mt-2 text-xs text-slate-500">
+            {translate(
+              "Hiện đầu ra (stdout/stderr) của các lần chạy gần nhất. Lệnh chạy trong sandbox: chỉ ghi được trong thư mục home.",
+            )}
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              className="btn-ghost"
+              onClick={() =>
+                api<CronStatus>(`/cron/${log.job.id}/status`)
+                  .then((st) => setLog({ job: log.job, st }))
+                  .catch((e) => setError(errMsg(e)))
+              }
+            >
+              {translate("Làm mới")}
+            </button>
+            <button className="btn-primary" onClick={() => setLog(null)}>
+              {translate("Đóng")}
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {deleting && (
         <Modal

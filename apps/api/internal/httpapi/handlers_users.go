@@ -78,6 +78,65 @@ func (s *Server) handleSetUserStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, u)
 }
 
+// PATCH /api/users/{id}/expiry {"expires_at": "YYYY-MM-DD" | null}
+func (s *Server) handleSetUserExpiry(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	var in struct {
+		ExpiresAt *string `json:"expires_at"`
+	}
+	if !ok || !decode(w, r, &in) {
+		return
+	}
+	u, err := s.accounts.SetExpiry(r.Context(), currentUser(r), id, in.ExpiresAt)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.auditUser(r, "user.expiry", u, map[string]any{"expires_at": in.ExpiresAt})
+	writeJSON(w, http.StatusOK, u)
+}
+
+// GET /api/settings/smtp (admin)
+func (s *Server) handleSMTPSettings(w http.ResponseWriter, r *http.Request) {
+	st, err := s.accounts.SMTPSettings(r.Context(), currentUser(r))
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, st)
+}
+
+// PUT /api/settings/smtp (admin)
+func (s *Server) handleSaveSMTP(w http.ResponseWriter, r *http.Request) {
+	var in accounts.SMTPInput
+	if !decode(w, r, &in) {
+		return
+	}
+	st, err := s.accounts.SaveSMTP(r.Context(), currentUser(r), in)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.audit.Record(r.Context(), audit.Entry{ActorID: &currentUser(r).ID, Action: "settings.smtp", IP: clientIP(r),
+		Meta: map[string]any{"host": st.Host, "enabled": st.Enabled}})
+	writeJSON(w, http.StatusOK, st)
+}
+
+// POST /api/settings/smtp/test {"to": "..."} (admin)
+func (s *Server) handleTestSMTP(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		To string `json:"to"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if err := s.accounts.TestSMTP(r.Context(), currentUser(r), in.To); err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // PATCH /api/users/{id}/package
 func (s *Server) handleSetUserPackage(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)

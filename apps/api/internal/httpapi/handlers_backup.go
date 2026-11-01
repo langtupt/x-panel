@@ -38,6 +38,22 @@ func (s *Server) handleSaveBackupSettings(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, st)
 }
 
+// PUT /api/backups/destination (the hosting account itself) {destination, host, port, user, password?, dir, tls, insecure}
+func (s *Server) handleSaveBackupDestination(w http.ResponseWriter, r *http.Request) {
+	var in accounts.BackupFTPInput
+	if !decode(w, r, &in) {
+		return
+	}
+	st, err := s.accounts.SaveBackupDestination(r.Context(), currentUser(r), in)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.audit.Record(r.Context(), audit.Entry{ActorID: &currentUser(r).ID, Action: "backup.destination", IP: clientIP(r),
+		Meta: map[string]any{"destination": in.Destination, "host": in.Host}})
+	writeJSON(w, http.StatusOK, st)
+}
+
 // POST /api/backups/drive (the hosting account itself) {client_id, client_secret}
 func (s *Server) handleConnectDrive(w http.ResponseWriter, r *http.Request) {
 	var in struct {

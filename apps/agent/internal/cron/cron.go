@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"xpanel/apps/agent/internal/accounts"
 	"xpanel/apps/agent/internal/run"
@@ -177,6 +178,14 @@ func Sync(ctx context.Context, p agentproto.CronSyncParams) error {
 	if err != nil {
 		return err
 	}
+	// The jobs run as the account, which must be able to traverse StateRoot
+	// to reach its own directory; 0711 still hides the other accounts' names.
+	if err := os.MkdirAll(StateRoot, 0o711); err != nil {
+		return err
+	}
+	if err := os.Chmod(StateRoot, 0o711); err != nil {
+		return err
+	}
 	dir := filepath.Join(StateRoot, p.Username)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
@@ -286,4 +295,78 @@ func SetActive(ctx context.Context, username string, active bool) error {
 		}
 	}
 	return nil
+}
+
+// unitOf checks that ref names a timer this account has (as last synced) and
+// returns its unit name.
+func unitOf(ref agentproto.CronJobRef) (string, error) {
+	if _, err := accounts.Managed(ref.Username); err != nil {
+		return "", err
+	}
+	if ref.Index < 0 || ref.Index >= len(ref.Jobs) {
+		return "", fmt.Errorf("không tìm thấy cron job")
+	}
+	name := unitName(ref.Username, ref.Index, ref.Jobs[ref.Index])
+	if _, err := os.Stat(filepath.Join(StateRoot, ref.Username, name)); err != nil {
+		return "", fmt.Errorf("cron job chưa được cài, hãy lưu lại")
+	}
+	return name, nil
+}
+
+// unixTime turns systemctl's "@<seconds>" timestamps into RFC 3339.
+func unixTime(v string) string {
+	n, err := strconv.ParseInt(strings.TrimPrefix(v, "@"), 10, 64)
+	if err != nil || n == 0 {
+		return ""
+	}
+	return time.Unix(n, 0).UTC().Format(time.RFC3339)
+}
+
+// Status reports the last run of a job and the end of its output.
+func Status(ctx context.Context, ref agentproto.CronJobRef) (agentproto.CronStatus, error) {
+	var st agentproto.CronStatus
+	name, err := unitOf(ref)
+	if err != nil {
+		return st, err
+	}
+	out, err := run.Output(ctx, "systemctl", "show", "--timestamp=unix", name+".service",
+		"-p", "ActiveState,Result,ExecMainStatus,ExecMainStartTimestamp,ExecMainExitTimestamp")
+	if err != nil {
+		return st, err
+	}
+	props := map[string]string{}
+	for _, line := range strings.Split(out, "\n") {
+		if k, v, ok := strings.Cut(strings.TrimSpace(line), "="); ok {
+			props[k] = v
+		}
+	}
+	st.Running = props["ActiveState"] == "activating" || props["ActiveState"] == "active"
+	st.LastRun = unixTime(props["ExecMainStartTimestamp"])
+	st.ExitCode, _ = strconv.Atoi(props["ExecMainStatus"])
+	if st.LastRun != "" && !st.Running {
+		st.Finished = unixTime(props["ExecMainExitTimestamp"])
+		st.Result = "failed"
+		if props["Result"] == "success" && st.ExitCode == 0 {
+			st.Result = "success"
+		}
+	}
+	// Only the job's own output (and systemd's messages about it).
+	logs, _ := run.Output(ctx, "journalctl", "-u", name+".service", "-n", "60", "-o", "short-iso", "--no-pager", "-q")
+	if len(logs) > 16384 {
+		logs = logs[len(logs)-16384:]
+	}
+	st.Log = logs
+	return st, nil
+}
+
+// Run starts a job now in the background, in its usual sandbox.
+func Run(ctx context.Context, ref agentproto.CronJobRef) error {
+	name, err := unitOf(ref)
+	if err != nil {
+		return err
+	}
+	if accounts.Locked(ref.Username) {
+		return fmt.Errorf("tài khoản đang bị khóa")
+	}
+	return run.Cmd(ctx, "systemctl", "start", "--no-block", name+".service")
 }

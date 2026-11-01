@@ -52,7 +52,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, auth.ErrTOTPRequired):
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": err.Error(), "totp_required": true})
 		return
-	case errors.Is(err, auth.ErrInvalidCredentials), errors.Is(err, auth.ErrSuspended), errors.Is(err, auth.ErrTOTPInvalid):
+	case errors.Is(err, auth.ErrInvalidCredentials), errors.Is(err, auth.ErrSuspended), errors.Is(err, auth.ErrExpired), errors.Is(err, auth.ErrTOTPInvalid):
 		s.audit.Record(r.Context(), audit.Entry{Action: "auth.login_failed", IP: ip, Meta: map[string]any{"username": req.Username}})
 		writeErr(w, http.StatusUnauthorized, err.Error())
 		return

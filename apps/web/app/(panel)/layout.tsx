@@ -40,6 +40,7 @@ import {
   RefreshCw,
   ScrollText,
   Server,
+  SlidersHorizontal,
   Settings2,
   ShieldAlert,
   ShieldCheck,
@@ -186,6 +187,13 @@ const NAV: NavItem[] = [
     label: "Cập nhật",
     roles: ["admin"],
     icon: RefreshCw,
+    group: "Hệ thống",
+  },
+  {
+    href: "/settings/",
+    label: "Cài đặt hệ thống",
+    roles: ["admin"],
+    icon: SlidersHorizontal,
     group: "Hệ thống",
   },
   {
@@ -465,6 +473,28 @@ export default function PanelLayout({
                 </button>
               </div>
             )}
+            {user.role === "user" &&
+              user.expires_at &&
+              (() => {
+                const [y, m, d] = user.expires_at.slice(0, 10).split("-").map(Number);
+                const now = new Date();
+                const left = Math.round(
+                  (Date.UTC(y, m - 1, d) -
+                    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) /
+                    86400000,
+                );
+                if (left > 7) return null;
+                return (
+                  <div className="bg-amber-100 px-6 py-2 text-xs text-amber-950">
+                    {left <= 0
+                      ? translate("Gói hosting hết hạn hôm nay ({0}).", [`${d}/${m}/${y}`])
+                      : translate("Gói hosting sẽ hết hạn sau {0} ngày ({1}).", [left, `${d}/${m}/${y}`])}{" "}
+                    {translate(
+                      "Vui lòng liên hệ quản trị viên để gia hạn, tránh website bị tạm ngưng.",
+                    )}
+                  </div>
+                );
+              })()}
             <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b bg-background/95 px-5 backdrop-blur-md md:px-8">
               <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 <Button

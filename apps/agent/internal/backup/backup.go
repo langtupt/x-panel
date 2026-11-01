@@ -35,7 +35,6 @@ import (
 	"xpanel/apps/agent/internal/apps"
 	"xpanel/apps/agent/internal/run"
 	"xpanel/pkg/agentproto"
-	"xpanel/pkg/gdrive"
 	"xpanel/pkg/validate"
 )
 
@@ -121,8 +120,12 @@ func Create(ctx context.Context, p agentproto.BackupCreateParams) (agentproto.Ba
 	if err := checkDomains(p.MailDomains); err != nil {
 		return res, err
 	}
-	if !fileNameRe.MatchString(p.FileName) || p.FolderID == "" || len(p.Passphrase) < 12 {
+	if !fileNameRe.MatchString(p.FileName) || (p.FTP == nil && p.FolderID == "") || len(p.Passphrase) < 12 {
 		return res, errors.New("invalid backup parameters")
+	}
+	st, err := storeFor(p.Drive, p.FolderID, p.FTP)
+	if err != nil {
+		return res, err
 	}
 	if !running.TryLock() {
 		return res, errors.New("đang có một backup/restore khác chạy, thử lại sau")
@@ -139,9 +142,9 @@ func Create(ctx context.Context, p agentproto.BackupCreateParams) (agentproto.Ba
 		pw.CloseWithError(err)
 		written <- err
 	}()
-	log.printf("Tải lên Google Drive: %s", p.FileName)
+	log.printf("Tải lên %s: %s", st.Name(), p.FileName)
 	var lastLog time.Time
-	file, upErr := gdrive.New(p.Drive).Upload(ctx, p.FileName, p.FolderID, pr, func(n int64) {
+	id, size, upErr := st.Upload(ctx, p.FileName, pr, func(n int64) {
 		if time.Since(lastLog) > 30*time.Second {
 			lastLog = time.Now()
 			log.printf("  đã tải lên %d MB", n>>20)
@@ -149,15 +152,18 @@ func Create(ctx context.Context, p agentproto.BackupCreateParams) (agentproto.Ba
 	})
 	pr.CloseWithError(errors.New("upload stopped"))
 	if werr := <-written; werr != nil {
-		if file != nil {
-			_ = gdrive.New(p.Drive).Delete(context.WithoutCancel(ctx), file.ID)
+		if id != "" {
+			_ = st.Delete(context.WithoutCancel(ctx), id)
 		}
 		return res, werr
 	}
 	if upErr != nil {
+		if id != "" && p.FTP != nil {
+			_ = st.Delete(context.WithoutCancel(ctx), id) // partial file
+		}
 		return res, upErr
 	}
-	res.FileID, res.Size = file.ID, file.SizeBytes()
+	res.FileID, res.Size = id, size
 	log.printf("Hoàn tất: %.1f MB (đã mã hóa)", float64(res.Size)/(1<<20))
 	return res, nil
 }
@@ -358,8 +364,12 @@ func Restore(ctx context.Context, p agentproto.BackupRestoreParams) (agentproto.
 	}
 	defer running.Unlock()
 
-	log.printf("Tải backup từ Google Drive")
-	body, err := gdrive.New(p.Drive).Download(ctx, p.FileID)
+	st, err := storeFor(p.Drive, "", p.FTP)
+	if err != nil {
+		return res(err)
+	}
+	log.printf("Tải backup từ %s", st.Name())
+	body, err := st.Download(ctx, p.FileID)
 	if err != nil {
 		return res(err)
 	}
@@ -708,7 +718,11 @@ func ReadManifest(ctx context.Context, p agentproto.BackupManifestParams) (agent
 	if _, err := account(p.Username); err != nil {
 		return agentproto.BackupManifest{}, err
 	}
-	body, err := gdrive.New(p.Drive).Download(ctx, p.FileID)
+	st, err := storeFor(p.Drive, "", p.FTP)
+	if err != nil {
+		return agentproto.BackupManifest{}, err
+	}
+	body, err := st.Download(ctx, p.FileID)
 	if err != nil {
 		return agentproto.BackupManifest{}, err
 	}

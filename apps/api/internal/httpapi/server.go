@@ -74,6 +74,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.accounts.RunMalwareScans(ctx)
 	go s.accounts.InitFirewall(ctx)
 	go s.accounts.RunAutoUpdate(ctx)
+	go s.accounts.RunExpiry(ctx)
 }
 
 func (s *Server) Handler() http.Handler {
@@ -133,6 +134,8 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/cron", s.handleCreateCron)
 			r.Put("/cron/{id}", s.handleUpdateCron)
 			r.Delete("/cron/{id}", s.handleDeleteCron)
+			r.Get("/cron/{id}/status", s.handleCronStatus)
+			r.Post("/cron/{id}/run", s.handleRunCron)
 			r.Get("/audit", s.handleListAudit)
 			r.Get("/ftp", s.handleListFTP)
 			r.Post("/ftp", s.handleCreateFTP)
@@ -159,6 +162,7 @@ func (s *Server) Handler() http.Handler {
 			r.Put("/backups/settings", s.handleSaveBackupSettings)
 			r.Post("/backups/drive", s.handleConnectDrive)
 			r.Delete("/backups/drive", s.handleDisconnectDrive)
+			r.Put("/backups/destination", s.handleSaveBackupDestination)
 			r.Get("/backups", s.handleListBackups)
 			r.Post("/backups", s.handleCreateBackup)
 			r.Post("/backups/import", s.handleImportBackups)
@@ -188,6 +192,7 @@ func (s *Server) Handler() http.Handler {
 				r.Post("/users", s.handleCreateUser)
 				r.Patch("/users/{id}/status", s.handleSetUserStatus)
 				r.Patch("/users/{id}/package", s.handleSetUserPackage)
+				r.Patch("/users/{id}/expiry", s.handleSetUserExpiry)
 				r.Patch("/users/{id}/password", s.handleResetPassword)
 				r.Delete("/users/{id}", s.handleDeleteUser)
 
@@ -200,6 +205,9 @@ func (s *Server) Handler() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(requireRole(users.RoleAdmin))
 				r.Get("/system/info", s.handleSystemInfo)
+				r.Get("/settings/smtp", s.handleSMTPSettings)
+				r.Put("/settings/smtp", s.handleSaveSMTP)
+				r.Post("/settings/smtp/test", s.handleTestSMTP)
 				r.Get("/system/panel-ssl", s.handlePanelSSL)
 				r.Post("/system/panel-ssl", s.handleIssuePanelSSL)
 				r.Post("/system/reboot", s.handleSystemReboot)

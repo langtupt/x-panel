@@ -155,6 +155,8 @@ func ValidPHPVersion(v string) bool {
 type WebSyncParams struct {
 	Username  string `json:"username"`
 	Suspended bool   `json:"suspended"`
+	// "expired": the sites say the hosting has expired instead of "suspended".
+	SuspendReason string `json:"suspend_reason,omitempty"`
 	// The month's bandwidth allowance is used up: sites answer 503 until
 	// the next month or a bigger package (cron and apps keep running).
 	OverBandwidth bool      `json:"over_bandwidth,omitempty"`
@@ -309,7 +311,27 @@ type SystemInfo struct {
 	QuotaMount      string     `json:"quota_mount"`
 }
 
-const ActionCronSync = "cron.sync" // CronSyncParams
+const (
+	ActionCronSync   = "cron.sync"   // CronSyncParams
+	ActionCronStatus = "cron.status" // CronJobRef -> CronStatus
+	ActionCronRun    = "cron.run"    // CronJobRef
+)
+
+// CronJobRef names job Index of the account's enabled Jobs (as last synced).
+type CronJobRef struct {
+	CronSyncParams
+	Index int `json:"index"`
+}
+
+// CronStatus is the last (or current) run of one job.
+type CronStatus struct {
+	Running  bool   `json:"running"`
+	LastRun  string `json:"last_run"` // RFC 3339, "" = never ran
+	Finished string `json:"finished"` // RFC 3339
+	Result   string `json:"result"`   // success | failed | ""
+	ExitCode int    `json:"exit_code"`
+	Log      string `json:"log"` // end of the job's output
+}
 
 // CronSyncParams is the complete crontab of a Linux user (empty = remove it).
 type CronSyncParams struct {
@@ -476,7 +498,27 @@ const (
 	ActionBackupCreate   = "backup.create"   // BackupCreateParams -> BackupCreateResult
 	ActionBackupRestore  = "backup.restore"  // BackupRestoreParams -> TaskLog
 	ActionBackupManifest = "backup.manifest" // BackupManifestParams -> BackupManifest
+	ActionBackupFTP      = "backup.ftp"      // BackupFTPParams
 )
+
+// FTPDest is an FTP/FTPS server that stores an account's backups (instead
+// of Google Drive). TLS = explicit FTPS (AUTH TLS).
+type FTPDest struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	Dir      string `json:"dir"` // relative to the FTP login's folder; "" = that folder
+	TLS      bool   `json:"tls"`
+	Insecure bool   `json:"insecure"` // accept a self-signed certificate
+}
+
+// BackupFTPParams: Op "test" (log in and write a file) or "delete" (Name).
+type BackupFTPParams struct {
+	Op   string  `json:"op"`
+	FTP  FTPDest `json:"ftp"`
+	Name string  `json:"name,omitempty"`
+}
 
 // BackupDB is a customer database inside a backup.
 type BackupDB struct {
@@ -520,6 +562,7 @@ type BackupCreateParams struct {
 	MailDomains []string        `json:"mail_domains"`
 	Drive       gdrive.Creds    `json:"drive"`
 	FolderID    string          `json:"folder_id"`
+	FTP         *FTPDest        `json:"ftp,omitempty"` // set: store on FTP instead of Drive
 	FileName    string          `json:"file_name"`
 	Passphrase  string          `json:"passphrase"`
 	Manifest    json.RawMessage `json:"manifest"` // panel records of the account, stored as manifest.json
@@ -537,6 +580,7 @@ type BackupCreateResult struct {
 type BackupRestoreParams struct {
 	Username    string       `json:"username"`
 	Drive       gdrive.Creds `json:"drive"`
+	FTP         *FTPDest     `json:"ftp,omitempty"`
 	FileID      string       `json:"file_id"`
 	Passphrase  string       `json:"passphrase"`
 	Files       bool         `json:"files"`
@@ -558,6 +602,7 @@ type MailUsage struct {
 type BackupManifestParams struct {
 	Username   string       `json:"username"`
 	Drive      gdrive.Creds `json:"drive"`
+	FTP        *FTPDest     `json:"ftp,omitempty"`
 	FileID     string       `json:"file_id"`
 	Passphrase string       `json:"passphrase"`
 }
@@ -652,9 +697,11 @@ type MalwareWriteParams struct {
 const ActionNotifyEmail = "notify.email" // NotifyEmailParams
 
 type NotifyEmailParams struct {
-	To      string `json:"to"`
-	Subject string `json:"subject"`
-	Body    string `json:"body"`
+	To       string `json:"to"`
+	Subject  string `json:"subject"`
+	Body     string `json:"body"`
+	From     string `json:"from,omitempty"` // "" = noreply@<mail server name>
+	FromName string `json:"from_name,omitempty"`
 }
 
 // Firewall (see apps/agent/internal/firewall).
