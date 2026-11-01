@@ -61,6 +61,7 @@ export function Operations() {
   const [open, setOpen] = useState(false);
   const [warning, setWarning] = useState("");
   useEffect(() => {
+    const pending = new Map<number, ReturnType<typeof setTimeout>>();
     const listener = (event: Event) => {
       const op = (event as CustomEvent<Operation>).detail;
       const value = op.result as
@@ -72,9 +73,30 @@ export function Operations() {
       setOperations((items) =>
         [...items.filter((item) => item.id !== op.id), op].slice(-20),
       );
-      if (op.status === "running" && op.progress === undefined) {
-        setOpen(true);
-        setWarning("");
+      // Quick requests (save, delete…) finish in a few hundred ms: opening
+      // the popup for them made it flash over the page's own dialog. Open
+      // only when a request is still running after a short delay, or when it
+      // started a background task whose progress is worth following.
+      if (op.status === "running") {
+        if (op.progress === undefined && !pending.has(op.id))
+          pending.set(
+            op.id,
+            setTimeout(() => {
+              pending.delete(op.id);
+              setOpen(true);
+              setWarning("");
+            }, 700),
+          );
+        return;
+      }
+      const timer = pending.get(op.id);
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        pending.delete(op.id);
+        if (op.task && isOpen(op.task)) {
+          setOpen(true);
+          setWarning("");
+        }
       }
     };
     window.addEventListener("xpanel:operation", listener);
@@ -89,6 +111,7 @@ export function Operations() {
     window.addEventListener("xpanel:task", restore);
     return () => {
       window.removeEventListener("xpanel:operation", listener);
+      pending.forEach(clearTimeout);
       window.removeEventListener("xpanel:task", restore);
     };
   }, []);
