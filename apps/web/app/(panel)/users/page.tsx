@@ -693,14 +693,6 @@ export default function UsersPage() {
                   <td className="px-4 py-3">
                     {manageable && (
                       <div className="flex flex-wrap justify-end gap-1.5">
-                        <button
-                          onClick={() =>
-                            setDialog({ kind: "edit", user: u, canPackage: isChild })
-                          }
-                          className="btn-ghost px-2.5 py-1 text-xs"
-                        >
-                          {translate("Sửa")}
-                        </button>
                         {u.suspend_reason === "expired" && (
                           <button
                             onClick={() =>
@@ -731,6 +723,14 @@ export default function UsersPage() {
                               ? translate("Khóa")
                               : translate("Mở khóa"),
                           )}
+                        </button>
+                        <button
+                          onClick={() =>
+                            setDialog({ kind: "edit", user: u, canPackage: isChild })
+                          }
+                          className="btn-ghost px-2.5 py-1 text-xs"
+                        >
+                          {translate("Sửa")}
                         </button>
                         <button
                           onClick={() => setDialog({ kind: "delete", user: u })}
