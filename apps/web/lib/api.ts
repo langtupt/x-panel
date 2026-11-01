@@ -261,6 +261,9 @@ export interface Task {
 export interface PHPList {
   supported: string[];
   installed: string[];
+  /** installed Node.js lines and Go versions, newest first */
+  node?: string[];
+  go?: string[];
 }
 
 export const taskLabel: Record<string, string> = {
@@ -283,6 +286,38 @@ export const taskLabel: Record<string, string> = {
 
 export const isOpen = (t: Task) =>
   t.status === "pending" || t.status === "running";
+
+/** Task types the server can stop while running (see tasks.Interruptible). */
+const interruptible = [
+  "site.build",
+  "backup.create",
+  "malware.scan",
+  "ssl.issue",
+  "db.backup",
+  "db.restore",
+];
+
+/** Pending tasks can always be cancelled; running ones only if interruptible. */
+export const canCancel = (t: Task) =>
+  t.status === "pending" ||
+  (t.status === "running" && interruptible.includes(t.type));
+
+export function cancelTask(id: number) {
+  return api<void>(`/tasks/${id}/cancel`, { method: "POST" });
+}
+
+// Client-side operations (uploads) register how to abort them.
+const aborts = new Map<number, () => void>();
+export function registerAbort(id: number, abort: () => void) {
+  aborts.set(id, abort);
+  return () => aborts.delete(id);
+}
+export function canAbort(id: number) {
+  return aborts.has(id);
+}
+export function abortOperation(id: number) {
+  aborts.get(id)?.();
+}
 
 export interface Database {
   engine: "mariadb" | "postgresql";

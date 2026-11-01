@@ -21,7 +21,7 @@ import {
   type TaskStatus,
 } from "@/lib/api";
 import { CopyButton, ErrorBox } from "@/components/ui";
-import { TaskStatusBadge } from "@/components/task";
+import { CancelTaskButton, TaskStatusBadge } from "@/components/task";
 import { openTask } from "@/components/operations";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -63,7 +63,7 @@ function StatusIcon({ status }: { status: TaskStatus }) {
   return <Clock3 className="size-4 shrink-0 text-muted-foreground" />;
 }
 
-function TaskRow({ task }: { task: Task }) {
+function TaskRow({ task, onChange }: { task: Task; onChange: () => void }) {
   const [open, setOpen] = useState(false);
   const when = new Date(task.created_at).toLocaleString(localeTag(), {
     dateStyle: "short",
@@ -95,8 +95,11 @@ function TaskRow({ task }: { task: Task }) {
         <span className="hidden w-32 shrink-0 text-right text-xs text-muted-foreground tabular-nums sm:inline">
           {when}
         </span>
-        <span className="w-24 shrink-0 text-right">
+        <span className="flex w-24 shrink-0 justify-end">
           <TaskStatusBadge status={task.status} />
+        </span>
+        <span className="w-8 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <CancelTaskButton task={task} compact onCancelled={onChange} />
         </span>
         <ChevronDown
           className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
@@ -141,6 +144,7 @@ export default function TasksPage() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -162,7 +166,7 @@ export default function TasksPage() {
       stopped = true;
       clearTimeout(timer);
     };
-  }, []);
+  }, [reload]);
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = { all: 0, open: 0, failed: 0, done: 0 };
@@ -233,7 +237,11 @@ export default function TasksPage() {
         ) : visible.length ? (
           <ul>
             {visible.map((t) => (
-              <TaskRow key={t.id} task={t} />
+              <TaskRow
+                key={t.id}
+                task={t}
+                onChange={() => setReload((n) => n + 1)}
+              />
             ))}
           </ul>
         ) : (

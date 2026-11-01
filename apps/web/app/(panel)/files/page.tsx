@@ -11,7 +11,14 @@ import {
   useState,
 } from "react";
 import dynamic from "next/dynamic";
-import { api, errMsg, fmtBytes, joinPath, type FSEntry } from "@/lib/api";
+import {
+  api,
+  errMsg,
+  fmtBytes,
+  joinPath,
+  registerAbort,
+  type FSEntry,
+} from "@/lib/api";
 import { ErrorBox, Modal } from "@/components/ui";
 import { OwnerSelect, useHostingAccounts } from "@/components/owner";
 import { useSession } from "../session";
@@ -400,6 +407,11 @@ export default function FilesPage() {
         `/api/files/upload?${q}path=${encodeURIComponent(target)}`,
       );
       xhr.setRequestHeader("X-XPanel", "1");
+      let aborted = false;
+      const unregister = registerAbort(operationID, () => {
+        aborted = true;
+        xhr.abort();
+      });
       xhr.upload.onprogress = (ev) => {
         const pct = ev.lengthComputable
           ? Math.round((ev.loaded / ev.total) * 100)
@@ -410,8 +422,15 @@ export default function FilesPage() {
         );
       };
       xhr.onloadend = () => {
+        unregister();
         setUploads((u) => u.filter((x) => x.name !== f.name));
-        if (xhr.status !== 200) {
+        if (aborted) {
+          notify(
+            "failed",
+            undefined,
+            translate("Đã hủy tải lên {0}", [f.name]),
+          );
+        } else if (xhr.status !== 200) {
           notify(
             "failed",
             undefined,

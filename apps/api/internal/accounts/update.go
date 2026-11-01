@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,61 +30,81 @@ type UpdateState struct {
 	Auto      bool      `json:"auto"`
 	CheckedAt time.Time `json:"checked_at"`
 	CheckErr  string    `json:"check_error,omitempty"`
-	Running   bool      `json:"running"`
-	Log       string    `json:"log"`
+	// Release notes of Latest (GitHub markdown), when known.
+	Notes       string     `json:"notes,omitempty"`
+	PublishedAt *time.Time `json:"published_at,omitempty"`
+	URL         string     `json:"url,omitempty"`
+	Running     bool       `json:"running"`
+	Log         string     `json:"log"`
 }
 
 // latestCache keeps the GitHub answer for an hour (unauthenticated API
 // calls are rate limited).
 var latestCache struct {
 	sync.Mutex
-	tag string
+	rel release
 	at  time.Time
 	err string
 }
 
+type release struct {
+	Tag       string     `json:"tag_name"`
+	Body      string     `json:"body"`
+	Published *time.Time `json:"published_at"`
+	URL       string     `json:"html_url"`
+}
+
 func latestRelease(ctx context.Context, force bool) (string, time.Time, string) {
+	rel, at, err := latestReleaseInfo(ctx, force)
+	return rel.Tag, at, err
+}
+
+func latestReleaseInfo(ctx context.Context, force bool) (release, time.Time, string) {
 	latestCache.Lock()
 	defer latestCache.Unlock()
 	if !force && time.Since(latestCache.at) < time.Hour {
-		return latestCache.tag, latestCache.at, latestCache.err
+		return latestCache.rel, latestCache.at, latestCache.err
 	}
-	tag, err := fetchLatestRelease(ctx)
+	rel, err := fetchLatestRelease(ctx)
 	latestCache.at, latestCache.err = time.Now(), ""
 	if err != nil {
 		latestCache.err = err.Error()
 	} else {
-		latestCache.tag = tag
+		latestCache.rel = rel
 	}
-	return latestCache.tag, latestCache.at, latestCache.err
+	return latestCache.rel, latestCache.at, latestCache.err
 }
 
-func fetchLatestRelease(ctx context.Context) (string, error) {
+func fetchLatestRelease(ctx context.Context) (release, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, latestReleaseAt, nil)
 	if err != nil {
-		return "", err
+		return release{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return release{}, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub trả về %s", res.Status)
+		return release{}, fmt.Errorf("GitHub trả về %s", res.Status)
 	}
-	var rel struct {
-		Tag string `json:"tag_name"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&rel); err != nil {
-		return "", err
+	var rel release
+	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&rel); err != nil {
+		return release{}, err
 	}
 	if !version.Valid(rel.Tag) {
-		return "", fmt.Errorf("bản phát hành không hợp lệ %q", rel.Tag)
+		return release{}, fmt.Errorf("bản phát hành không hợp lệ %q", rel.Tag)
 	}
-	return rel.Tag, nil
+	if len(rel.Body) > 20000 {
+		rel.Body = rel.Body[:20000] + "…"
+	}
+	if !strings.HasPrefix(rel.URL, "https://github.com/") {
+		rel.URL = ""
+	}
+	return rel, nil
 }
 
 func (s *Service) Update(ctx context.Context, actor *users.User, check bool) (*UpdateState, error) {
@@ -90,7 +112,9 @@ func (s *Service) Update(ctx context.Context, actor *users.User, check bool) (*U
 		return nil, err
 	}
 	st := &UpdateState{Current: version.Version}
-	st.Latest, st.CheckedAt, st.CheckErr = latestRelease(ctx, check)
+	var rel release
+	rel, st.CheckedAt, st.CheckErr = latestReleaseInfo(ctx, check)
+	st.Latest, st.Notes, st.PublishedAt, st.URL = rel.Tag, rel.Body, rel.Published, rel.URL
 	st.Available = version.Newer(st.Latest, st.Current)
 	auto, err := settings.NewRepo(s.pool).Get(ctx, updateAutoKey)
 	if err != nil {

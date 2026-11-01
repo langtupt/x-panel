@@ -222,7 +222,8 @@ func main() {
 		return agentproto.TaskLog{Log: out}, nil
 	}))
 	srv.Register(agentproto.ActionPHPList, func(context.Context, json.RawMessage) (any, error) {
-		return agentproto.PHPList{Supported: agentproto.PHPVersions, Installed: php.Installed(d)}, nil
+		return agentproto.PHPList{Supported: agentproto.PHPVersions, Installed: php.Installed(d),
+			Node: nonNil(apps.NodeInstalled()), Go: nonNil(apps.GoInstalled())}, nil
 	})
 	srv.Register(agentproto.ActionPHPInstall, server.Typed(func(ctx context.Context, p agentproto.PHPInstallParams) (any, error) {
 		out, err := php.Install(ctx, d, p.Version)
@@ -402,4 +403,11 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func nonNil(v []string) []string {
+	if v == nil {
+		return []string{}
+	}
+	return v
 }

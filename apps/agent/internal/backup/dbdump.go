@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"xpanel/apps/agent/internal/fsutil"
 	"xpanel/pkg/agentproto"
 	"xpanel/pkg/validate"
 )
@@ -96,8 +97,26 @@ func CreateDBDump(ctx context.Context, p agentproto.DBDumpParams) (agentproto.DB
 	return createDump(ctx, u, p.DB, "")
 }
 
+// ensureDumpDir creates ~/backups/databases for the account. The home itself
+// is root-owned (chroot for SFTP and the file manager), so the account cannot
+// create it; root does it segment by segment without following symlinks.
+func ensureDumpDir(u *user.User) (string, error) {
+	uid, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return "", err
+	}
+	gid, err := strconv.Atoi(u.Gid)
+	if err != nil {
+		return "", err
+	}
+	return fsutil.SafeMkdirAll(u.HomeDir, DBDumpDir, uid, gid, 0o700)
+}
+
 func createDump(ctx context.Context, u *user.User, d agentproto.BackupDB, suffix string) (agentproto.DBDumpFile, error) {
-	dir := filepath.Join(u.HomeDir, DBDumpDir)
+	dir, err := ensureDumpDir(u)
+	if err != nil {
+		return agentproto.DBDumpFile{}, err
+	}
 	now := time.Now()
 	name := d.Name + "-" + now.Format("20060102-150405") + suffix + ".sql.gz"
 	part := "." + name + ".part"
@@ -109,7 +128,7 @@ func createDump(ctx context.Context, u *user.User, d agentproto.BackupDB, suffix
 	if err != nil {
 		return agentproto.DBDumpFile{}, err
 	}
-	writer := asUser(ctx, u, `umask 077 && mkdir -p -- "$1" && cat > "$1/$2"`, dir, part)
+	writer := asUser(ctx, u, `umask 077 && cat > "$1/$2"`, dir, part)
 	pr, pw := io.Pipe()
 	var writeErr bytes.Buffer
 	writer.Stdin, writer.Stderr = pr, &writeErr
@@ -162,8 +181,11 @@ func ListDBDumps(ctx context.Context, p agentproto.DBDumpParams) (agentproto.DBD
 	if err != nil {
 		return res, err
 	}
-	out, err := runAsUser(ctx, u, `umask 077; mkdir -p -- "$1" && cd -- "$1" && find . -maxdepth 1 -type f -printf '%f\t%s\t%T@\n'`,
-		filepath.Join(u.HomeDir, DBDumpDir))
+	dir, err := ensureDumpDir(u)
+	if err != nil {
+		return res, err
+	}
+	out, err := runAsUser(ctx, u, `cd -- "$1" && find . -maxdepth 1 -type f -printf '%f\t%s\t%T@\n'`, dir)
 	if err != nil {
 		return res, err
 	}

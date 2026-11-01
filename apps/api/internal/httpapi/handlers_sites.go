@@ -163,3 +163,32 @@ func (s *Server) handleGetTask(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, t)
 }
+
+// POST /api/tasks/{id}/cancel — stop a pending task, or a running one whose
+// type can be interrupted safely.
+func (s *Server) handleCancelTask(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	me := currentUser(r)
+	t, err := s.tasks.Get(r.Context(), id)
+	if errors.Is(err, tasks.ErrNotFound) || (err == nil && me.Role != users.RoleAdmin && (t.UserID == nil || *t.UserID != me.ID)) {
+		writeErr(w, http.StatusNotFound, "không tìm thấy tác vụ")
+		return
+	}
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	if err := s.tasks.Cancel(r.Context(), t); errors.Is(err, tasks.ErrNotCancellable) {
+		writeErr(w, http.StatusConflict, "tác vụ đã kết thúc hoặc không thể dừng giữa chừng (cài/gỡ gói hệ thống)")
+		return
+	} else if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.audit.Record(r.Context(), audit.Entry{ActorID: &me.ID, Action: "task.cancel", TargetType: "task",
+		TargetID: &t.ID, IP: clientIP(r), Meta: map[string]any{"type": t.Type, "target": t.Target}})
+	w.WriteHeader(http.StatusNoContent)
+}
