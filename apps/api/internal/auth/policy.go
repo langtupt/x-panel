@@ -30,4 +30,5 @@ func (s *Service) LockedIPs() []Lock      { return s.limiter.Locks() }
 func (s *Service) LockedAccounts() []Lock { return s.accountLimiter.Locks() }
 
 func (s *Service) UnlockIP(ip string) bool        { return s.limiter.Unlock(ip) }
+func (s *Service) IPLocked(ip string) bool        { return s.limiter.Blocked(ip) }
 func (s *Service) UnlockAccount(name string) bool { return s.accountLimiter.Unlock(name) }

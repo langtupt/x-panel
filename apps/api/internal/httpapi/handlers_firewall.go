@@ -60,13 +60,24 @@ func (s *Server) handleFirewallUnban(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if err := s.accounts.UnbanIP(r.Context(), currentUser(r), in.IP); err != nil {
+	res, err := s.accounts.UnbanIP(r.Context(), currentUser(r), in.IP)
+	if err != nil {
 		s.fail(w, err)
 		return
 	}
 	s.audit.Record(r.Context(), audit.Entry{ActorID: &currentUser(r).ID, Action: "firewall.unban", IP: clientIP(r),
 		Meta: map[string]any{"ip": in.IP}})
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, res)
+}
+
+// GET /api/firewall/check?ip= (admin): where an address is blocked.
+func (s *Server) handleFirewallCheck(w http.ResponseWriter, r *http.Request) {
+	res, err := s.accounts.CheckIP(r.Context(), currentUser(r), r.URL.Query().Get("ip"))
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 // POST /api/firewall/unlock {username} (admin): lift a panel login lock.

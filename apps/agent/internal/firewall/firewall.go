@@ -442,20 +442,6 @@ func restoreBans(ctx context.Context) error {
 	return err
 }
 
-func Unban(ctx context.Context, p agentproto.FirewallBanParams) error {
-	a, err := parseIP(p.IP)
-	if err != nil {
-		return err
-	}
-	_, _ = run.With(ctx, run.Opts{}, "nft", "delete", "element", "inet", table, setFor(a), "{ "+a.String()+" }")
-	_ = os.Remove(filepath.Join(reasonsDir, a.String()))
-	// fail2ban would otherwise re-add it on its next restart.
-	if _, err := os.Stat("/usr/bin/fail2ban-client"); err == nil {
-		_, _ = run.With(ctx, run.Opts{Timeout: 20 * time.Second}, "fail2ban-client", "unban", a.String())
-	}
-	return nil
-}
-
 // Bans lists the active timed and permanent bans.
 func Bans(ctx context.Context) (agentproto.FirewallBans, error) {
 	out := agentproto.FirewallBans{Bans: []agentproto.FirewallBan{}}

@@ -190,15 +190,32 @@ func (s *Service) BanIP(ctx context.Context, actor *users.User, myIP, ip string,
 	return nil
 }
 
-func (s *Service) UnbanIP(ctx context.Context, actor *users.User, ip string) error {
+// UnbanIP lifts every ban on ip and reports what still blocks it (for
+// example an "always block" network that contains it).
+func (s *Service) UnbanIP(ctx context.Context, actor *users.User, ip string) (*agentproto.FirewallCheck, error) {
 	if err := adminOnly(actor); err != nil {
-		return err
+		return nil, err
 	}
 	s.auth.UnlockIP(ip)
-	if err := s.agent.Call(ctx, agentproto.ActionFirewallUnban, agentproto.FirewallBanParams{IP: ip}, nil); err != nil {
-		return apperr.Invalid("%s", strings.TrimPrefix(err.Error(), "agent: "))
+	var res agentproto.FirewallCheck
+	if err := s.agent.Call(ctx, agentproto.ActionFirewallUnban, agentproto.FirewallBanParams{IP: ip}, &res); err != nil {
+		return nil, apperr.Invalid("%s", strings.TrimPrefix(err.Error(), "agent: "))
 	}
-	return nil
+	res.PanelLocked = s.auth.IPLocked(res.IP)
+	return &res, nil
+}
+
+// CheckIP reports everything that blocks or exempts ip.
+func (s *Service) CheckIP(ctx context.Context, actor *users.User, ip string) (*agentproto.FirewallCheck, error) {
+	if err := adminOnly(actor); err != nil {
+		return nil, err
+	}
+	var res agentproto.FirewallCheck
+	if err := s.agent.Call(ctx, agentproto.ActionFirewallCheck, agentproto.FirewallBanParams{IP: ip}, &res); err != nil {
+		return nil, apperr.Invalid("%s", strings.TrimPrefix(err.Error(), "agent: "))
+	}
+	res.PanelLocked = s.auth.IPLocked(res.IP)
+	return &res, nil
 }
 
 func (s *Service) UnlockAccount(actor *users.User, username string) error {

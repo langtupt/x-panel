@@ -150,7 +150,10 @@ func main() {
 		return nil, firewall.Ban(ctx, p)
 	}))
 	srv.Register(agentproto.ActionFirewallUnban, server.Typed(func(ctx context.Context, p agentproto.FirewallBanParams) (any, error) {
-		return nil, firewall.Unban(ctx, p)
+		return firewall.Unban(ctx, p)
+	}))
+	srv.Register(agentproto.ActionFirewallCheck, server.Typed(func(ctx context.Context, p agentproto.FirewallBanParams) (any, error) {
+		return firewall.Check(ctx, p)
 	}))
 	srv.Register(agentproto.ActionNotifyEmail, server.Typed(func(ctx context.Context, p agentproto.NotifyEmailParams) (any, error) {
 		return nil, mail.Notify(ctx, p)
