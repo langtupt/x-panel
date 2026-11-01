@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -101,7 +102,18 @@ func InstallVersion(ctx context.Context, d distro.Distro, version string) (strin
 	if _, err := rand.Read(secret); err != nil {
 		return log.String(), err
 	}
-	if err := os.WriteFile(filepath.Join(stage, "config.inc.php"), []byte(config(hex.EncodeToString(secret))), 0o644); err != nil {
+	// The blowfish secret decrypts the login cookie (which holds the database
+	// password): readable by phpMyAdmin's own pool only, not by customers.
+	cfgFile := filepath.Join(stage, "config.inc.php")
+	if err := os.WriteFile(cfgFile, []byte(config(hex.EncodeToString(secret))), 0o640); err != nil {
+		return log.String(), err
+	}
+	g, err := user.LookupGroup(sysUser)
+	if err != nil {
+		return log.String(), err
+	}
+	gid, _ := strconv.Atoi(g.Gid)
+	if err := os.Chown(cfgFile, 0, gid); err != nil {
 		return log.String(), err
 	}
 	_ = os.RemoveAll(filepath.Join(stage, "setup")) // web installer is not needed

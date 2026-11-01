@@ -20,7 +20,7 @@ import { NotificationBell } from "@/components/notifications";
 import {
   Activity,
   BarChart3,
-  Blocks,
+  Braces,
   BrickWall,
   ChevronRight,
   Clock3,
@@ -30,115 +30,121 @@ import {
   Globe2,
   HardDriveDownload,
   LayoutDashboard,
+  LayoutGrid,
   LogOut,
   Mail,
   Menu,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   RefreshCw,
   ScrollText,
   Server,
   Settings2,
-  ShieldCheck,
   ShieldAlert,
+  ShieldCheck,
   Users,
   type LucideIcon,
 } from "lucide-react";
 
 const ALL: Role[] = ["admin", "reseller", "user"];
+
+type Group = "Dịch vụ" | "Quản lý" | "Hệ thống";
+const GROUPS: Group[] = ["Dịch vụ", "Quản lý", "Hệ thống"];
+
 type NavItem = {
   href: string;
-  label: string;
+  label: string; // Vietnamese source text, translated at render time
   roles: Role[];
   icon: LucideIcon;
-  group: string;
+  group: Group;
 };
+
 const NAV: NavItem[] = [
   {
     href: "/dashboard/",
     label: "Tổng quan",
     roles: ALL,
     icon: LayoutDashboard,
-    group: "Workspace",
+    group: "Dịch vụ",
   },
   {
     href: "/sites/",
     label: "Website",
     roles: ALL,
     icon: Globe2,
-    group: "Workspace",
+    group: "Dịch vụ",
   },
   {
     href: "/ssl/",
     label: "Chứng chỉ SSL",
     roles: ALL,
     icon: ShieldCheck,
-    group: "Workspace",
+    group: "Dịch vụ",
   },
-  {
-    href: "/mail/",
-    label: "Email",
-    roles: ALL,
-    icon: Mail,
-    group: "Workspace",
-  },
+  { href: "/mail/", label: "Email", roles: ALL, icon: Mail, group: "Dịch vụ" },
   {
     href: "/databases/",
     label: "Database",
     roles: ALL,
     icon: Database,
-    group: "Workspace",
+    group: "Dịch vụ",
   },
   {
     href: "/files/",
     label: "Quản lý file",
     roles: ALL,
     icon: FolderOpen,
-    group: "Workspace",
+    group: "Dịch vụ",
   },
   {
     href: "/ftp/",
     label: "FTP / SFTP",
     roles: ALL,
     icon: FileCode2,
-    group: "Workspace",
+    group: "Dịch vụ",
   },
   {
     href: "/cron/",
     label: "Lịch chạy Cron",
     roles: ALL,
     icon: Clock3,
-    group: "Workspace",
-  },
-  {
-    href: "/php/", label: "PHP", roles: ["admin"], icon: Blocks, group: "Quản trị",
+    group: "Dịch vụ",
   },
   {
     href: "/applications/",
-    label: "Applications",
+    label: "Ứng dụng",
     roles: ["admin"],
-    icon: Blocks,
-    group: "Quản trị",
+    icon: LayoutGrid,
+    group: "Quản lý",
+  },
+  {
+    href: "/php/",
+    label: "PHP",
+    roles: ["admin"],
+    icon: Braces,
+    group: "Quản lý",
   },
   {
     href: "/users/",
     label: "Tài khoản",
     roles: ["admin", "reseller"],
     icon: Users,
-    group: "Quản trị",
+    group: "Quản lý",
   },
   {
     href: "/packages/",
     label: "Gói dịch vụ",
     roles: ["admin", "reseller"],
     icon: Package,
-    group: "Quản trị",
+    group: "Quản lý",
   },
   {
     href: "/firewall/",
     label: "Tường lửa",
     roles: ["admin"],
     icon: BrickWall,
-    group: "Quản trị",
+    group: "Quản lý",
   },
   {
     href: "/malware/",
@@ -190,6 +196,182 @@ const NAV: NavItem[] = [
     group: "Hệ thống",
   },
 ];
+
+const COLLAPSE_KEY = "xpanel.sidebar.collapsed";
+
+function samePath(a: string, b: string) {
+  return a.replace(/\/$/, "") === b.replace(/\/$/, "");
+}
+
+/** One menu entry; icon-only with a tooltip when the sidebar is collapsed. */
+function NavLink({
+  item,
+  selected,
+  collapsed,
+}: {
+  item: NavItem;
+  selected: boolean;
+  collapsed: boolean;
+}) {
+  const label = translate(item.label);
+  const cls = `group relative flex h-9 items-center gap-3 rounded-md text-[13px] transition-colors ${collapsed ? "justify-center px-0" : "px-3"} ${selected ? "bg-foreground/[.06] font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`;
+  const inner = (
+    <>
+      {selected && (
+        <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-foreground" />
+      )}
+      <item.icon className="size-4 shrink-0" strokeWidth={1.7} />
+      {!collapsed && <span className="truncate">{label}</span>}
+    </>
+  );
+  if (!collapsed)
+    return (
+      <Link
+        href={item.href}
+        aria-current={selected ? "page" : undefined}
+        className={cls}
+      >
+        {inner}
+      </Link>
+    );
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Link
+            href={item.href}
+            aria-current={selected ? "page" : undefined}
+            aria-label={label}
+            className={cls}
+          />
+        }
+      >
+        {inner}
+      </TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function Sidebar({
+  user,
+  nav,
+  current,
+  collapsed,
+  onToggle,
+}: {
+  user: Me;
+  nav: NavItem[];
+  current?: NavItem;
+  collapsed: boolean;
+  onToggle?: () => void;
+}) {
+  return (
+    <>
+      <div
+        className={`flex h-16 shrink-0 items-center border-b ${collapsed ? "justify-center px-2" : "gap-3 px-4"}`}
+      >
+        <Link
+          href="/dashboard/"
+          className="flex min-w-0 flex-1 items-center gap-3"
+          aria-label="X-Panel"
+        >
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-sm font-bold text-background">
+            X
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <span className="block text-sm font-semibold tracking-tight">
+                X-Panel
+              </span>
+              <span className="block truncate text-[11px] text-muted-foreground">
+                {translate("Bảng điều khiển hosting")}
+                {user.panel_version ? ` · ${user.panel_version}` : ""}
+              </span>
+            </div>
+          )}
+        </Link>
+        {onToggle && !collapsed && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8 shrink-0 text-muted-foreground"
+            aria-label={translate("Thu gọn menu")}
+            title={translate("Thu gọn menu")}
+            onClick={onToggle}
+          >
+            <PanelLeftClose className="size-4" />
+          </Button>
+        )}
+      </div>
+      <nav
+        className={`flex-1 overflow-y-auto py-3 ${collapsed ? "px-2" : "px-3"}`}
+        aria-label={translate("Điều hướng chính")}
+      >
+        {GROUPS.map((group, i) => {
+          const items = nav.filter((n) => n.group === group);
+          if (!items.length) return null;
+          return (
+            <div key={group} className={i ? "mt-4" : ""}>
+              {collapsed ? (
+                i > 0 && <div className="mx-2 mb-3 border-t" />
+              ) : (
+                <div className="mb-1.5 px-3 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground/80 uppercase">
+                  {translate(group)}
+                </div>
+              )}
+              <div className="space-y-0.5">
+                {items.map((n) => (
+                  <NavLink
+                    key={n.href}
+                    item={n}
+                    selected={current?.href === n.href}
+                    collapsed={collapsed}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </nav>
+      {onToggle && collapsed && (
+        <div className="flex justify-center border-t py-2">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8 text-muted-foreground"
+            aria-label={translate("Mở rộng menu")}
+            title={translate("Mở rộng menu")}
+            onClick={onToggle}
+          >
+            <PanelLeftOpen className="size-4" />
+          </Button>
+        </div>
+      )}
+      <Link
+        href="/account/"
+        title={collapsed ? user.username : undefined}
+        className={`flex shrink-0 items-center gap-3 border-t py-3 hover:bg-muted/50 ${collapsed ? "justify-center px-2" : "px-4"}`}
+      >
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase">
+          {user.username.slice(0, 2)}
+        </div>
+        {!collapsed && (
+          <>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold">{user.username}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {translate(roleLabel[user.role])}
+              </p>
+            </div>
+            <Settings2 className="size-4 text-muted-foreground" />
+          </>
+        )}
+      </Link>
+    </>
+  );
+}
+
 export default function PanelLayout({
   children,
 }: {
@@ -199,12 +381,26 @@ export default function PanelLayout({
   const pathname = usePathname();
   const [user, setUser] = useState<Me | null>(null);
   const [mobile, setMobile] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
     api<Me>("/me")
       .then(setUser)
       .catch(() => router.replace("/login/"));
   }, [router]);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
+    } catch {}
+  }, []);
   useEffect(() => setMobile(false), [pathname]);
+  function toggleCollapsed() {
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem(COLLAPSE_KEY, c ? "0" : "1");
+      } catch {}
+      return !c;
+    });
+  }
   async function logout() {
     await api("/auth/logout", { method: "POST" }).catch(() => {});
     router.replace("/login/");
@@ -225,95 +421,41 @@ export default function PanelLayout({
       </div>
     );
   const nav = NAV.filter((n) => n.roles.includes(user.role));
-  const current = nav.find(
-    (n) => pathname.replace(/\/$/, "") === n.href.replace(/\/$/, ""),
-  );
-  const navigation = (
-    <>
-      <Link href="/dashboard/" className="flex h-20 items-center gap-3 px-5">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
-          X
-        </div>
-        <div>
-          <span className="font-semibold tracking-tight">X-Panel</span>
-          <p className="text-[11px] text-muted-foreground">
-            Hosting workspace{user.panel_version ? ` · ${user.panel_version}` : ""}
-          </p>
-        </div>
-      </Link>
-      <nav
-        className="flex-1 space-y-6 overflow-y-auto px-3 py-3"
-        aria-label={translate("Điều hướng chính")}
-      >
-        {["Workspace", "Quản trị", "Hệ thống"].map((group) => {
-          const items = nav.filter((n) => n.group === group);
-          return (
-            items.length > 0 && (
-              <div key={group}>
-                <div className="mb-2 px-3 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-                  {translate(group)}
-                </div>
-                <div className="space-y-1">
-                  {items.map((n) => {
-                    const selected = current?.href === n.href;
-                    return (
-                      <Link
-                        key={n.href}
-                        href={n.href}
-                        aria-current={selected ? "page" : undefined}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-colors ${selected ? "bg-primary font-medium text-primary-foreground shadow-xs" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
-                      >
-                        <n.icon className="size-4" strokeWidth={1.6} />
-                        {translate(n.label)}
-                        {selected && (
-                          <ChevronRight className="ml-auto size-3.5 opacity-60" />
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )
-          );
-        })}
-      </nav>
-      <Link
-        href="/account/"
-        className="flex items-center gap-3 border-t px-5 py-4"
-      >
-        <div className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase">
-          {translate(user.username.slice(0, 2))}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold">{user.username}</p>
-          <p className="text-[11px] text-muted-foreground">
-            {translate(roleLabel[user.role])}
-          </p>
-        </div>
-        <Settings2 className="size-4 text-muted-foreground" />
-      </Link>
-    </>
-  );
+  const current = nav.find((n) => samePath(pathname, n.href));
   return (
     <SessionContext.Provider value={user}>
       <TooltipProvider>
         <div className="flex min-h-screen bg-muted/30">
-          <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r bg-sidebar lg:flex">
-            {translate(navigation)}
+          <aside
+            className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r bg-sidebar transition-[width] duration-200 lg:flex ${collapsed ? "w-16" : "w-60"}`}
+          >
+            <Sidebar
+              user={user}
+              nav={nav}
+              current={current}
+              collapsed={collapsed}
+              onToggle={toggleCollapsed}
+            />
           </aside>
           <Sheet open={mobile} onOpenChange={setMobile}>
             <SheetContent side="left" className="flex w-64 flex-col gap-0 p-0">
               <SheetTitle className="sr-only">Menu X-Panel</SheetTitle>
-              {translate(navigation)}
+              <Sidebar
+                user={user}
+                nav={nav}
+                current={current}
+                collapsed={false}
+              />
             </SheetContent>
           </Sheet>
-          <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
+          <div
+            className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ${collapsed ? "lg:pl-16" : "lg:pl-60"}`}
+          >
             {user.impersonator && (
               <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-100 px-6 py-2 text-xs text-amber-950">
                 <span>
                   {translate("Đang đăng nhập thay")} <b>{user.username}</b>{" "}
-                  {translate("bởi")} {translate(" ")}
-                  {translate(user.impersonator.username)}
+                  {translate("bởi")} <b>{user.impersonator.username}</b>
                 </span>
                 <button
                   onClick={stopImpersonating}
@@ -324,7 +466,7 @@ export default function PanelLayout({
               </div>
             )}
             <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b bg-background/95 px-5 backdrop-blur-md md:px-8">
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 <Button
                   size="icon"
                   variant="ghost"
@@ -334,20 +476,20 @@ export default function PanelLayout({
                 >
                   <Menu />
                 </Button>
-                <span className="hidden text-xs text-muted-foreground sm:inline">
-                  Workspace
-                </span>
-                <ChevronRight className="hidden size-3 text-muted-foreground sm:block" />
+                {current && (
+                  <>
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
+                      {translate(current.group)}
+                    </span>
+                    <ChevronRight className="hidden size-3 text-muted-foreground sm:block" />
+                  </>
+                )}
                 <span className="min-w-0 truncate text-xs font-medium">
-                  {translate(current?.label ?? "X-Panel")}
+                  {current ? translate(current.label) : "X-Panel"}
                 </span>
               </div>
               <div className="flex items-center gap-2 sm:gap-3">
                 <LanguageSwitcher />
-                <span className="hidden items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-medium text-muted-foreground sm:flex">
-                  <span className="size-1.5 rounded-full bg-emerald-500" />
-                  {translate(roleLabel[user.role])}
-                </span>
                 <Tooltip>
                   <TooltipTrigger
                     render={
@@ -377,12 +519,22 @@ export default function PanelLayout({
             <main className="panel-main flex-1">{children}</main>
             <footer className="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-4 text-[10px] text-muted-foreground md:px-8">
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span>X-Panel · Hosting control panel</span>
-                <span>· {translate("Một sản phẩm của")} <a href="https://socsmart.com" target="_blank" rel="noopener noreferrer" className="font-medium hover:text-foreground hover:underline">socsmart.com</a></span>
+                <span>X-Panel</span>
+                <span>
+                  · {translate("Một sản phẩm của")}{" "}
+                  <a
+                    href="https://socsmart.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium hover:text-foreground hover:underline"
+                  >
+                    socsmart.com
+                  </a>
+                </span>
               </span>
               <span className="flex items-center gap-1.5">
                 <Server className="size-3" />
-                Workspace / {user.username}
+                {user.username}
               </span>
             </footer>
           </div>

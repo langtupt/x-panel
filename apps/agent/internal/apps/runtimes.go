@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"regexp"
 	"xpanel/apps/agent/internal/fetch"
@@ -73,13 +75,45 @@ func latestNode(rel []nodeRelease) map[string]nodeRelease {
 	return out
 }
 
+// nodeLatest remembers the newest release of each offered major line from the
+// last successful nodejs.org lookup ("22" → "22.11.0").
+var nodeLatest struct {
+	sync.Mutex
+	versions map[string]string
+}
+
+func nodeLatestVersions() map[string]string {
+	nodeLatest.Lock()
+	defer nodeLatest.Unlock()
+	return nodeLatest.versions
+}
+
 // nodeAvailable offers the current line plus the three newest LTS lines.
 func nodeAvailable(ctx context.Context) ([]string, error) {
 	rel, err := nodeReleases(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return pickNodeLines(rel), nil
+	lines, latest := pickNodeLines(rel), latestNode(rel)
+	versions := map[string]string{}
+	for _, m := range lines {
+		versions[m] = strings.TrimPrefix(latest[m].Version, "v")
+	}
+	nodeLatest.Lock()
+	nodeLatest.versions = versions
+	nodeLatest.Unlock()
+	return lines, nil
+}
+
+// nodeInstalledVersion is the full release installed for a major line
+// ("22.10.0"), or "" if it cannot be determined.
+func nodeInstalledVersion(major string) string {
+	out, err := run.With(context.Background(), run.Opts{Timeout: 10 * time.Second}, filepath.Join(NodeDir(major), "bin", "node"), "--version")
+	v := strings.TrimPrefix(strings.TrimSpace(out), "v")
+	if err != nil || !numericVersion.MatchString(v) {
+		return ""
+	}
+	return v
 }
 
 // pickNodeLines keeps the newest major (Current) and the three newest LTS majors.

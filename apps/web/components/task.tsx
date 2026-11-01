@@ -3,6 +3,7 @@ import { t as translate } from "@/lib/i18n";
 
 import { useState } from "react";
 import { taskLabel, type Task, type TaskStatus } from "@/lib/api";
+import { CopyButton } from "@/components/ui";
 
 const statusStyle: Record<TaskStatus, { label: string; cls: string }> = {
   pending: { label: "Đang chờ", cls: "bg-slate-100 text-slate-600" },
@@ -59,7 +60,8 @@ export function TaskCard({
           {task.log || translate("Chưa có log…")}
         </pre>
       )}
-      <div className="flex justify-end border-t px-3 py-1.5">
+      <div className="flex items-center justify-between gap-2 border-t px-2 py-1">
+        <CopyButton text={task.log} />
         <button
           className="text-[11px] text-muted-foreground hover:text-foreground"
           onClick={() =>

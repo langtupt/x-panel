@@ -267,6 +267,16 @@ func (r *Repo) DeleteAlias(ctx context.Context, id int64) error {
 }
 
 // SiteOwnedByOther reports whether another account hosts a website on the domain.
+// SiteOwnedBy reports whether domain is a website domain or alias of userID,
+// or a subdomain of one.
+func (r *Repo) SiteOwnedBy(ctx context.Context, domain string, userID int64) (bool, error) {
+	var owned bool
+	err := r.q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM sites s, unnest(array_append(s.aliases, s.domain)) AS n(name)
+		WHERE s.user_id=$2 AND ($1=n.name OR right($1, length(n.name)+1)='.'||n.name))`,
+		domain, userID).Scan(&owned)
+	return owned, err
+}
+
 func (r *Repo) SiteOwnedByOther(ctx context.Context, domain string, userID int64) (bool, error) {
 	var taken bool
 	err := r.q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM sites WHERE user_id<>$2 AND (domain=$1 OR $1=ANY(aliases)))`,

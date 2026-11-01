@@ -239,7 +239,7 @@ export default function FTPPage() {
             <dd>{translate(host)}</dd>
             <dt className="font-sans text-slate-500">{translate("Cổng")}</dt>
             <dd>21 (FTP / FTPS explicit)</dd>
-            <dt className="font-sans text-slate-500">User</dt>
+            <dt className="font-sans text-slate-500">{translate("Người dùng")}</dt>
             <dd>{translate(created.a.login)}</dd>
             <dt className="font-sans text-slate-500">
               {translate("Mật khẩu")}

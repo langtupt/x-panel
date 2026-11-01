@@ -39,6 +39,9 @@ c cust POST /auth/login '{"username":"mailcust","password":"Client12345"}' >/dev
 c other POST /auth/login '{"username":"mailother","password":"Client12345"}' >/dev/null
 echo "mailcust:Linux12345" | chpasswd
 
+expect "$(c cust POST /mail/domains '{"domain":"gmail.com"}')" 400 "customer cannot host mail for a domain that is not its website"
+expect "$(c cust POST /mail/domains '{"domain":"corp.example.com"}')" 400 "mail domain needs the account's website first"
+expect "$(c cust POST /sites '{"domain":"corp.example.com","aliases":[],"app_type":"html","doc_root":""}')" 201 "customer adds website corp.example.com"
 expect "$(c cust POST /mail/domains '{"domain":"corp.example.com"}')" 201 "customer adds mail domain"; D=$(jq .id /tmp/out)
 expect "$(c other POST /mail/domains '{"domain":"corp.example.com"}')" 409 "same domain for another account refused"
 expect "$(c cust POST /mail/domains/$D/mailboxes '{"local_part":"info","password":"MailPass12345","quota_mb":50}')" 201 "mailbox info@"

@@ -31,9 +31,12 @@ type Catalog struct {
 	D    distro.Distro
 	apps []app
 
-	mu    sync.Mutex
-	cache map[string]cached // available versions per app (remote lookups)
+	mu         sync.Mutex
+	cache      map[string]cached // available versions per app (remote lookups)
+	refreshing map[string]bool   // background refresh running, per app
 }
+
+const cacheTTL = 5 * time.Minute
 
 type cached struct {
 	at       time.Time
@@ -43,7 +46,7 @@ type cached struct {
 }
 
 func New(d distro.Distro) *Catalog {
-	c := &Catalog{D: d, cache: map[string]cached{}}
+	c := &Catalog{D: d, cache: map[string]cached{}, refreshing: map[string]bool{}}
 	c.apps = []app{
 		{
 			info: agentproto.AppInfo{ID: "php", Name: "PHP", Category: "runtime", MultiVersion: true,
@@ -178,47 +181,156 @@ func (c *Catalog) Refresh() {
 	}
 }
 
-// List returns every app with its installed and installable versions.
-func (c *Catalog) List(ctx context.Context) []agentproto.AppInfo {
-	out := make([]agentproto.AppInfo, 0, len(c.apps))
-	for _, a := range c.apps {
-		info := a.info
-		info.Installed = a.installed()
-		if info.Installed == nil {
-			info.Installed = []string{}
-		}
-		info.Available, info.Error = c.availableCached(ctx, a)
-		c.mu.Lock()
-		checked := c.cache[a.info.ID]
-		c.mu.Unlock()
-		if !checked.at.IsZero() {
-			info.CheckedAt = checked.at.UTC().Format(time.RFC3339)
-		}
-		info.Source = appSource(a.info.ID)
-		if a.info.ID == "php" {
-			info.VersionLabels = map[string]string{}
-			info.InstalledLabels = map[string]string{}
-			for _, v := range info.Available {
-				if candidate, err := aptCandidate(ctx, "php"+v+"-fpm"); err == nil {
-					info.VersionLabels[v] = v + " → " + candidate
-				}
-			}
-			for _, v := range info.Installed {
-				if installed := aptInstalled("php" + v + "-fpm"); len(installed) > 0 {
-					info.InstalledLabels[v] = installed[0]
-				}
-			}
-		}
-		out = append(out, info)
+// List returns every app with its installed and installable versions. The
+// apps are looked up in parallel. Unless wait is set (the "refresh" button),
+// a stale version list is answered at once and refreshed in the background,
+// so opening the page never waits on release feeds or apt-get update.
+func (c *Catalog) List(ctx context.Context, wait bool) []agentproto.AppInfo {
+	out := make([]agentproto.AppInfo, len(c.apps))
+	var wg sync.WaitGroup
+	for i, a := range c.apps {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			out[i] = c.info(ctx, a, wait)
+		}()
 	}
+	wg.Wait()
 	return out
+}
+
+// Warm fills the version caches in the background (agent start), so the
+// first visit of the Applications page is fast too.
+func (c *Catalog) Warm() {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		c.List(ctx, true)
+	}()
+}
+
+func (c *Catalog) info(ctx context.Context, a app, wait bool) agentproto.AppInfo {
+	info := a.info
+	info.Installed = a.installed()
+	if info.Installed == nil {
+		info.Installed = []string{}
+	}
+	info.Available, info.Error = c.availableFor(ctx, a, wait)
+	c.mu.Lock()
+	checked := c.cache[a.info.ID]
+	c.mu.Unlock()
+	if !checked.at.IsZero() {
+		info.CheckedAt = checked.at.UTC().Format(time.RFC3339)
+	}
+	info.Source = appSource(a.info.ID)
+	switch a.info.ID {
+	case "php":
+		info.VersionLabels, info.InstalledLabels, info.Updates = phpLabels(ctx, info.Available, info.Installed)
+	case "nodejs":
+		info.VersionLabels, info.InstalledLabels, info.Updates = nodeLabels(info.Available, info.Installed)
+	}
+	return info
+}
+
+// availableFor serves a cached version list, refreshing a stale one in the
+// background unless wait is set. Only a missing list is fetched inline.
+func (c *Catalog) availableFor(ctx context.Context, a app, wait bool) ([]string, string) {
+	c.mu.Lock()
+	hit, ok := c.cache[a.info.ID]
+	c.mu.Unlock()
+	if ok && !wait && (hit.expired || time.Since(hit.at) >= cacheTTL) {
+		c.refreshBackground(a)
+		return hit.versions, ""
+	}
+	return c.availableCached(ctx, a)
+}
+
+func (c *Catalog) refreshBackground(a app) {
+	c.mu.Lock()
+	if c.refreshing[a.info.ID] {
+		c.mu.Unlock()
+		return
+	}
+	c.refreshing[a.info.ID] = true
+	c.mu.Unlock()
+	go func() {
+		defer func() {
+			c.mu.Lock()
+			delete(c.refreshing, a.info.ID)
+			c.mu.Unlock()
+		}()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		c.availableCached(ctx, a)
+	}()
+}
+
+// phpLabels pairs each PHP line with its APT candidate and installed package
+// version; a line is updatable when the candidate is newer than what is installed.
+func phpLabels(ctx context.Context, available, installed []string) (labels, installedLabels, updates map[string]string) {
+	labels, installedLabels, updates = map[string]string{}, map[string]string{}, map[string]string{}
+	candidates := map[string]string{}
+	for _, v := range slices.Concat(available, installed) {
+		if _, done := candidates[v]; done {
+			continue
+		}
+		candidate, _ := aptPolicy(ctx, "php"+v+"-fpm") // index refresh happens with the version list
+
+		candidates[v] = candidate
+		if candidate != "" && slices.Contains(available, v) {
+			labels[v] = v + " → " + candidate
+		}
+	}
+	for _, v := range installed {
+		cur := aptInstalled("php" + v + "-fpm")
+		if len(cur) == 0 {
+			continue
+		}
+		installedLabels[v] = cur[0]
+		if c := candidates[v]; c != "" && slices.Contains(available, v) && debNewer(c, cur[0]) {
+			updates[v] = c
+		}
+	}
+	return labels, installedLabels, updates
+}
+
+// nodeLabels pairs each Node.js major line with its newest release and the
+// release installed in /opt/xpanel/node/<major>.
+func nodeLabels(available, installed []string) (labels, installedLabels, updates map[string]string) {
+	labels, installedLabels, updates = map[string]string{}, map[string]string{}, map[string]string{}
+	latest := nodeLatestVersions()
+	for _, m := range available {
+		if v := latest[m]; v != "" {
+			labels[m] = m + " → " + v
+		}
+	}
+	for _, m := range installed {
+		cur := nodeInstalledVersion(m)
+		if cur == "" {
+			continue
+		}
+		installedLabels[m] = cur
+		if v := latest[m]; v != "" && slices.Contains(available, m) && compareVersions(v, cur) > 0 {
+			updates[m] = v
+		}
+	}
+	return labels, installedLabels, updates
+}
+
+// debNewer reports whether Debian version a sorts after b.
+func debNewer(a, b string) bool {
+	if a == b {
+		return false
+	}
+	_, err := run.Output(context.Background(), "dpkg", "--compare-versions", a, "gt", b)
+	return err == nil
 }
 
 func (c *Catalog) availableCached(ctx context.Context, a app) ([]string, string) {
 	c.mu.Lock()
 	hit, ok := c.cache[a.info.ID]
 	c.mu.Unlock()
-	if ok && !hit.expired && time.Since(hit.at) < 5*time.Minute && hit.err == nil {
+	if ok && !hit.expired && time.Since(hit.at) < cacheTTL && hit.err == nil {
 		return hit.versions, ""
 	}
 	lctx, cancel := context.WithTimeout(ctx, 15*time.Second)

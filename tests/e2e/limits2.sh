@@ -46,7 +46,7 @@ expect "$(psqlx "SELECT count(*) FROM totp_recovery_codes WHERE user_id=$U")" 0 
 
 echo "### mailboxes count in the package's disk space"
 if c admin GET /mail/status >/dev/null && [ "$(jq -r .installed /tmp/out)" = true ]; then
-  c cust POST /mail/domains '{"domain":"l2mail.example.com"}' >/dev/null; MD=$(jq .id /tmp/out)
+  c admin POST /mail/domains "{\"user_id\":$U,\"domain\":\"l2mail.example.com\"}" >/dev/null; MD=$(jq .id /tmp/out)
   expect "$(c cust POST /mail/domains/$MD/mailboxes '{"local_part":"a","password":"MailPass12345","quota_mb":0}')" 400 "unlimited mailbox refused on a limited package"
   expect "$(c cust POST /mail/domains/$MD/mailboxes '{"local_part":"a","password":"MailPass12345","quota_mb":300}')" 201 "300 MB mailbox"
   A=$(jq .id /tmp/out)

@@ -339,6 +339,10 @@ type AppInfo struct {
 	Source          string            `json:"source,omitempty"`
 	VersionLabels   map[string]string `json:"version_labels,omitempty"`
 	InstalledLabels map[string]string `json:"installed_labels,omitempty"`
+	// Updates maps an installed version line to the newer patch release that
+	// installing it again would bring ("8.3" → "8.3.27-1+0~…"). Lines that are
+	// already on the newest patch are absent.
+	Updates map[string]string `json:"updates,omitempty"`
 }
 
 type AppListParams struct {
@@ -475,6 +479,33 @@ type BackupDB struct {
 	Name   string `json:"name"`
 	Engine string `json:"engine"` // mariadb | postgresql
 	User   string `json:"user"`   // owning database user
+}
+
+// Per-database dumps kept in the account's home (~/backups/databases), so
+// the customer can download them or upload one to restore.
+const (
+	ActionDBDumpCreate  = "db.dump.create"  // DBDumpParams -> DBDumpFile
+	ActionDBDumpList    = "db.dump.list"    // DBDumpParams -> DBDumpList
+	ActionDBDumpRestore = "db.dump.restore" // DBDumpParams (File) -> TaskLog
+	ActionDBDumpDelete  = "db.dump.delete"  // DBDumpParams (File)
+)
+
+type DBDumpParams struct {
+	Username string   `json:"username"`
+	DB       BackupDB `json:"db"`
+	File     string   `json:"file,omitempty"` // base name inside ~/backups/databases
+}
+
+type DBDumpFile struct {
+	Name     string `json:"name"`
+	Path     string `json:"path"` // relative to the account's home, for the file manager
+	Size     int64  `json:"size"`
+	Modified string `json:"modified"` // RFC 3339
+}
+
+type DBDumpList struct {
+	Dir   string       `json:"dir"`
+	Files []DBDumpFile `json:"files"`
 }
 
 // BackupCreateParams: archive one account (home, databases, mail), encrypt

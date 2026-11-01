@@ -333,48 +333,44 @@ export function ServerDashboard() {
         </div>
       ) : (
         <>
-          <section className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 p-6 text-white sm:p-7">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -right-12 -top-32 size-96 rounded-full bg-emerald-400/10 blur-3xl"
-            />
+          <section className="card relative overflow-hidden p-6 sm:p-7">
             <div className="relative flex flex-wrap items-start justify-between gap-6">
               <div className="flex min-w-0 items-center gap-4">
-                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/5">
+                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border bg-muted/50">
                   <Server
-                    className="size-6 text-emerald-300"
+                    className="size-6 text-foreground"
                     strokeWidth={1.5}
                   />
                 </div>
                 <div className="min-w-0">
-                  <p className="mb-1 text-[10px] font-medium uppercase tracking-[.18em] text-neutral-400">
+                  <p className="mb-1 text-[10px] font-medium uppercase tracking-[.18em] text-muted-foreground">
                     {translate("Máy chủ của bạn")}
                   </p>
                   <h2 className="break-all text-xl font-semibold tracking-tight sm:text-2xl">
                     {info.hostname || "—"}
                   </h2>
-                  <p className="mt-1.5 text-xs text-neutral-400">
+                  <p className="mt-1.5 text-xs text-muted-foreground">
                     {info.os_name} · {info.architecture} · {info.cpu_count} vCPU
                   </p>
                 </div>
               </div>
               <span
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] ${error ? "border-amber-400/30 bg-amber-400/10 text-amber-200" : "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"}`}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] ${error ? "border-amber-200 bg-amber-50 text-amber-800" : "bg-muted/50 text-foreground"}`}
               >
                 <span
-                  className={`size-1.5 rounded-full ${error ? "bg-amber-300" : "bg-emerald-300"}`}
+                  className={`size-1.5 rounded-full ${error ? "bg-amber-500" : "bg-emerald-500"}`}
                 />
                 {translate(error ? "Dữ liệu chưa cập nhật" : "Đã kết nối")}
               </span>
             </div>
-            <div className="relative mt-6 grid gap-5 border-t border-white/10 pt-5 sm:grid-cols-3">
+            <div className="relative mt-6 grid gap-5 border-t pt-5 sm:grid-cols-3">
               {[
                 ["Hệ điều hành", info.os_name],
                 ["Thời gian hoạt động", uptime(info.uptime_sec)],
                 ["Khởi động gần nhất", bootTime],
               ].map(([label, value]) => (
                 <div key={label}>
-                  <p className="text-[10px] text-neutral-400">
+                  <p className="text-[10px] text-muted-foreground">
                     {translate(label)}
                   </p>
                   <p className="mt-1.5 text-xs font-medium">{value}</p>
@@ -624,7 +620,7 @@ export function ServerDashboard() {
                     fmtMB(info.disk_available_mb),
                   ],
                   [
-                    "Disk quota",
+                    translate("Hạn mức ổ đĩa"),
                     translate(info.quota_enabled ? "Đang bật" : "Chưa bật"),
                   ],
                   [translate("Phân vùng quota"), info.quota_mount || "—"],

@@ -61,7 +61,7 @@ export default function LoginPage() {
           </div>
           <span className="font-semibold tracking-tight">X-Panel</span>
           <span className="ml-1 rounded-full border border-white/20 px-2 py-0.5 text-[10px] text-neutral-400">
-            Hosting workspace
+            {translate("Bảng điều khiển hosting")}
           </span>
         </div>
         <div className="relative z-10 max-w-md py-16">
@@ -69,7 +69,7 @@ export default function LoginPage() {
             <Server className="size-7" strokeWidth={1.3} />
           </div>
           <p className="mb-4 text-xs tracking-[0.2em] text-neutral-500 uppercase">
-            Built for your infrastructure
+            {translate("Xây dựng cho hạ tầng của bạn")}
           </p>
           <h2 className="text-4xl font-medium leading-tight tracking-tight xl:text-5xl">
             {translate("Một workspace.")} <br />
@@ -96,7 +96,7 @@ export default function LoginPage() {
           </div>
         </div>
         <p className="text-[10px] text-neutral-500">
-          X-Panel · Your hosting, under control.
+          X-Panel · {translate("Hosting của bạn, trong tầm kiểm soát.")}
         </p>
         <div
           aria-hidden="true"
@@ -209,7 +209,11 @@ export default function LoginPage() {
                     setCode("");
                   }}
                 >
-                  {translate(recovery ? "Dùng mã 6 số từ ứng dụng" : "Mất điện thoại? Dùng mã dự phòng")}
+                  {translate(
+                    recovery
+                      ? "Dùng mã 6 số từ ứng dụng"
+                      : "Mất điện thoại? Dùng mã dự phòng",
+                  )}
                 </button>
               </div>
             )}

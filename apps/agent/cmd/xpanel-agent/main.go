@@ -306,11 +306,12 @@ func main() {
 	srv.Register(agentproto.ActionSiteRestart, server.Typed(siteapp.Restart))
 	srv.Register(agentproto.ActionSiteBuild, server.Typed(func(ctx context.Context, p agentproto.SiteAppParams) (any, error) { return siteapp.Build(ctx, d, p) }))
 	catalog := apps.New(d)
+	catalog.Warm()
 	srv.Register(agentproto.ActionAppsList, server.Typed(func(ctx context.Context, p agentproto.AppListParams) (any, error) {
 		if p.Refresh {
 			catalog.Refresh()
 		}
-		return agentproto.AppList{Apps: catalog.List(ctx)}, nil
+		return agentproto.AppList{Apps: catalog.List(ctx, p.Refresh)}, nil
 	}))
 	srv.Register(agentproto.ActionAppsInstall, server.Typed(func(ctx context.Context, p agentproto.AppInstallParams) (any, error) {
 		out, err := catalog.Install(ctx, p.ID, p.Version)
@@ -343,6 +344,18 @@ func main() {
 	})
 	srv.Register(agentproto.ActionPanelSSLIssue, server.Typed(func(ctx context.Context, p agentproto.PanelSSLParams) (any, error) {
 		return issuer.IssuePanel(ctx, p)
+	}))
+	srv.Register(agentproto.ActionDBDumpCreate, server.Typed(func(ctx context.Context, p agentproto.DBDumpParams) (any, error) {
+		return backup.CreateDBDump(ctx, p)
+	}))
+	srv.Register(agentproto.ActionDBDumpList, server.Typed(func(ctx context.Context, p agentproto.DBDumpParams) (any, error) {
+		return backup.ListDBDumps(ctx, p)
+	}))
+	srv.Register(agentproto.ActionDBDumpRestore, server.Typed(func(ctx context.Context, p agentproto.DBDumpParams) (any, error) {
+		return backup.RestoreDBDump(ctx, p)
+	}))
+	srv.Register(agentproto.ActionDBDumpDelete, server.Typed(func(ctx context.Context, p agentproto.DBDumpParams) (any, error) {
+		return nil, backup.DeleteDBDump(ctx, p)
 	}))
 	srv.Register(agentproto.ActionBackupCreate, server.Typed(func(ctx context.Context, p agentproto.BackupCreateParams) (any, error) {
 		return backup.Create(ctx, p)

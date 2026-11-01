@@ -171,8 +171,20 @@ func Sync(ctx context.Context, p agentproto.CronSyncParams) error {
 	// Jobs from earlier versions lived in the account's crontab.
 	_ = run.Cmd(ctx, "crontab", "-u", p.Username, "-r")
 
+	// Job scripts often carry secrets (tokens, DB passwords): only root and the
+	// account itself may read them, never the other hosting accounts.
+	gid, err := strconv.Atoi(u.Gid)
+	if err != nil {
+		return err
+	}
 	dir := filepath.Join(StateRoot, p.Username)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return err
+	}
+	if err := os.Chown(dir, 0, gid); err != nil {
+		return err
+	}
+	if err := os.Chmod(dir, 0o750); err != nil {
 		return err
 	}
 	want := map[string]bool{}
@@ -190,7 +202,13 @@ func Sync(ctx context.Context, p agentproto.CronSyncParams) error {
 		name := unitName(p.Username, i, j)
 		want[name] = true
 		script := filepath.Join(dir, name+".sh")
-		if err := os.WriteFile(script, []byte("#!/bin/sh\n"+j.Command+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(script, []byte("#!/bin/sh\n"+j.Command+"\n"), 0o640); err != nil {
+			return err
+		}
+		if err := os.Chown(script, 0, gid); err != nil {
+			return err
+		}
+		if err := os.Chmod(script, 0o640); err != nil {
 			return err
 		}
 		service := fmt.Sprintf(`# Managed by X-Panel: cron job of %[1]s.

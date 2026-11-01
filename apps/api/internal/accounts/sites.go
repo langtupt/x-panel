@@ -62,6 +62,8 @@ func (s *Service) RegisterTasks(q *tasks.Queue) {
 	q.Handle(TaskPHPInstall, s.runPHPInstall)
 	q.Handle("php.manage", s.runPHPManage)
 	q.Handle(TaskPMAInstall, s.runPMAInstall)
+	q.Handle(TaskDBDump, s.runDBDump)
+	q.Handle(TaskDBRestore, s.runDBRestore)
 }
 
 // syncWeb pushes the account's complete site list to the agent. Run it

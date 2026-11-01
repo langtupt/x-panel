@@ -266,10 +266,19 @@ export interface PHPList {
 export const taskLabel: Record<string, string> = {
   "site.build": "Build website",
   "app.install": "Cài ứng dụng",
+  "app.remove": "Gỡ ứng dụng",
   "ssl.issue": "Cấp SSL",
+  "panel.ssl": "SSL cho panel",
   "php.install": "Cài PHP",
   "php.manage": "Quản lý PHP",
   "pma.install": "Cài phpMyAdmin",
+  "backup.create": "Tạo bản sao lưu",
+  "backup.restore": "Khôi phục sao lưu",
+  "db.backup": "Sao lưu database",
+  "db.restore": "Khôi phục database",
+  "malware.install": "Cài ClamAV",
+  "malware.clamd": "Bật/tắt clamd",
+  "malware.scan": "Quét mã độc",
 };
 
 export const isOpen = (t: Task) =>
@@ -375,6 +384,8 @@ export interface AppInfo {
   source?: string;
   version_labels?: Record<string, string>;
   installed_labels?: Record<string, string>;
+  /** installed line → newer patch release available for it */
+  updates?: Record<string, string>;
   error?: string;
 }
 

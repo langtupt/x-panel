@@ -73,6 +73,12 @@ func aptCandidate(ctx context.Context, pkg string) (string, error) {
 	if err := refreshAptIndex(ctx); err != nil {
 		return "", fmt.Errorf("không cập nhật được chỉ mục APT: %w", err)
 	}
+	return aptPolicy(ctx, pkg)
+}
+
+// aptPolicy reads a package's candidate from the current APT index without
+// refreshing it.
+func aptPolicy(ctx context.Context, pkg string) (string, error) {
 	text, err := run.Output(ctx, "apt-cache", "policy", pkg)
 	if err != nil {
 		return "", err

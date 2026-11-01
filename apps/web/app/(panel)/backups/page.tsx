@@ -552,7 +552,7 @@ export default function BackupsPage() {
               onClick={backupNow}
               disabled={manager && !ownerId}
             >
-              Backup ngay
+              {translate("Sao lưu ngay")}
             </button>
           </div>
         </div>

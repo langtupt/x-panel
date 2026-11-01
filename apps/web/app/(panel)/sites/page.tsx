@@ -6,6 +6,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   api,
   errMsg,
+  isOpen,
   type PHPList,
   type Site,
   type SiteResult,
@@ -14,7 +15,7 @@ import {
   type User,
 } from "@/lib/api";
 import { useTask } from "@/lib/useTask";
-import { ErrorBox, Modal } from "@/components/ui";
+import { CopyButton, ErrorBox, Modal } from "@/components/ui";
 import { TaskCard } from "@/components/task";
 import { SitePHP } from "@/components/site-php";
 import { useSession } from "../session";
@@ -57,10 +58,13 @@ const DEPLOY_HINT: Record<string, string> = {
 // What a plain restart (no build) picks up, per application type.
 const RESTART_HINT: Record<string, string> = {
   php: "Khởi động lại PHP-FPM của website (xóa OPcache, nạp lại biến môi trường)",
-  laravel: "Khởi động lại PHP-FPM (xóa OPcache). Đổi .env hoặc config: dùng Build & restart để tạo lại cache",
-  nodejs: "Khởi động lại ứng dụng để chạy mã mới (không cài lại package). Đổi package.json: dùng Build & restart",
-  nextjs: "Khởi động lại ứng dụng với bản build hiện có. Mã mới cần Build & restart",
-  go: "Khởi động lại ứng dụng với bản build hiện có. Mã mới cần Build & restart",
+  laravel:
+    "Khởi động lại PHP-FPM (xóa OPcache). Đổi .env hoặc config: dùng Build & khởi động lại để tạo lại cache",
+  nodejs:
+    "Khởi động lại ứng dụng để chạy mã mới (không cài lại package). Đổi package.json: dùng Build & khởi động lại",
+  nextjs:
+    "Khởi động lại ứng dụng với bản build hiện có. Mã mới cần Build & khởi động lại",
+  go: "Khởi động lại ứng dụng với bản build hiện có. Mã mới cần Build & khởi động lại",
 };
 
 function SiteForm({
@@ -312,13 +316,15 @@ function SiteForm({
           onChange={(e) => setF({ ...f, envText: e.target.value })}
         />
         <p className="text-xs text-slate-500">
-          {translate("Lưu cấu hình rồi Build & restart để áp dụng.")}
+          {translate("Lưu cấu hình rồi Build & khởi động lại để áp dụng.")}
         </p>
       </div>
       {f.app_type !== "html" && (
         <div>
           <label className="label">
-            {translate("Lệnh triển khai (chạy sau mỗi lần Build, dưới quyền tài khoản)")}
+            {translate(
+              "Lệnh triển khai (chạy sau mỗi lần Build, dưới quyền tài khoản)",
+            )}
           </label>
           <textarea
             className="input font-mono"
@@ -328,7 +334,9 @@ function SiteForm({
             onChange={(e) => setF({ ...f, deploy: e.target.value })}
           />
           <p className="text-xs text-slate-500">
-            {translate("Ví dụ chạy migration, build tài nguyên. Lệnh php / composer dùng đúng phiên bản PHP của website; lệnh lỗi sẽ dừng Build.")}
+            {translate(
+              "Ví dụ chạy migration, build tài nguyên. Lệnh php / composer dùng đúng phiên bản PHP của website; lệnh lỗi sẽ dừng Build.",
+            )}
           </p>
         </div>
       )}
@@ -412,7 +420,7 @@ function SSLCell({
   );
 }
 
-function SiteTask({ task, onDone }: { task: Task; onDone: () => void }) {
+function SiteTask({ task, onDone }: { task: Task; onDone: (t: Task) => void }) {
   const t = useTask(task, onDone);
   if (!t) return null;
   return <TaskCard task={t} defaultOpen={t.status === "failed"} />;
@@ -471,7 +479,7 @@ export default function SitesPage() {
     setRestarting(s.id);
     try {
       await api(`/sites/${s.id}/restart`, { method: "POST" });
-      setDone(translate("Đã restart {0}", [s.domain]));
+      setDone(translate("Đã khởi động lại {0}", [s.domain]));
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -510,20 +518,21 @@ export default function SitesPage() {
     setDeleting(null);
   }
 
+  // The finished task replaces the stored one: a successful task disappears,
+  // a failed one stays visible (with its log) but no longer blocks the
+  // site's buttons.
   const taskDone = useCallback(
-    (siteId: number) => () => {
+    (siteId: number) => (final: Task) => {
       load();
-      setTimeout(
-        () =>
-          setTasks((t) => {
-            const { [siteId]: _, ...rest } = t;
-            return t[siteId]?.status === "done" ? rest : t;
-          }),
-        0,
-      );
+      setTasks((t) => {
+        if (t[siteId]?.id !== final.id) return t;
+        const { [siteId]: _, ...rest } = t;
+        return final.status === "done" ? rest : { ...rest, [siteId]: final };
+      });
     },
     [load],
   );
+  const busy = (id: number) => !!tasks[id] && isOpen(tasks[id]);
 
   return (
     <div className="space-y-6">
@@ -628,7 +637,7 @@ export default function SitesPage() {
                 <td className="px-4 py-3">
                   <SSLCell
                     site={s}
-                    task={tasks[s.id] ?? null}
+                    task={busy(s.id) ? tasks[s.id] : null}
                     onIssue={() => issueSSL(s)}
                     onDisable={() => disableSSL(s)}
                   />
@@ -645,7 +654,7 @@ export default function SitesPage() {
                     )}
                     <button
                       className="btn-ghost px-2.5 py-1 text-xs"
-                      disabled={!!tasks[s.id]}
+                      disabled={busy(s.id)}
                       onClick={async () => {
                         try {
                           const t = await api<Task>(`/sites/${s.id}/build`, {
@@ -657,16 +666,18 @@ export default function SitesPage() {
                         }
                       }}
                     >
-                      Build &amp; restart
+                      {translate("Build & khởi động lại")}
                     </button>
                     {s.app_type && s.app_type !== "html" && (
                       <button
                         className="btn-ghost px-2.5 py-1 text-xs"
-                        disabled={restarting === s.id || !!tasks[s.id]}
+                        disabled={restarting === s.id || busy(s.id)}
                         title={translate(RESTART_HINT[s.app_type] ?? "")}
                         onClick={() => restart(s)}
                       >
-                        {restarting === s.id ? translate("Đang restart…") : "Restart"}
+                        {restarting === s.id
+                          ? translate("Đang khởi động lại…")
+                          : translate("Khởi động lại")}
                       </button>
                     )}
                     <button
@@ -682,7 +693,7 @@ export default function SitesPage() {
                         }
                       }}
                     >
-                      Logs
+                      {translate("Nhật ký")}
                     </button>
                     <button
                       className="btn-ghost px-2.5 py-1 text-xs"
@@ -724,10 +735,13 @@ export default function SitesPage() {
       {logs && (
         <Modal
           size="large"
-          title={translate(`Logs ${logs.domain}`)}
+          title={translate("Nhật ký {0}", [logs.domain])}
           onClose={() => setLogs(null)}
         >
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap text-xs">
+          <div className="mb-2 flex justify-end">
+            <CopyButton text={logs.log} />
+          </div>
+          <pre className="max-h-[60dvh] overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-muted/40 p-3 font-mono text-xs leading-5">
             {logs.log || translate("Chưa có nhật ký")}
           </pre>
         </Modal>
