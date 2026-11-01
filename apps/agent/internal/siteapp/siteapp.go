@@ -416,8 +416,15 @@ func Build(ctx context.Context, d distro.Distro, p agentproto.SiteAppParams) (an
 	if werr != nil {
 		return nil, werr
 	}
-	args = append(args, "--property=EnvironmentFile="+envFile.Name(), "/bin/sh", "-c", script)
+	// A named unit so a cancelled build can be stopped: killing systemd-run
+	// alone would leave the build running.
+	unit := fmt.Sprintf("xpanel-build-%s-%d", p.Username, time.Now().UnixNano())
+	args = append(args, "--unit="+unit, "--property=EnvironmentFile="+envFile.Name(), "/bin/sh", "-c", script)
 	out, err := run.With(ctx, run.Opts{Timeout: 30 * time.Minute}, "systemd-run", args...)
+	if ctx.Err() != nil {
+		_ = run.Cmd(context.WithoutCancel(ctx), "systemctl", "stop", unit+".service")
+		return nil, fmt.Errorf("build đã bị hủy")
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w\n%s", err, out)
 	}

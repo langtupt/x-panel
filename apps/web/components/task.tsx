@@ -1,9 +1,109 @@
 "use client";
 import { t as translate } from "@/lib/i18n";
 
-import { useState } from "react";
-import { taskLabel, type Task, type TaskStatus } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { Ban, Loader2 } from "lucide-react";
+import {
+  canCancel,
+  cancelTask,
+  errMsg,
+  taskLabel,
+  type Task,
+  type TaskStatus,
+} from "@/lib/api";
 import { CopyButton } from "@/components/ui";
+
+/**
+ * Stop button for a running task or upload. The first click asks for
+ * confirmation (an accidental click must not kill a build); errors show in
+ * the tooltip and next to the button.
+ */
+export function CancelButton({
+  onCancel,
+  compact = false,
+  tone = "light",
+}: {
+  onCancel: () => Promise<void> | void;
+  compact?: boolean;
+  tone?: "light" | "dark";
+}) {
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!confirm) return;
+    const id = setTimeout(() => setConfirm(false), 4000);
+    return () => clearTimeout(id);
+  }, [confirm]);
+  const base =
+    tone === "dark"
+      ? "text-neutral-300 hover:bg-white/10 hover:text-white"
+      : "text-muted-foreground hover:bg-red-50 hover:text-red-700";
+  return (
+    <span className="inline-flex items-center gap-1">
+      {error && !compact && (
+        <span className="max-w-48 truncate text-[11px] text-destructive">
+          {error}
+        </span>
+      )}
+      <button
+        type="button"
+        disabled={busy}
+        title={
+          error || translate(confirm ? "Bấm lần nữa để hủy" : "Hủy tác vụ")
+        }
+        aria-label={translate("Hủy tác vụ")}
+        onClick={async (e) => {
+          e.stopPropagation();
+          if (!confirm) return setConfirm(true);
+          setBusy(true);
+          setError("");
+          try {
+            await onCancel();
+          } catch (err) {
+            setError(errMsg(err));
+          } finally {
+            setBusy(false);
+            setConfirm(false);
+          }
+        }}
+        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50 ${confirm ? "bg-red-600 text-white hover:bg-red-700" : base}`}
+      >
+        {busy ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Ban className="size-3.5" />
+        )}
+        {confirm ? translate("Hủy?") : !compact && translate("Hủy")}
+      </button>
+    </span>
+  );
+}
+
+/** CancelButton for a server task (shown only when it can be cancelled). */
+export function CancelTaskButton({
+  task,
+  compact,
+  tone,
+  onCancelled,
+}: {
+  task: Task;
+  compact?: boolean;
+  tone?: "light" | "dark";
+  onCancelled?: () => void;
+}) {
+  if (!canCancel(task)) return null;
+  return (
+    <CancelButton
+      compact={compact}
+      tone={tone}
+      onCancel={async () => {
+        await cancelTask(task.id);
+        onCancelled?.();
+      }}
+    />
+  );
+}
 
 const statusStyle: Record<TaskStatus, { label: string; cls: string }> = {
   pending: { label: "Đang chờ", cls: "bg-slate-100 text-slate-600" },
@@ -61,7 +161,10 @@ export function TaskCard({
         </pre>
       )}
       <div className="flex items-center justify-between gap-2 border-t px-2 py-1">
-        <CopyButton text={task.log} />
+        <span className="flex items-center gap-1">
+          <CopyButton text={task.log} />
+          <CancelTaskButton task={task} />
+        </span>
         <button
           className="text-[11px] text-muted-foreground hover:text-foreground"
           onClick={() =>

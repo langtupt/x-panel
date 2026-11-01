@@ -120,6 +120,7 @@ func (s *Server) Handler() http.Handler {
 			r.Get("/php", s.handleListPHP)
 			r.Get("/tasks", s.handleListTasks)
 			r.Get("/tasks/{id}", s.handleGetTask)
+			r.Post("/tasks/{id}/cancel", s.handleCancelTask)
 			r.Get("/databases", s.handleListDatabases)
 			r.Post("/databases", s.handleCreateDatabase)
 			r.Patch("/databases/{id}/password", s.handleDatabasePassword)

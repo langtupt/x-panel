@@ -50,8 +50,10 @@ func (s *Service) InstallApp(ctx context.Context, actor *users.User, p agentprot
 	if !slices.Contains(a.Available, p.Version) {
 		return nil, apperr.Invalid("phiên bản %q của %s không có trong danh sách", p.Version, a.Name)
 	}
-	if a.MultiVersion && slices.Contains(a.Installed, p.Version) {
-		return nil, apperr.Conflict("%s %s đã được cài", a.Name, p.Version)
+	// Installing an installed line again is how a patch update is applied;
+	// refuse it only when that line is already on the newest patch.
+	if a.MultiVersion && slices.Contains(a.Installed, p.Version) && a.Updates[p.Version] == "" {
+		return nil, apperr.Conflict("%s %s đã là bản vá mới nhất", a.Name, p.Version)
 	}
 	target := strings.TrimSuffix(a.Name+" "+p.Version, " latest")
 	if open, err := s.tasks.HasOpen(ctx, TaskAppInstall, target); err != nil {

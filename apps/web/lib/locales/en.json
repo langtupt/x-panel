@@ -967,5 +967,20 @@
   "Ẩn mục đã xong": "Hide finished",
   "Tất cả tác vụ →": "All tasks →",
   "{0} tác vụ thất bại": "{0} task(s) failed",
-  "Đã hoàn tất": "Done"
+  "Đã hoàn tất": "Done",
+  "Xác nhận cập nhật": "Confirm update",
+  "Phiên bản đang cài sẽ được nâng lên bản vá mới nhất (cả các extension của dòng này). Website đang chạy được khởi động lại dịch vụ, cấu hình được giữ nguyên.": "The installed version is upgraded to the newest patch (including its extensions). Running websites get their service restarted; configuration is kept.",
+  "Bấm lần nữa để hủy": "Click again to cancel",
+  "Hủy tác vụ": "Cancel task",
+  "Hủy?": "Cancel?",
+  "Đã hủy tải lên {0}": "Upload of {0} cancelled",
+  "Phiên bản panel": "Panel version",
+  "Đang dùng": "Current",
+  "Có bản mới": "Update available",
+  "Bản cài được kiểm tra SHA-256. Nếu cập nhật lỗi, panel giữ nguyên bản đang chạy.": "Release files are verified with SHA-256. If an update fails, the running version is kept.",
+  "Nhật ký cập nhật": "Update log",
+  "Có gì mới trong {0}": "What's new in {0}",
+  "Cập nhật X-Panel lên {0}?": "Update X-Panel to {0}?",
+  "Panel sẽ khởi động lại trong vài phút; website và email vẫn chạy.": "The panel restarts for a few minutes; websites and email keep running.",
+  "Cập nhật ngay": "Update now"
 }

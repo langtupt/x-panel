@@ -297,6 +297,10 @@ export default function ApplicationsPage() {
       setSending(false);
     }
   }
+  const patching =
+    !!selection &&
+    !selection.remove &&
+    selection.app.installed.includes(selection.version);
   const visible = apps.filter(
     (a) =>
       (category === "all" || a.category === category) &&
@@ -446,11 +450,11 @@ export default function ApplicationsPage() {
               <Download className="size-5" />
             </div>
             <DialogTitle>
-              {translate(
-                selection?.remove
-                  ? translate("Gỡ cài đặt")
-                  : translate("Cài đặt"),
-              )}{" "}
+              {selection?.remove
+                ? translate("Gỡ cài đặt")
+                : patching
+                  ? translate("Cập nhật bản vá")
+                  : translate("Cài đặt")}{" "}
               {translate(selection?.app.name)}?
             </DialogTitle>
             <DialogDescription>
@@ -459,9 +463,13 @@ export default function ApplicationsPage() {
                   ? translate(
                       "Phiên bản đã chọn sẽ được gỡ khỏi máy chủ. Website đang sử dụng phiên bản này phải được chuyển sang phiên bản khác trước.",
                     )
-                  : translate(
-                      "Ứng dụng sẽ được cài trên máy chủ. Bạn có thể theo dõi trạng thái và nhật ký trong popup tác vụ.",
-                    ),
+                  : patching
+                    ? translate(
+                        "Phiên bản đang cài sẽ được nâng lên bản vá mới nhất (cả các extension của dòng này). Website đang chạy được khởi động lại dịch vụ, cấu hình được giữ nguyên.",
+                      )
+                    : translate(
+                        "Ứng dụng sẽ được cài trên máy chủ. Bạn có thể theo dõi trạng thái và nhật ký trong popup tác vụ.",
+                      ),
               )}
             </DialogDescription>
           </DialogHeader>
@@ -490,11 +498,11 @@ export default function ApplicationsPage() {
               onClick={install}
             >
               <Download />
-              {translate(
-                selection?.remove
-                  ? translate("Xác nhận gỡ cài đặt")
-                  : translate("Xác nhận cài đặt"),
-              )}
+              {selection?.remove
+                ? translate("Xác nhận gỡ cài đặt")
+                : patching
+                  ? translate("Xác nhận cập nhật")
+                  : translate("Xác nhận cài đặt")}
             </Button>
           </div>
         </DialogContent>

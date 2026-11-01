@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -40,10 +42,15 @@ type Queue struct {
 	log      *slog.Logger
 	handlers map[string]Handler
 	wake     chan struct{}
+
+	mu      sync.Mutex
+	running map[int64]context.CancelFunc // tasks executing in this process
+	stopped map[int64]bool               // cancelled by a user
 }
 
 func NewQueue(pool *pgxpool.Pool, log *slog.Logger) *Queue {
-	return &Queue{pool: pool, log: log, handlers: map[string]Handler{}, wake: make(chan struct{}, 1)}
+	return &Queue{pool: pool, log: log, handlers: map[string]Handler{}, wake: make(chan struct{}, 1),
+		running: map[int64]context.CancelFunc{}, stopped: map[int64]bool{}}
 }
 
 func (q *Queue) Handle(typ string, h Handler) { q.handlers[typ] = h }
@@ -163,7 +170,51 @@ func (q *Queue) claim(ctx context.Context) (*Task, error) {
 		RETURNING `+cols))
 }
 
-func (q *Queue) execute(ctx context.Context, t *Task) {
+// Interruptible lists task types that may be stopped while running. The
+// others (apt installs and removals, PHP management…) can only be cancelled
+// before they start: killing dpkg half way leaves the system broken.
+var Interruptible = []string{"site.build", "backup.create", "malware.scan", "ssl.issue", "db.backup", "db.restore"}
+
+// ErrNotCancellable is returned for a task that has finished or must not be
+// interrupted.
+var ErrNotCancellable = errors.New("task cannot be cancelled")
+
+// Cancel stops a pending task, or a running one of an interruptible type.
+func (q *Queue) Cancel(ctx context.Context, t *Task) error {
+	tag, err := q.pool.Exec(ctx, `UPDATE tasks SET status='failed', finished_at=now(),
+		log = log || $2 WHERE id=$1 AND status='pending'`, t.ID, time.Now().Format("15:04:05")+" Đã hủy trước khi chạy.\n")
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 1 {
+		return nil
+	}
+	if !slices.Contains(Interruptible, t.Type) {
+		return ErrNotCancellable
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	cancel, ok := q.running[t.ID]
+	if !ok {
+		return ErrNotCancellable
+	}
+	q.stopped[t.ID] = true
+	cancel()
+	return nil
+}
+
+func (q *Queue) execute(parent context.Context, t *Task) {
+	ctx, cancel := context.WithCancel(parent)
+	q.mu.Lock()
+	q.running[t.ID] = cancel
+	q.mu.Unlock()
+	defer func() {
+		cancel()
+		q.mu.Lock()
+		delete(q.running, t.ID)
+		delete(q.stopped, t.ID)
+		q.mu.Unlock()
+	}()
 	logf := func(format string, args ...any) {
 		line := time.Now().Format("15:04:05") + " " + fmt.Sprintf(format, args...) + "\n"
 		if _, err := q.pool.Exec(context.WithoutCancel(ctx), `UPDATE tasks SET log = log || $2 WHERE id=$1`, t.ID, line); err != nil {
@@ -179,7 +230,13 @@ func (q *Queue) execute(ctx context.Context, t *Task) {
 		}()
 		return q.handlers[t.Type](ctx, t, logf)
 	}()
-	if err != nil {
+	q.mu.Lock()
+	stopped := q.stopped[t.ID]
+	q.mu.Unlock()
+	if stopped {
+		status = "failed"
+		logf("Đã hủy bởi người dùng.")
+	} else if err != nil {
 		status = "failed"
 		logf("LỖI: %v", err)
 		q.log.Warn("task failed", "task", t.ID, "type", t.Type, "err", err)

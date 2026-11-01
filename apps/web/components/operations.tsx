@@ -3,7 +3,16 @@ import { t as translate } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, isOpen, taskLabel, type Task } from "@/lib/api";
+import {
+  abortOperation,
+  api,
+  canAbort,
+  canCancel,
+  cancelTask,
+  isOpen,
+  taskLabel,
+  type Task,
+} from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +32,7 @@ import {
   Terminal,
   X,
 } from "lucide-react";
-import { TaskStatusBadge } from "@/components/task";
+import { CancelButton, TaskStatusBadge } from "@/components/task";
 import { CopyButton } from "@/components/ui";
 
 type Operation = {
@@ -117,6 +126,13 @@ export function Operations() {
         -30,
       );
     });
+  }
+  const cancellable = (op: Operation) =>
+    !finished(op) && (op.task ? canCancel(op.task) : canAbort(op.id));
+  async function cancelOp(op: Operation) {
+    if (!op.task) return abortOperation(op.id);
+    await cancelTask(op.task.id);
+    upsert({ ...op, task: await api<Task>(`/tasks/${op.task.id}`) });
   }
   function show(id: number) {
     setSelected(id);
@@ -339,6 +355,9 @@ export function Operations() {
                         </span>
                       )}
                     </button>
+                    {cancellable(op) && (
+                      <CancelButton compact onCancel={() => cancelOp(op)} />
+                    )}
                     <button
                       type="button"
                       className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -449,20 +468,30 @@ export function Operations() {
               </div>
             )}
             {running && (
-              <div
-                role="progressbar"
-                aria-label={translate("Đang xử lý")}
-                aria-valuenow={current.progress}
-                className="h-1.5 overflow-hidden rounded-full bg-muted"
-              >
+              <div className="flex items-center gap-3">
                 <div
-                  className={`h-full rounded-full bg-primary ${current.progress === undefined ? "w-1/3 animate-pulse" : ""}`}
-                  style={
-                    current.progress === undefined
-                      ? undefined
-                      : { width: `${current.progress}%` }
-                  }
-                />
+                  role="progressbar"
+                  aria-label={translate("Đang xử lý")}
+                  aria-valuenow={current.progress}
+                  className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+                >
+                  <div
+                    className={`h-full rounded-full bg-primary ${current.progress === undefined ? "w-1/3 animate-pulse" : ""}`}
+                    style={
+                      current.progress === undefined
+                        ? undefined
+                        : { width: `${current.progress}%` }
+                    }
+                  />
+                </div>
+                {current.progress !== undefined && (
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {current.progress}%
+                  </span>
+                )}
+                {cancellable(current) && (
+                  <CancelButton onCancel={() => cancelOp(current)} />
+                )}
               </div>
             )}
             <div className="overflow-hidden rounded-lg border bg-neutral-950 text-neutral-200">
