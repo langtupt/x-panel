@@ -401,17 +401,23 @@ func Build(ctx context.Context, d distro.Distro, p agentproto.SiteAppParams) (an
 	}
 	// A transient service bounds the whole process tree and kills it on timeout.
 	args := []string{"--quiet", "--wait", "--pipe", "--collect", "--uid=" + p.Username, "--gid=" + p.Username, "--slice=xpanel-" + p.Username + ".slice", "--working-directory=" + r, "--property=RuntimeMaxSec=1800", "--property=NoNewPrivileges=yes", "--property=ProtectSystem=strict", "--property=ProtectHome=read-only", "--property=ReadWritePaths=" + u.HomeDir, "--property=PrivateTmp=yes", "--property=ProtectProc=invisible"}
-	env := map[string]string{"HOME": u.HomeDir, "PATH": path, "PORT": strconv.Itoa(p.Site.Port), "HOST": "127.0.0.1", "NODE_ENV": "production", "XDG_CACHE_HOME": filepath.Join(u.HomeDir, "tmp/.cache"), "npm_config_cache": filepath.Join(u.HomeDir, "tmp/.npm"), "GOPATH": filepath.Join(u.HomeDir, "tmp/go"), "GOCACHE": filepath.Join(u.HomeDir, "tmp/go-build"), "COMPOSER_HOME": filepath.Join(u.HomeDir, "tmp/composer"), "COMPOSER_CACHE_DIR": filepath.Join(u.HomeDir, "tmp/composer-cache")}
-	for k, v := range p.Site.Env {
-		env[k] = v
+	// The customer's variables go to the unit through a root-only
+	// EnvironmentFile, never into systemd-run's own (root) environment:
+	// LD_PRELOAD or LD_LIBRARY_PATH there would run customer code as root.
+	envFile, err := os.CreateTemp("/run", "xpanel-build-*.env")
+	if err != nil {
+		return nil, err
 	}
-	var buildEnv []string
-	for k, v := range env {
-		args = append(args, "--setenv="+k)
-		buildEnv = append(buildEnv, k+"="+v)
+	defer os.Remove(envFile.Name())
+	_, werr := envFile.WriteString(environment(p.Site, u.HomeDir, path))
+	if cerr := envFile.Close(); werr == nil {
+		werr = cerr
 	}
-	args = append(args, "/bin/sh", "-c", script)
-	out, err := run.With(ctx, run.Opts{Timeout: 30 * time.Minute, Env: buildEnv}, "systemd-run", args...)
+	if werr != nil {
+		return nil, werr
+	}
+	args = append(args, "--property=EnvironmentFile="+envFile.Name(), "/bin/sh", "-c", script)
+	out, err := run.With(ctx, run.Opts{Timeout: 30 * time.Minute}, "systemd-run", args...)
 	if err != nil {
 		return nil, fmt.Errorf("%w\n%s", err, out)
 	}

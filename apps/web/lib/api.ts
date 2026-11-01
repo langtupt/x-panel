@@ -375,6 +375,8 @@ export interface AppInfo {
   source?: string;
   version_labels?: Record<string, string>;
   installed_labels?: Record<string, string>;
+  /** installed line → newer patch release available for it */
+  updates?: Record<string, string>;
   error?: string;
 }
 

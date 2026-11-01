@@ -227,6 +227,17 @@ func (s *Service) CreateMailDomain(ctx context.Context, actor *users.User, in Ma
 	} else if taken {
 		return nil, apperr.Conflict("tên miền %s thuộc website của tài khoản khác", domain)
 	}
+	// Postfix delivers mail for a hosted domain locally, including mail that
+	// other accounts' websites send to it: an account claiming gmail.com (or
+	// another customer's domain) would receive all of that. Only the
+	// administrator may host mail for a domain no website of the account uses.
+	if actor.Role != users.RoleAdmin {
+		if owned, err := r.SiteOwnedBy(ctx, domain, owner.ID); err != nil {
+			return nil, err
+		} else if !owned {
+			return nil, apperr.Invalid("tên miền %s chưa là website (hoặc tên miền phụ của website) của tài khoản; tạo website trước", domain)
+		}
+	}
 	d := &mailrepo.Domain{UserID: owner.ID, Username: owner.Username, Domain: domain}
 	if err := r.CreateDomain(ctx, d); errors.Is(err, mailrepo.ErrTaken) {
 		return nil, apperr.Conflict("tên miền %s đã có dịch vụ mail", domain)

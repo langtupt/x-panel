@@ -339,6 +339,10 @@ type AppInfo struct {
 	Source          string            `json:"source,omitempty"`
 	VersionLabels   map[string]string `json:"version_labels,omitempty"`
 	InstalledLabels map[string]string `json:"installed_labels,omitempty"`
+	// Updates maps an installed version line to the newer patch release that
+	// installing it again would bring ("8.3" → "8.3.27-1+0~…"). Lines that are
+	// already on the newest patch are absent.
+	Updates map[string]string `json:"updates,omitempty"`
 }
 
 type AppListParams struct {

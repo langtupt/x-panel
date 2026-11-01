@@ -195,23 +195,75 @@ func (c *Catalog) List(ctx context.Context) []agentproto.AppInfo {
 			info.CheckedAt = checked.at.UTC().Format(time.RFC3339)
 		}
 		info.Source = appSource(a.info.ID)
-		if a.info.ID == "php" {
-			info.VersionLabels = map[string]string{}
-			info.InstalledLabels = map[string]string{}
-			for _, v := range info.Available {
-				if candidate, err := aptCandidate(ctx, "php"+v+"-fpm"); err == nil {
-					info.VersionLabels[v] = v + " → " + candidate
-				}
-			}
-			for _, v := range info.Installed {
-				if installed := aptInstalled("php" + v + "-fpm"); len(installed) > 0 {
-					info.InstalledLabels[v] = installed[0]
-				}
-			}
+		switch a.info.ID {
+		case "php":
+			info.VersionLabels, info.InstalledLabels, info.Updates = phpLabels(ctx, info.Available, info.Installed)
+		case "nodejs":
+			info.VersionLabels, info.InstalledLabels, info.Updates = nodeLabels(info.Available, info.Installed)
 		}
 		out = append(out, info)
 	}
 	return out
+}
+
+// phpLabels pairs each PHP line with its APT candidate and installed package
+// version; a line is updatable when the candidate is newer than what is installed.
+func phpLabels(ctx context.Context, available, installed []string) (labels, installedLabels, updates map[string]string) {
+	labels, installedLabels, updates = map[string]string{}, map[string]string{}, map[string]string{}
+	candidates := map[string]string{}
+	for _, v := range slices.Concat(available, installed) {
+		if _, done := candidates[v]; done {
+			continue
+		}
+		candidate, _ := aptCandidate(ctx, "php"+v+"-fpm")
+		candidates[v] = candidate
+		if candidate != "" && slices.Contains(available, v) {
+			labels[v] = v + " → " + candidate
+		}
+	}
+	for _, v := range installed {
+		cur := aptInstalled("php" + v + "-fpm")
+		if len(cur) == 0 {
+			continue
+		}
+		installedLabels[v] = cur[0]
+		if c := candidates[v]; c != "" && slices.Contains(available, v) && debNewer(c, cur[0]) {
+			updates[v] = c
+		}
+	}
+	return labels, installedLabels, updates
+}
+
+// nodeLabels pairs each Node.js major line with its newest release and the
+// release installed in /opt/xpanel/node/<major>.
+func nodeLabels(available, installed []string) (labels, installedLabels, updates map[string]string) {
+	labels, installedLabels, updates = map[string]string{}, map[string]string{}, map[string]string{}
+	latest := nodeLatestVersions()
+	for _, m := range available {
+		if v := latest[m]; v != "" {
+			labels[m] = m + " → " + v
+		}
+	}
+	for _, m := range installed {
+		cur := nodeInstalledVersion(m)
+		if cur == "" {
+			continue
+		}
+		installedLabels[m] = cur
+		if v := latest[m]; v != "" && slices.Contains(available, m) && compareVersions(v, cur) > 0 {
+			updates[m] = v
+		}
+	}
+	return labels, installedLabels, updates
+}
+
+// debNewer reports whether Debian version a sorts after b.
+func debNewer(a, b string) bool {
+	if a == b {
+		return false
+	}
+	_, err := run.Output(context.Background(), "dpkg", "--compare-versions", a, "gt", b)
+	return err == nil
 }
 
 func (c *Catalog) availableCached(ctx context.Context, a app) ([]string, string) {

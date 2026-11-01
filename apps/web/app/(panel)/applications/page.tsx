@@ -58,8 +58,8 @@ function AppCard({
     installed = app.installed ?? [];
   const [version, setVersion] = useState(available[0] ?? "");
   const selected = available.includes(version) ? version : (available[0] ?? "");
-  const update =
-    installed.includes(selected) && ["php", "nodejs"].includes(app.id);
+  // Only offer the patch update when the agent found a newer patch release.
+  const update = installed.includes(selected) && !!app.updates?.[selected];
   const Icon =
     app.category === "database"
       ? Database
@@ -170,9 +170,15 @@ function AppCard({
               {update ? <RefreshCw /> : <Download />}
               {translate(
                 update
-                  ? translate("Cập nhật bản vá")
+                  ? translate("Cập nhật bản vá {0}", [
+                      displayVersion(app.updates?.[selected] ?? ""),
+                    ])
                   : installed.includes(selected)
-                    ? translate("Đã cài phiên bản này")
+                    ? translate(
+                        app.updates
+                          ? "Đã là bản vá mới nhất"
+                          : "Đã cài phiên bản này",
+                      )
                     : translate("Cài đặt ứng dụng"),
               )}
             </Button>

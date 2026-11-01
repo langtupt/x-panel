@@ -118,6 +118,8 @@
   "Cấu hình nginx/PHP và chứng chỉ SSL của website sẽ bị gỡ. Mã nguồn trong": "The website's nginx/PHP configuration and SSL certificate will be removed. Source code in",
   "Cập nhật": "Update",
   "Cập nhật bản vá": "Patch update",
+  "Cập nhật bản vá {0}": "Patch update {0}",
+  "Đã là bản vá mới nhất": "Latest patch installed",
   "Cập nhật chứng chỉ SSL": "Update SSL certificate",
   "Cập nhật {0} · mỗi 5 giây": "Update {0} · every 5 seconds",
   "Cổng": "Gate",

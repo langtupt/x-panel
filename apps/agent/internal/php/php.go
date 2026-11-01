@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -59,7 +60,16 @@ func Install(ctx context.Context, d distro.Distro, version string) (string, erro
 		err = step(apt, "apt-get", "update", "-q")
 	}
 	if err == nil {
-		err = step(apt, "apt-get", append([]string{"install", "-y", "-q"}, d.PHPPackages(version)...)...)
+		// Re-running install on an installed line is the patch update: list every
+		// package of the line already present (extensions added later included)
+		// so all of them move to the new patch together with php-common.
+		pkgs := d.PHPPackages(version)
+		for _, p := range installedPackages(ctx, version) {
+			if !slices.Contains(pkgs, p) {
+				pkgs = append(pkgs, p)
+			}
+		}
+		err = step(apt, "apt-get", append([]string{"install", "-y", "-q"}, pkgs...)...)
 	}
 	if err == nil {
 		err = WritePerformanceDefaults(version)
@@ -75,6 +85,21 @@ func Install(ctx context.Context, d distro.Distro, version string) (string, erro
 		err = step(run.Opts{Timeout: time.Minute}, "systemctl", "reload-or-restart", d.PHPFPMService(version))
 	}
 	return log.String(), err
+}
+
+// installedPackages lists the installed Debian packages of one PHP line
+// ("php8.3-fpm", "php8.3-pgsql", …).
+func installedPackages(ctx context.Context, version string) []string {
+	// No match exits non-zero with a message that has no tab; parse regardless.
+	out, _ := run.Output(ctx, "dpkg-query", "-W", "-f=${db:Status-Abbrev}\t${Package}\n", "php"+version+"-*")
+	var pkgs []string
+	for _, line := range strings.Split(out, "\n") {
+		f := strings.Split(line, "\t")
+		if len(f) == 2 && strings.HasPrefix(f[0], "ii") && strings.HasPrefix(f[1], "php"+version+"-") {
+			pkgs = append(pkgs, f[1])
+		}
+	}
+	return pkgs
 }
 
 type stepFn func(o run.Opts, name string, args ...string) error
