@@ -395,6 +395,15 @@ export interface CronJob {
   created_at: string;
 }
 
+export interface CronStatus {
+  running: boolean;
+  last_run: string;
+  finished: string;
+  result: "success" | "failed" | "";
+  exit_code: number;
+  log: string;
+}
+
 export interface AuditRow {
   id: number;
   actor: string | null;

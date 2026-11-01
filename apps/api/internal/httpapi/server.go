@@ -133,6 +133,8 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/cron", s.handleCreateCron)
 			r.Put("/cron/{id}", s.handleUpdateCron)
 			r.Delete("/cron/{id}", s.handleDeleteCron)
+			r.Get("/cron/{id}/status", s.handleCronStatus)
+			r.Post("/cron/{id}/run", s.handleRunCron)
 			r.Get("/audit", s.handleListAudit)
 			r.Get("/ftp", s.handleListFTP)
 			r.Post("/ftp", s.handleCreateFTP)

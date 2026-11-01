@@ -309,7 +309,27 @@ type SystemInfo struct {
 	QuotaMount      string     `json:"quota_mount"`
 }
 
-const ActionCronSync = "cron.sync" // CronSyncParams
+const (
+	ActionCronSync   = "cron.sync"   // CronSyncParams
+	ActionCronStatus = "cron.status" // CronJobRef -> CronStatus
+	ActionCronRun    = "cron.run"    // CronJobRef
+)
+
+// CronJobRef names job Index of the account's enabled Jobs (as last synced).
+type CronJobRef struct {
+	CronSyncParams
+	Index int `json:"index"`
+}
+
+// CronStatus is the last (or current) run of one job.
+type CronStatus struct {
+	Running  bool   `json:"running"`
+	LastRun  string `json:"last_run"` // RFC 3339, "" = never ran
+	Finished string `json:"finished"` // RFC 3339
+	Result   string `json:"result"`   // success | failed | ""
+	ExitCode int    `json:"exit_code"`
+	Log      string `json:"log"` // end of the job's output
+}
 
 // CronSyncParams is the complete crontab of a Linux user (empty = remove it).
 type CronSyncParams struct {

@@ -293,6 +293,9 @@ export default function FilesPage() {
   const owners = useHostingAccounts(manager);
   const [ownerId, setOwnerId] = useState<number | null>(null);
   const [cwd, setCwd] = useState("/www");
+  // Uploads finish later: reload the folder shown then, not the one they started in.
+  const cwdRef = useRef(cwd);
+  cwdRef.current = cwd;
   const [entries, setEntries] = useState<FSEntry[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -449,7 +452,7 @@ export default function FilesPage() {
           if (archiveRe.test(f.name))
             setUploaded((u) => [...u.filter((n) => n !== f.name), f.name]);
         }
-        load(cwd);
+        if (cwdRef.current === joinPath(target, "..")) load(cwdRef.current);
       };
       xhr.send(f);
     }

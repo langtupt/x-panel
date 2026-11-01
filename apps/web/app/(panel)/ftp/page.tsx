@@ -2,7 +2,13 @@
 import { t as translate } from "@/lib/i18n";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { api, errMsg, genPassword, type FtpAccount } from "@/lib/api";
+import {
+  api,
+  errMsg,
+  genPassword,
+  type FtpAccount,
+  type Site,
+} from "@/lib/api";
 import { ErrorBox, Modal } from "@/components/ui";
 import { OwnerSelect, useHostingAccounts } from "@/components/owner";
 import { useSession } from "../session";
@@ -22,12 +28,27 @@ function CreateForm({
   const [name, setName] = useState("");
   const [dir, setDir] = useState("www");
   const [password, setPassword] = useState(genPassword);
+  const [sites, setSites] = useState<Site[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (manager && ownerId === null && owners.length) setOwnerId(owners[0].id);
   }, [manager, owners, ownerId]);
+  useEffect(() => {
+    api<Site[]>("/sites")
+      .then(setSites)
+      .catch(() => setSites([]));
+  }, []);
+  // Folders to pick from: each website of the owner, all websites, the home.
+  const owner = manager ? ownerId : me.id;
+  const dirs: { value: string; label: string }[] = [
+    ...sites
+      .filter((x) => x.user_id === owner)
+      .map((x) => ({ value: `www/${x.domain}`, label: x.domain })),
+    { value: "www", label: translate("Tất cả website (www)") },
+    { value: "", label: translate("Toàn bộ thư mục home") },
+  ];
   const prefix =
     (manager ? owners.find((o) => o.id === ownerId)?.username : me.username) ??
     "user";
@@ -87,12 +108,34 @@ function CreateForm({
             <input
               className="input rounded-l-none border-0 border-l"
               placeholder="www/example.com"
+              list="ftp-dir-suggestions"
               value={dir}
               onChange={(e) => setDir(e.target.value)}
             />
           </div>
+          <datalist id="ftp-dir-suggestions">
+            {dirs.map((x) => (
+              <option key={x.value} value={x.value}>
+                {x.label}
+              </option>
+            ))}
+          </datalist>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {dirs.map((x) => (
+              <button
+                type="button"
+                key={x.value}
+                onClick={() => setDir(x.value)}
+                className={`rounded-md border px-2 py-0.5 text-xs ${dir.replace(/^\/+|\/+$/g, "") === x.value ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-300"}`}
+              >
+                {x.label}
+              </button>
+            ))}
+          </div>
           <p className="mt-1 text-xs text-slate-400">
-            {translate("Tài khoản FTP chỉ thấy thư mục này.")}
+            {translate(
+              "Tài khoản FTP chỉ thấy thư mục này. Thư mục chưa có sẽ được tạo.",
+            )}
           </p>
         </div>
         <div>

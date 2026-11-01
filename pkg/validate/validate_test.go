@@ -60,12 +60,12 @@ func TestFTPLogin(t *testing.T) {
 }
 
 func TestCron(t *testing.T) {
-	for _, ok := range []string{"* * * * *", "*/5 * * * *", "0 3 * * 1-5", "15,45 0-6/2 1 * *", "@daily"} {
+	for _, ok := range []string{"* * * * *", "*/5 * * * *", "0 3 * * 1-5", "15,45 0-6/2 1 * *", "@daily", "59 23 31 12 7", "5/15 * * * 0"} {
 		if err := CronSchedule(ok); err != nil {
 			t.Errorf("%q: %v", ok, err)
 		}
 	}
-	for _, bad := range []string{"", "* * * *", "@reboot", "* * * * * *", "a * * * *", "* * * * mon;id"} {
+	for _, bad := range []string{"", "* * * *", "@reboot", "* * * * * *", "a * * * *", "* * * * mon;id", "99 * * * *", "* 24 * * *", "* * 0 * *", "* * * 13 *", "* * * * 8", "*/0 * * * *", "30-10 * * * *"} {
 		if CronSchedule(bad) == nil {
 			t.Errorf("%q should be invalid", bad)
 		}

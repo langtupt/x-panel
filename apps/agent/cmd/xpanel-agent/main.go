@@ -305,6 +305,12 @@ func main() {
 	srv.Register(agentproto.ActionCronSync, server.Typed(func(ctx context.Context, p agentproto.CronSyncParams) (any, error) {
 		return nil, cron.Sync(ctx, p)
 	}))
+	srv.Register(agentproto.ActionCronStatus, server.Typed(func(ctx context.Context, p agentproto.CronJobRef) (any, error) {
+		return cron.Status(ctx, p)
+	}))
+	srv.Register(agentproto.ActionCronRun, server.Typed(func(ctx context.Context, p agentproto.CronJobRef) (any, error) {
+		return nil, cron.Run(ctx, p)
+	}))
 	srv.Register(agentproto.ActionSiteDetect, server.Typed(siteapp.Detect))
 	srv.Register(agentproto.ActionSiteLogs, server.Typed(siteapp.Logs))
 	srv.Register(agentproto.ActionSiteRestart, server.Typed(siteapp.Restart))

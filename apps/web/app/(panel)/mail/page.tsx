@@ -21,7 +21,7 @@ import {
   Settings2,
   Trash2,
 } from "lucide-react";
-import { api, errMsg, genPassword } from "@/lib/api";
+import { api, errMsg, genPassword, type Site } from "@/lib/api";
 import { ErrorBox, Modal } from "@/components/ui";
 import { OwnerSelect, useHostingAccounts } from "@/components/owner";
 import { useSession } from "../session";
@@ -205,23 +205,109 @@ function Credentials({
   );
 }
 
+// AddressField is "<local>@<domain>"; the domain is a picker when the
+// account has several mail domains, so it never has to be typed.
+function AddressField({
+  local,
+  onLocal,
+  placeholder,
+  domains,
+  domainId,
+  onDomain,
+}: {
+  local: string;
+  onLocal: (v: string) => void;
+  placeholder: string;
+  domains: MailDomain[];
+  domainId: number;
+  onDomain: (id: number) => void;
+}) {
+  const current = domains.find((x) => x.id === domainId);
+  return (
+    <div className="flex items-center overflow-hidden rounded-lg border focus-within:ring-2 focus-within:ring-ring/40">
+      <input
+        className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none"
+        autoFocus
+        required
+        placeholder={placeholder}
+        value={local}
+        onChange={(e) => {
+          const v = e.target.value.toLowerCase().replace(/\s/g, "");
+          // "info@other.vn" pasted whole: pick that domain if it is one of ours.
+          const at = v.indexOf("@");
+          if (at >= 0) {
+            const dom = domains.find((x) => x.domain === v.slice(at + 1));
+            if (dom) onDomain(dom.id);
+            onLocal(v.slice(0, at));
+            return;
+          }
+          onLocal(v);
+        }}
+      />
+      {domains.length > 1 ? (
+        <select
+          className="max-w-[60%] border-l bg-muted px-2 py-2 text-sm text-muted-foreground outline-none"
+          value={domainId}
+          onChange={(e) => onDomain(Number(e.target.value))}
+          aria-label={translate("Tên miền")}
+        >
+          {domains.map((x) => (
+            <option key={x.id} value={x.id}>
+              @{x.domain}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="border-l bg-muted px-3 py-2 text-sm text-muted-foreground">
+          @{current?.domain}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function AddDomain({
   manager,
+  existing,
   onDone,
   onClose,
 }: {
   manager: boolean;
+  existing: MailDomain[];
   onDone: (id: number) => void;
   onClose: () => void;
 }) {
+  const me = useSession();
   const owners = useHostingAccounts(manager);
   const [ownerId, setOwnerId] = useState<number | null>(null);
   const [domain, setDomain] = useState("");
+  const [sites, setSites] = useState<Site[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (manager && ownerId === null && owners.length) setOwnerId(owners[0].id);
   }, [manager, owners, ownerId]);
+  useEffect(() => {
+    api<Site[]>("/sites")
+      .then(setSites)
+      .catch(() => setSites([]));
+  }, []);
+  // The owner's website domains and aliases that have no mail yet.
+  const owner = manager ? ownerId : me.id;
+  const taken = new Set(existing.map((x) => x.domain));
+  const suggestions = Array.from(
+    new Set(
+      sites
+        .filter((x) => x.user_id === owner)
+        .flatMap((x) => [x.domain, ...(x.aliases ?? [])])
+        .map((x) => x.replace(/^www\./, ""))
+        .filter((x) => x && !x.startsWith("*") && !taken.has(x)),
+    ),
+  ).sort();
+  useEffect(() => {
+    setDomain((cur) => (cur && suggestions.includes(cur) ? cur : (suggestions[0] ?? cur)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestions.join(",")]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -257,10 +343,33 @@ function AddDomain({
             className="input"
             autoFocus
             required
+            list="mail-domain-suggestions"
             placeholder="example.com"
             value={domain}
             onChange={(e) => setDomain(e.target.value.toLowerCase().trim())}
           />
+          <datalist id="mail-domain-suggestions">
+            {suggestions.map((x) => (
+              <option key={x} value={x} />
+            ))}
+          </datalist>
+          {suggestions.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className="text-xs text-muted-foreground">
+                {translate("Tên miền website:")}
+              </span>
+              {suggestions.map((x) => (
+                <button
+                  type="button"
+                  key={x}
+                  onClick={() => setDomain(x)}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs ${domain === x ? "border-foreground bg-foreground text-background" : "hover:bg-muted"}`}
+                >
+                  {x}
+                </button>
+              ))}
+            </div>
+          )}
           <p className="mt-1 text-xs text-muted-foreground">
             {translate(
               'Sau khi thêm, tạo các bản ghi DNS ở tab "DNS" để nhận và gửi thư.',
@@ -285,16 +394,20 @@ function AddDomain({
 
 function MailboxDialog({
   d,
+  domains,
   box,
   onClose,
   onSaved,
 }: {
   d: Detail;
+  domains: MailDomain[];
   box: Mailbox | null;
   onClose: () => void;
   onSaved: (address: string, password: string | null) => void;
 }) {
   const [local, setLocal] = useState("");
+  const [domainId, setDomainId] = useState(d.id);
+  const target = domains.find((x) => x.id === domainId) ?? d;
   const [password, setPassword] = useState(() => genPassword(16));
   const [changePw, setChangePw] = useState(!box);
   const [quota, setQuota] = useState(box?.quota_mb ?? 1024);
@@ -313,11 +426,11 @@ function MailboxDialog({
         });
         onSaved(box.address, changePw ? password : null);
       } else {
-        await api(`/mail/domains/${d.id}/mailboxes`, {
+        await api(`/mail/domains/${target.id}/mailboxes`, {
           method: "POST",
           body: { local_part: local, password, quota_mb: quota },
         });
-        onSaved(`${local}@${d.domain}`, password);
+        onSaved(`${local}@${target.domain}`, password);
       }
     } catch (err) {
       setError(errMsg(err));
@@ -335,21 +448,14 @@ function MailboxDialog({
         {!box && (
           <div>
             <label className="label">{translate("Địa chỉ email")}</label>
-            <div className="flex items-center overflow-hidden rounded-lg border focus-within:ring-2 focus-within:ring-ring/40">
-              <input
-                className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none"
-                autoFocus
-                required
-                placeholder="info"
-                value={local}
-                onChange={(e) =>
-                  setLocal(e.target.value.toLowerCase().replace(/\s/g, ""))
-                }
-              />
-              <span className="border-l bg-muted px-3 py-2 text-sm text-muted-foreground">
-                @{d.domain}
-              </span>
-            </div>
+            <AddressField
+              local={local}
+              onLocal={setLocal}
+              placeholder="info"
+              domains={domains}
+              domainId={domainId}
+              onDomain={setDomainId}
+            />
           </div>
         )}
         <div>
@@ -407,16 +513,19 @@ function MailboxDialog({
 
 function AliasDialog({
   d,
+  domains,
   alias,
   onClose,
   onSaved,
 }: {
   d: Detail;
+  domains: MailDomain[];
   alias: Alias | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [local, setLocal] = useState("");
+  const [domainId, setDomainId] = useState(d.id);
   const [dest, setDest] = useState(alias?.destinations.join("\n") ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -436,7 +545,7 @@ function AliasDialog({
           body: { destinations: list },
         });
       else
-        await api(`/mail/domains/${d.id}/aliases`, {
+        await api(`/mail/domains/${domainId}/aliases`, {
           method: "POST",
           body: { local_part: local, destinations: list },
         });
@@ -459,21 +568,14 @@ function AliasDialog({
         {!alias && (
           <div>
             <label className="label">{translate("Thư gửi tới")}</label>
-            <div className="flex items-center overflow-hidden rounded-lg border focus-within:ring-2 focus-within:ring-ring/40">
-              <input
-                className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none"
-                autoFocus
-                required
-                placeholder="sales"
-                value={local}
-                onChange={(e) =>
-                  setLocal(e.target.value.toLowerCase().replace(/\s/g, ""))
-                }
-              />
-              <span className="border-l bg-muted px-3 py-2 text-sm text-muted-foreground">
-                @{d.domain}
-              </span>
-            </div>
+            <AddressField
+              local={local}
+              onLocal={setLocal}
+              placeholder="sales"
+              domains={domains}
+              domainId={domainId}
+              onDomain={setDomainId}
+            />
           </div>
         )}
         <div>
@@ -521,12 +623,14 @@ function AliasDialog({
 
 function DomainView({
   id,
+  domains,
   status,
   manager,
   onChanged,
   onDeleted,
 }: {
   id: number;
+  domains: MailDomain[];
   status: Status | null;
   manager: boolean;
   onChanged: () => void;
@@ -570,6 +674,11 @@ function DomainView({
   }
 
   const host = status?.hostname || `mail.${d?.domain ?? ""}`;
+  // Mail of one account only: quotas and ownership are per account.
+  const ownDomains = useMemo(() => {
+    const l = domains.filter((x) => d && x.user_id === d.user_id);
+    return d && !l.some((x) => x.id === d.id) ? [d, ...l] : l;
+  }, [domains, d]);
   const boxes = useMemo(
     () =>
       (d?.mailbox_list ?? []).filter((m) =>
@@ -984,6 +1093,7 @@ function DomainView({
       {boxDialog && (
         <MailboxDialog
           d={d}
+          domains={ownDomains}
           box={boxDialog.box}
           onClose={() => setBoxDialog(null)}
           onSaved={(address, password) => {
@@ -997,6 +1107,7 @@ function DomainView({
       {aliasDialog && (
         <AliasDialog
           d={d}
+          domains={ownDomains}
           alias={aliasDialog.alias}
           onClose={() => setAliasDialog(null)}
           onSaved={() => {
@@ -1179,6 +1290,7 @@ export default function MailPage() {
             <DomainView
               key={current}
               id={current}
+              domains={list ?? []}
               status={status}
               manager={manager}
               onChanged={load}
@@ -1194,6 +1306,7 @@ export default function MailPage() {
       {adding && (
         <AddDomain
           manager={manager}
+          existing={list ?? []}
           onClose={() => setAdding(false)}
           onDone={(id) => {
             setAdding(false);

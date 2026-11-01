@@ -57,6 +57,35 @@ func (s *Server) handleUpdateCron(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, j)
 }
 
+// GET /api/cron/{id}/status
+func (s *Server) handleCronStatus(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	st, err := s.accounts.CronStatus(r.Context(), currentUser(r), id)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, st)
+}
+
+// POST /api/cron/{id}/run
+func (s *Server) handleRunCron(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	j, err := s.accounts.RunCron(r.Context(), currentUser(r), id)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.auditCron(r, "cron.run", j)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // DELETE /api/cron/{id}
 func (s *Server) handleDeleteCron(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
