@@ -336,9 +336,9 @@ export function ServerDashboard() {
           <section className="card relative overflow-hidden p-6 sm:p-7">
             <div className="relative flex flex-wrap items-start justify-between gap-6">
               <div className="flex min-w-0 items-center gap-4">
-                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border bg-muted/50">
+                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-foreground bg-foreground shadow-sm">
                   <Server
-                    className="size-6 text-foreground"
+                    className="size-6 text-background"
                     strokeWidth={1.5}
                   />
                 </div>
@@ -354,14 +354,11 @@ export function ServerDashboard() {
                   </p>
                 </div>
               </div>
-              <span
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] ${error ? "border-amber-200 bg-amber-50 text-amber-800" : "bg-muted/50 text-foreground"}`}
-              >
-                <span
-                  className={`size-1.5 rounded-full ${error ? "bg-amber-500" : "bg-emerald-500"}`}
-                />
-                {translate(error ? "Dữ liệu chưa cập nhật" : "Đã kết nối")}
-              </span>
+              {error && (
+                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800">
+                  {translate("Dữ liệu chưa cập nhật")}
+                </span>
+              )}
             </div>
             <div className="relative mt-6 grid gap-5 border-t pt-5 sm:grid-cols-3">
               {[
